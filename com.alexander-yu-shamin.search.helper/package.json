@@ -1,0 +1,26 @@
+{
+  "name": "com.alexander-yu-shamin.search.helper",
+  "version": "0.0.0",
+  "__displayName": "Package template",
+  "__description": "This is an package template.",
+  "__unity": "2019.1",
+  "__unityRelease": "0b5",
+  "__documentationUrl": "https://example.com/",
+  "__changelogUrl": "https://example.com/changelog.html",
+  "__licensesUrl": "https://example.com/licensing.html",
+  "__dependencies": {
+    "com.company-name.some-package": "1.0.0",
+    "com.company-name.other-package": "2.0.0"
+ },
+ "__keywords": [
+    "keyword1",
+    "keyword2",
+    "keyword3"
+  ],
+  "__author": {
+    "name": "Unity",
+    "email": "unity@example.com",
+    "url": "https://www.unity3d.com"
+  }
+}
+      
