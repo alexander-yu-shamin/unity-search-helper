@@ -1,8 +1,8 @@
 using System.Text;
 
-namespace Search.Helper.Runtime.Helpers
+namespace Search.Helper.Runtime.Extensions
 {
-    public static class StringHelper
+    public static class StringExtensions
     {
         public static string AddSpacesBeforeUppercase(this string text)
         {

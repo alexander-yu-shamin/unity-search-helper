@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using JetBrains.Annotations;
+using Search.Helper.Runtime.Extensions;
 using Search.Helper.Runtime.Helpers;
 using UnityEditor;
 using UnityEngine;
@@ -52,11 +54,19 @@ namespace Search.Helper.Editor.Tools
         private const string ContextMenuItemFindUsesName = "Assets/Search Helper Tool: Find Uses";
         private const string ContextMenuFindUsedByItemName = "Assets/Search Helper Tool: Find Used By";
 
+        private const string ResourceString = "/Resources/";
+        private const string EditorString = "/Editor/";
+
         private ObjectContext CurrentUsesObject { get; set; }
         private Object SelectedUsesObject { get; set; }
         public string CurrentGuid { get; set; }
+
         public ObjectContext CurrentGuidObject { get; set; }
         public bool? IsGuidObjectFound { get; set; }
+
+        public List<ObjectContext> CurrentUsedByObjects { get; set; }
+        public bool ShouldEditorAssetsBeIgnored { get; set; }
+        public bool ShouldFindDependencies { get; set; } = true;
 
         private Panel CurrentPanel { get; set; } = Panel.Uses;
         private Vector2 ScrollViewPos { get; set; } = Vector2.zero;
@@ -82,7 +92,7 @@ namespace Search.Helper.Editor.Tools
         public static void ShowUsesBy()
         {
             var window = OpenWindow().ChangePanel(Panel.UsedBy);
-            window?.SetCurrentObject(window?.FindDependencies(Selection.activeObject));
+            window?.SetCurrentObjects(window?.FindUsedBy(Selection.activeObject, window.ShouldFindDependencies), Selection.activeObject);
         }
 
         [MenuItem(ContextMenuItemFindUsesName, true)]
@@ -97,6 +107,79 @@ namespace Search.Helper.Editor.Tools
             PanelNames = Enum.GetNames(typeof(Panel)).Select(element => element.AddSpacesBeforeUppercase()).ToArray();
         }
 
+
+        private Dictionary<Object, ObjectContext> Dictionary { get; set; } = new Dictionary<Object, ObjectContext>();
+
+        public IEnumerable<ObjectContext> FindAllAssets()
+        {
+            EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets", 0f);
+
+            var searchFilter = "t:Object";
+            var searchDirs = new[] { "Assets" };
+            var guids = AssetDatabase.FindAssets(searchFilter, searchDirs);
+
+            var objects = guids.Select(guid =>
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                var obj = AssetDatabase.LoadMainAssetAtPath(path);
+
+                return new ObjectContext()
+                {
+                    Guid = guid,
+                    Path = path,
+                    Object = obj,
+                    Dependencies = new Dependencies()
+                };
+            });
+
+            EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets", 100f);
+            EditorUtility.ClearProgressBar();
+
+            return objects;
+        }
+
+        public List<ObjectContext> FindUsedBy(Object obj, bool updatedDependencies = false)
+        {
+            var results = new List<ObjectContext>();
+            var objects = FindAllAssets();
+            var objectContexts = objects.ToList();
+
+            if (!objectContexts.Any())
+            {
+                return results;
+            }
+
+            EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets", 0f);
+            //foreach (var objectContext in objectContexts)
+            for(var i = 0; i <  objectContexts.Count; i++)
+            {
+                var objectContext = objectContexts[i];
+
+                if (obj == objectContext.Object)
+                {
+                    continue;
+                }
+
+                var dependencies = EditorUtility.CollectDependencies(new[] { objectContext.Object });
+                if (dependencies.Any(element => element == obj))
+                {
+                    if (updatedDependencies)
+                    {
+                        objectContext.Dependencies = new Dependencies(ToObjectContexts(dependencies, obj));
+                    }
+                    results.Add(objectContext);
+                }
+
+                if (i % 100 == 0)
+                {
+                    EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets", (float)i / objectContexts.Count);
+                }
+            }
+
+            EditorUtility.ClearProgressBar();
+            return results;
+        }
+
         public Object FindObjectByGuid(string guid)
         {
             if (string.IsNullOrEmpty(guid))
@@ -108,6 +191,25 @@ namespace Search.Helper.Editor.Tools
             return string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<Object>(path);
         }
 
+        public IEnumerable<ObjectContext> ToObjectContexts(Object[] objects, Object mainObject = null)
+        {
+            if (objects == null)
+            {
+                return null;
+            }
+
+            if (mainObject != null)
+            {
+                objects = objects.Where(value => value != mainObject).ToArray();
+            }
+
+            return objects.Select(element => new ObjectContext()
+            {
+                Object = element,
+                Path = AssetDatabase.GetAssetPath(element)
+            });
+        }
+
         public ObjectContext FindDependencies(Object obj)
         {
             if (obj == null)
@@ -115,15 +217,7 @@ namespace Search.Helper.Editor.Tools
                 return null;
             }
 
-            var objectDependencies = EditorUtility.CollectDependencies(new[] { obj })
-                                                  .Where(element => element != obj)
-                                                  .Select(element => new ObjectContext()
-                                                  {
-                                                      Object = element,
-                                                      Path = AssetDatabase.GetAssetPath(element),
-                                                      Dependencies = null
-                                                  });
-
+            var objectDependencies = ToObjectContexts(EditorUtility.CollectDependencies(new[] { obj }), obj);
             var dependencies = new Dependencies(objectDependencies);
             var path = AssetDatabase.GetAssetPath(obj);
             var guid = AssetDatabase.AssetPathToGUID(path);
@@ -146,6 +240,16 @@ namespace Search.Helper.Editor.Tools
                 CurrentUsesObject = objectContext;
                 SelectedUsesObject = objectContext.Object;
             }
+        }
+
+        public void SetCurrentObjects(List<ObjectContext> objectContexts, Object selectedObject)
+        {
+            if (selectedObject == null || objectContexts == null)
+            {
+                return;
+            }
+            SelectedUsesObject = selectedObject;
+            CurrentUsedByObjects = objectContexts;
         }
 
         #region GUI
@@ -208,19 +312,7 @@ namespace Search.Helper.Editor.Tools
 
         private void DrawUsesPanel()
         {
-            DrawSelectedObjectField(() => SelectedUsesObject, selectedObject =>
-            {
-                SelectedUsesObject = selectedObject;
-                if (CurrentUsesObject == null || SelectedUsesObject == null)
-                {
-                    return;
-                }
-
-                if (CurrentUsesObject.Object != SelectedUsesObject)
-                {
-                    CurrentUsesObject = null;
-                }
-            }, selectedObject =>
+            DrawSelectedObjectField(selectedObject =>
             {
                 if (GUILayout.Button("Find Dependencies"))
                 {
@@ -281,6 +373,37 @@ namespace Search.Helper.Editor.Tools
 
         private void DrawUsedByPanel()
         {
+            DrawSelectedObjectField(selectedObject =>
+            {
+                GUIHelper.Button("Find", () =>
+                {
+                    CurrentUsedByObjects = FindUsedBy(selectedObject, ShouldFindDependencies);
+                });
+                GUIHelper.Button("Clean", () =>
+                {
+                    SelectedUsesObject = null;
+                    CurrentUsedByObjects = null;
+                });
+                GUIHelper.Toggle("Ignore Editor folders", ShouldEditorAssetsBeIgnored, value => ShouldEditorAssetsBeIgnored = value);
+                GUIHelper.Toggle("Should Find Dependencies", ShouldFindDependencies, value => ShouldFindDependencies = value);
+                GUILayout.FlexibleSpace();
+            }, selectedObject =>
+            {
+                if (CurrentUsedByObjects == null)
+                {
+                    return;
+                }
+
+                if (CurrentUsedByObjects.Count == 0 && SelectedUsesObject != null)
+                {
+                    GUIHelper.Color(ErrorColor, () => GUILayout.Label("No objects found."));
+                }
+
+                foreach (var objectContext in CurrentUsedByObjects)
+                {
+                    DrawObjectContext(objectContext);
+                }
+            });
         }
 
         private void DrawBoilerplatePanel()
@@ -290,18 +413,25 @@ namespace Search.Helper.Editor.Tools
 
         #endregion
 
-        private void DrawSelectedObjectField(Func<Object> getter, Action<Object> setter,
-            Action<Object> horizontalElements = null, Action<Object> verticalElements = null)
+        private void DrawSelectedObjectField(Action<Object> horizontalElements = null, Action<Object> verticalElements = null)
         {
             GUIHelper.Horizontal(() =>
             {
-                var newValue = EditorGUILayout.ObjectField(getter(), typeof(Object), true);
-                setter?.Invoke(newValue);
+                SelectedUsesObject = EditorGUILayout.ObjectField(SelectedUsesObject, typeof(Object), true);
 
-                GUIHelper.Enabled(getter() != null, () => { horizontalElements?.Invoke(getter()); });
+                if (CurrentUsesObject != null && SelectedUsesObject != null)
+                {
+                    if (CurrentUsesObject.Object != SelectedUsesObject)
+                    {
+                        CurrentUsesObject = null;
+                    }
+                }
+
+                GUIHelper.Enabled(SelectedUsesObject != null,
+                    () => { horizontalElements?.Invoke(SelectedUsesObject); });
             });
 
-            GUIHelper.Vertical(() => { verticalElements?.Invoke(getter()); });
+            GUIHelper.Vertical(() => { verticalElements?.Invoke(SelectedUsesObject); });
         }
 
         private void DrawObjectContext(ObjectContext objectContext, bool? expanded = null)

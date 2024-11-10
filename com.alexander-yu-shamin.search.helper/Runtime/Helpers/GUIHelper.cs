@@ -86,5 +86,10 @@ namespace Search.Helper.Runtime.Helpers
             }
         }
 
+        public static void Toggle(string text, bool value, Action<bool> action)
+        {
+            var result = GUILayout.Toggle(value, text);
+            action?.Invoke(result);
+        }
     }
 }
