@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using JetBrains.Annotations;
+using NUnit.Framework;
 using Search.Helper.Runtime.Extensions;
 using Search.Helper.Runtime.Helpers;
 using UnityEditor;
@@ -12,7 +15,7 @@ using Object = UnityEngine.Object;
 
 namespace Search.Helper.Editor.Tools
 {
-    public class ReferenceTool : EditorWindow
+    public class SearchHelperTool : EditorWindow
     {
         public class ObjectContext
         {
@@ -68,6 +71,8 @@ namespace Search.Helper.Editor.Tools
         public bool ShouldEditorAssetsBeIgnored { get; set; }
         public bool ShouldFindDependencies { get; set; } = true;
 
+        public List<ObjectContext> CurrentUnusedObjects { get; set; }
+
         private Panel CurrentPanel { get; set; } = Panel.Uses;
         private Vector2 ScrollViewPos { get; set; } = Vector2.zero;
 
@@ -76,9 +81,9 @@ namespace Search.Helper.Editor.Tools
         private Color WarningColor => Color.yellow;
 
         [MenuItem(WindowMenuItemName)]
-        public static ReferenceTool OpenWindow()
+        public static SearchHelperTool OpenWindow()
         {
-            return GetWindow<ReferenceTool>(WindowTitle);
+            return GetWindow<SearchHelperTool>(WindowTitle);
         }
 
         [MenuItem(ContextMenuItemFindUsesName)]
@@ -92,7 +97,8 @@ namespace Search.Helper.Editor.Tools
         public static void ShowUsesBy()
         {
             var window = OpenWindow().ChangePanel(Panel.UsedBy);
-            window?.SetCurrentObjects(window?.FindUsedBy(Selection.activeObject, window.ShouldFindDependencies), Selection.activeObject);
+            window?.SetCurrentObjects(window?.FindUsedBy(Selection.activeObject, window.ShouldFindDependencies),
+                Selection.activeObject);
         }
 
         [MenuItem(ContextMenuItemFindUsesName, true)]
@@ -102,20 +108,24 @@ namespace Search.Helper.Editor.Tools
             return Selection.activeObject;
         }
 
-        public ReferenceTool()
+        public SearchHelperTool()
         {
             PanelNames = Enum.GetNames(typeof(Panel)).Select(element => element.AddSpacesBeforeUppercase()).ToArray();
         }
 
+        private Dictionary<Object, ObjectContext> Dictionary { get; set; } = new();
 
-        private Dictionary<Object, ObjectContext> Dictionary { get; set; } = new Dictionary<Object, ObjectContext>();
-
-        public IEnumerable<ObjectContext> FindAllAssets()
+        public IEnumerable<ObjectContext> FindAllAssets(string root = null)
         {
             EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets", 0f);
 
             var searchFilter = "t:Object";
             var searchDirs = new[] { "Assets" };
+            if (!string.IsNullOrEmpty(root))
+            {
+                searchDirs = new[] { root };
+            }
+
             var guids = AssetDatabase.FindAssets(searchFilter, searchDirs);
 
             var objects = guids.Select(guid =>
@@ -150,8 +160,7 @@ namespace Search.Helper.Editor.Tools
             }
 
             EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets", 0f);
-            //foreach (var objectContext in objectContexts)
-            for(var i = 0; i <  objectContexts.Count; i++)
+            for (var i = 0; i < objectContexts.Count; i++)
             {
                 var objectContext = objectContexts[i];
 
@@ -167,14 +176,66 @@ namespace Search.Helper.Editor.Tools
                     {
                         objectContext.Dependencies = new Dependencies(ToObjectContexts(dependencies, obj));
                     }
+
                     results.Add(objectContext);
                 }
 
                 if (i % 100 == 0)
                 {
-                    EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets", (float)i / objectContexts.Count);
+                    EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets",
+                        (float)i / objectContexts.Count);
                 }
             }
+
+            EditorUtility.ClearProgressBar();
+            return results;
+        }
+
+        public List<ObjectContext> FindUnused()
+        {
+            var results = new List<ObjectContext>();
+            var objectContexts = FindAllAssets().ToList();
+
+            if (!objectContexts.Any())
+            {
+                return results;
+            }
+
+            var dict = new Dictionary<Object, List<ObjectContext>>();
+            foreach (var objectContext in objectContexts)
+            {
+                if (dict.ContainsKey(objectContext.Object))
+                {
+                    Debug.Log("Error!");
+                    continue;
+                }
+
+                dict[objectContext.Object] = new List<ObjectContext>(){objectContext};
+            }
+
+            EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets", 0f);
+            for (var i = 0; i < objectContexts.Count; i++)
+            {
+                var objectContext = objectContexts[i];
+
+
+                var dependencies = EditorUtility.CollectDependencies(new[] { objectContext.Object });
+                foreach (var dependency in dependencies)
+                {
+                    if (dict.ContainsKey(dependency))
+                    {
+                        dict[dependency].Add(objectContext);
+                    }
+                }
+
+                if (i % 100 == 0)
+                {
+                    EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets",
+                        (float)i / objectContexts.Count);
+                }
+            }
+
+            results = dict.Where(kv => kv.Value.Count == 1).Select(kv => kv.Value[0]).ToList();
 
             EditorUtility.ClearProgressBar();
             return results;
@@ -233,6 +294,102 @@ namespace Search.Helper.Editor.Tools
             return objectContext;
         }
 
+        public Dictionary<string, List<ObjectContext>> HashDictionary { get; set; }
+
+        public Dictionary<string, List<ObjectContext>> FindDuplicates(string basePath)
+        {
+            var assets = FindAllAssets(basePath).ToList();
+            var dict = new Dictionary<string, List<ObjectContext>>();
+
+            var md5 = MD5.Create();
+            foreach (var asset in assets)
+                try
+                {
+                    var hashBytes = md5.ComputeHash(File.ReadAllBytes(asset.Path));
+                    var hash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                    if (dict.ContainsKey(hash))
+                    {
+                        dict[hash].Add(asset);
+                    }
+                    else
+                    {
+                        dict.Add(hash, new List<ObjectContext>() { asset });
+                    }
+                }
+                catch
+                {
+                    // ignored
+                }
+
+            return dict.Where(kv => kv.Value.Count > 1).ToDictionary(kv => kv.Key, kv => kv.Value);
+        }
+
+        public void MergeAssets(List<ObjectContext> objectContexts)
+        {
+            if (objectContexts == null)
+            {
+                return;
+            }
+
+            if (objectContexts.Count < 2)
+            {
+                return;
+            }
+
+            AssetDatabase.StartAssetEditing();
+
+            var baseObj = objectContexts[0];
+            var baseGuid = AssetDatabase.GUIDFromAssetPath(baseObj.Path);
+            if (baseGuid.Empty())
+            {
+                return;
+            }
+
+            for (var i = 1; i < objectContexts.Count; i++)
+            {
+                var removedObject = objectContexts[i];
+                var usedByObjects = FindUsedBy(removedObject.Object);
+                if (usedByObjects == null)
+                {
+                    continue;
+                }
+
+                foreach (var objectContext in usedByObjects)
+                    FindAndReplaceInFile(new FileInfo(objectContext.Path), @"(?<=guid: )([0-9a-f]{32})", match =>
+                    {
+                        if (match.Groups[0].Captures[0].Value == removedObject.Guid)
+                        {
+                            return baseGuid.ToString().Replace("-", "");
+                        }
+
+                        return match.Groups[0].Captures[0].Value;
+                    });
+
+                AssetDatabase.DeleteAsset(removedObject.Path);
+            }
+
+            AssetDatabase.StopAssetEditing();
+        }
+
+        private static void FindAndReplaceInFile(FileInfo file, string pattern, MatchEvaluator match)
+        {
+            string buffer;
+            using (var fs = file.OpenRead())
+            using (var reader = new StreamReader(fs))
+            {
+                buffer = reader.ReadToEnd();
+            }
+
+            var regex = new Regex(pattern, RegexOptions.Multiline);
+            buffer = regex.Replace(buffer, match);
+
+            using (var fs = file.OpenWrite())
+            using (var writer = new StreamWriter(fs))
+            {
+                writer.Write(buffer);
+            }
+        }
+
         public void SetCurrentObject(ObjectContext objectContext)
         {
             if (objectContext?.IsValid ?? false)
@@ -248,6 +405,7 @@ namespace Search.Helper.Editor.Tools
             {
                 return;
             }
+
             SelectedUsesObject = selectedObject;
             CurrentUsedByObjects = objectContexts;
         }
@@ -264,7 +422,7 @@ namespace Search.Helper.Editor.Tools
             }
         }
 
-        private ReferenceTool ChangePanel(Panel newPanel)
+        private SearchHelperTool ChangePanel(Panel newPanel)
         {
             if (CurrentPanel != newPanel)
             {
@@ -293,10 +451,10 @@ namespace Search.Helper.Editor.Tools
                         DrawUsedByPanel();
                         break;
                     case Panel.Duplicate:
-                        DrawBoilerplatePanel();
+                        DrawDuplicatePanel();
                         break;
                     case Panel.Unused:
-                        DrawBoilerplatePanel();
+                        DrawUnusedPanel();
                         break;
                     case Panel.UsesInBuild:
                         DrawBoilerplatePanel();
@@ -375,17 +533,17 @@ namespace Search.Helper.Editor.Tools
         {
             DrawSelectedObjectField(selectedObject =>
             {
-                GUIHelper.Button("Find", () =>
-                {
-                    CurrentUsedByObjects = FindUsedBy(selectedObject, ShouldFindDependencies);
-                });
+                GUIHelper.Button("Find",
+                    () => { CurrentUsedByObjects = FindUsedBy(selectedObject, ShouldFindDependencies); });
                 GUIHelper.Button("Clean", () =>
                 {
                     SelectedUsesObject = null;
                     CurrentUsedByObjects = null;
                 });
-                GUIHelper.Toggle("Ignore Editor folders", ShouldEditorAssetsBeIgnored, value => ShouldEditorAssetsBeIgnored = value);
-                GUIHelper.Toggle("Should Find Dependencies", ShouldFindDependencies, value => ShouldFindDependencies = value);
+                GUIHelper.Toggle("Ignore Editor folders", ShouldEditorAssetsBeIgnored,
+                    value => ShouldEditorAssetsBeIgnored = value);
+                GUIHelper.Toggle("Should Find Dependencies", ShouldFindDependencies,
+                    value => ShouldFindDependencies = value);
                 GUILayout.FlexibleSpace();
             }, selectedObject =>
             {
@@ -400,10 +558,77 @@ namespace Search.Helper.Editor.Tools
                 }
 
                 foreach (var objectContext in CurrentUsedByObjects)
-                {
                     DrawObjectContext(objectContext);
-                }
             });
+        }
+
+        private void DrawDuplicatePanel()
+        {
+            DrawSelectedObjectField( selectedObject =>
+            {
+                string path = null;
+                var findDuplicatedButtonText = "Find Duplicated";
+                if (selectedObject != null)
+                {
+                    path = AssetDatabase.GetAssetPath(selectedObject);
+                    if (AssetDatabase.IsValidFolder(path))
+                    {
+                        findDuplicatedButtonText = "Find Duplicates in Folder";
+                    }
+                }
+
+                GUIHelper.Button(findDuplicatedButtonText, () => { HashDictionary = FindDuplicates(path); });
+
+                GUIHelper.Button("Clear", () => { HashDictionary = null; });
+
+                GUILayout.FlexibleSpace();
+            });
+
+
+            GUILayout.Space(10);
+
+            if (HashDictionary != null)
+            {
+                foreach (var (hash, objectContexts) in HashDictionary)
+                    GUIHelper.Vertical("Box", () =>
+                    {
+                        GUIHelper.Horizontal("Box", () =>
+                        {
+                            GUILayout.Label($"Hash: {hash}");
+                            GUIHelper.Button("Merge into one", () => { MergeAssets(objectContexts); });
+                            GUILayout.FlexibleSpace();
+                        });
+
+                        foreach (var objectContext in objectContexts)
+                            DrawObjectContext(objectContext);
+                    });
+            }
+        }
+
+        private void DrawUnusedPanel()
+        {
+            GUIHelper.Horizontal(() =>
+            {
+                GUIHelper.Button("Find Unused", () =>
+                {
+                    CurrentUnusedObjects = FindUnused();
+
+                });
+
+                GUIHelper.Button("Clear", () => { CurrentUnusedObjects = null; });
+                GUILayout.FlexibleSpace();
+            });
+
+            GUILayout.Space(10);
+
+            if (CurrentUnusedObjects != null)
+            {
+                foreach (var unusedObject in CurrentUnusedObjects)
+                {
+
+                    GUIHelper.Vertical("Box", () => { DrawObjectContext(unusedObject); });
+                }
+            }
         }
 
         private void DrawBoilerplatePanel()
@@ -413,7 +638,8 @@ namespace Search.Helper.Editor.Tools
 
         #endregion
 
-        private void DrawSelectedObjectField(Action<Object> horizontalElements = null, Action<Object> verticalElements = null)
+        private void DrawSelectedObjectField(Action<Object> horizontalElements = null,
+            Action<Object> verticalElements = null)
         {
             GUIHelper.Horizontal(() =>
             {
@@ -456,7 +682,7 @@ namespace Search.Helper.Editor.Tools
                     GUILayout.FlexibleSpace();
                     EditorGUILayout.ObjectField(objectContext.Object, typeof(Object), objectContext.Object);
                     GUILayout.Label("Guid: ");
-                    GUILayout.TextArea(objectContext.Guid, GUILayout.ExpandWidth(false));
+                    GUILayout.TextArea(objectContext.Guid, GUILayout.Width(250));
                 });
 
                 if (objectContext.Dependencies.IsExpanded)
