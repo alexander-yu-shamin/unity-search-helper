@@ -1,1 +1,105 @@
-{}
+trackSelection = true
+refreshSearchWindowsInPlayMode = false
+pickerAdvancedUI = false
+fetchPreview = true
+defaultFlags = 8
+keepOpen = false
+queryFolder = "Assets"
+onBoardingDoNotAskAgain = true
+showPackageIndexes = false
+showStatusBar = false
+scopes = {
+	"picker_window_position_offset.075BCD15" = "680;116;320;550"
+	"picker_visibility_flags.075BCD15" = "264"
+	"picker_item_size.075BCD15" = "96"
+	"picker_inspector.075BCD15" = "0"
+	"last_search.66F56946" = "ref:\"Assets/TestScript.cs\""
+	"OpenInspectorPreview.66F56946" = "0"
+	"currentGroup.66F56946" = "all"
+}
+providers = {
+	asset = {
+		active = true
+		priority = 25
+		defaultAction = null
+	}
+	scene = {
+		active = true
+		priority = 50
+		defaultAction = null
+	}
+	adb = {
+		active = true
+		priority = 2500
+		defaultAction = null
+	}
+	find = {
+		active = true
+		priority = 25
+		defaultAction = null
+	}
+	packages = {
+		active = true
+		priority = 90
+		defaultAction = null
+	}
+	profilermarkers = {
+		active = true
+		priority = 100
+		defaultAction = null
+	}
+	store = {
+		active = false
+		priority = 100
+		defaultAction = null
+	}
+	performance = {
+		active = false
+		priority = 100
+		defaultAction = null
+	}
+	log = {
+		active = false
+		priority = 210
+		defaultAction = null
+	}
+	static_methods = {
+		active = true
+		priority = 85
+		defaultAction = null
+	}
+	menu = {
+		active = true
+		priority = 80
+		defaultAction = null
+	}
+	settings = {
+		active = true
+		priority = 100
+		defaultAction = null
+	}
+	calculator = {
+		active = true
+		priority = 10
+		defaultAction = null
+	}
+}
+objectSelectors = {
+}
+recentSearches = [
+	"ref=\"Assets/TestScript.cs\""
+	""
+]
+searchItemFavorites = [
+]
+savedSearchesSortOrder = 0
+showSavedSearchPanel = true
+hideTabs = false
+expandedQueries = [
+]
+queryBuilder = false
+ignoredProperties = "id;name;classname;imagecontentshash"
+helperWidgetCurrentArea = "all"
+disabledIndexers = ""
+minIndexVariations = 2
+findProviderIndexHelper = true
