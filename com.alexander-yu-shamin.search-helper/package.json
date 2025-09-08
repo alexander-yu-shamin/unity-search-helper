@@ -1,0 +1,24 @@
+{
+  "name": "com.alexander-yu-shamin.search-helper",
+  "version": "0.0.0",
+  "displayName": "Search Helper",
+  "description": "Search tool for Unity",
+  "__unity": "2019.1",
+  "__unityRelease": "0b5",
+  "__documentationUrl": "https://example.com/",
+  "__changelogUrl": "https://example.com/changelog.html",
+  "__licensesUrl": "https://example.com/licensing.html",
+  "dependencies": {
+    "com.alexander-yu-shamin.toolkit": "0.0.1"
+  },
+  "__keywords": [
+    "keyword1",
+    "keyword2",
+    "keyword3"
+  ],
+  "__author": {
+    "name": "Unity",
+    "email": "unity@example.com",
+    "url": "https://www.unity3d.com"
+  }
+}
