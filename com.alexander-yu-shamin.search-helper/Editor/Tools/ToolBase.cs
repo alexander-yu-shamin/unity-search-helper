@@ -11,7 +11,7 @@ namespace SearchHelper.Editor
 {
     public abstract class ToolBase
     {
-        public string Name { get; set; }
+        public abstract string Name { get; set; }
 
         public virtual bool IsSortingSupported { get; set; } = true;
 
@@ -34,12 +34,13 @@ namespace SearchHelper.Editor
         protected const float HeaderHeightWithPadding = ContentHeight + HeaderPadding * 2;
 
         protected const float HorizontalIndent = 15.0f;
-        protected const float FoldOutIndent = 4.0f;
+        protected const float FirstElementIndent = 4.0f;
         protected const float ScrollBarWidth = 16.0f;
         protected const float NoScrollBarWidth = 4.0f;
         protected const float GuidTextAreaWidth = 275.0f;
         protected const float ExtraHeightToPreventBlinking = ContentHeightWithPadding * 5;
         protected const float BottomIndent = ContentHeightWithPadding * 3;
+        protected const float SelectedObjectWidth = HeaderHeight + 250.0f + HorizontalIndent / 2;
 
         protected static readonly Color BoxColor = new Color(0.0f, 0.0f, 0.0f, 0.2f);
         protected static readonly Color EmptyColor = new Color(0.0f, 0.0f, 0.0f, 0.0f);
@@ -185,6 +186,7 @@ namespace SearchHelper.Editor
 
         private float DrawObjectHeader(Rect rect, ObjectContext context)
         {
+            var x = rect.x + FirstElementIndent;
             var y = rect.y;
             EditorGUI.DrawRect(new Rect(rect.x, y, rect.width, HeaderPadding), EmptyColor);
             y += HeaderPadding;
@@ -192,40 +194,52 @@ namespace SearchHelper.Editor
             EditorGUI.DrawRect(new Rect(rect.x, y, rect.width, HeaderHeight + HeaderPadding), BoxColor);
             y += HeaderPadding / 2;
 
-            var elementWidth = EditorStyles.foldoutHeader.CalcSize(new GUIContent(context.Path)).x;
-            context.IsExpanded = EditorGUI.BeginFoldoutHeaderGroup(new Rect(rect.x + FoldOutIndent, y, elementWidth, HeaderHeight), context.IsExpanded, context.Path);
-
-            elementWidth = GuidTextAreaWidth;
-            var x = rect.width - elementWidth;
-            EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Guid);
-
-            elementWidth = 40.0f;
-            x -= elementWidth;
-            EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Guid:");
-
-            elementWidth = 50.0f;
-            x -= elementWidth + HorizontalIndent;
-            EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Dependencies?.Capacity.ToString());
-
-            elementWidth = 100.0f;
-            x -= elementWidth;
-            EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Dependencies:");
-
-            elementWidth = 250.0f;
-            x -= elementWidth + HorizontalIndent;
-            EditorGUI.ObjectField(new Rect(x, y, elementWidth, HeaderHeight), context.Object, typeof(Object),
-                context.Object);
-
-            elementWidth = HeaderHeight;
-            x -= elementWidth + HorizontalIndent;
-            if (GUI.Button(new Rect(x, y, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(FolderIconName)))
+            var elementWidth = HeaderHeight;
+            if (GUI.Button(new Rect(x, y - 1, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(FolderIconName)))
             {
                 if (!string.IsNullOrEmpty(context.Path))
                 {
                     EditorUtility.RevealInFinder(context.Path);
                 }
             }
+
+            x += elementWidth + HorizontalIndent / 2;
+            elementWidth = 250.0f;
+            EditorGUI.ObjectField(new Rect(x, y - 1, elementWidth, HeaderHeight), context.Object, typeof(Object),
+                context.Object);
+
+            x += elementWidth + HorizontalIndent / 2;
+            elementWidth = EditorStyles.foldoutHeader.CalcSize(new GUIContent(context.Path)).x;
+            context.IsExpanded = EditorGUI.BeginFoldoutHeaderGroup(new Rect(x, y, elementWidth, HeaderHeight), context.IsExpanded, context.Path);
             EditorGUI.EndFoldoutHeaderGroup();
+
+            x += elementWidth + HorizontalIndent;
+
+            var leftWidth = rect.width - x;
+            var neededWidthForDependency = GuidTextAreaWidth + 40.0f + 50.0f + 100.0f;
+            var neededWidthForGuid = GuidTextAreaWidth + 40.0f;
+
+            if (leftWidth > neededWidthForGuid)
+            {
+                elementWidth = GuidTextAreaWidth;
+                x = rect.width - elementWidth;
+                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Guid);
+
+                elementWidth = 40.0f;
+                x -= elementWidth;
+                EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Guid:");
+            }
+
+            if (leftWidth > neededWidthForDependency)
+            {
+                elementWidth = 50.0f;
+                x -= elementWidth + HorizontalIndent;
+                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Dependencies?.Capacity.ToString());
+
+                elementWidth = 100.0f;
+                x -= elementWidth;
+                EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Dependencies:");
+            }
 
             return HeaderHeightWithPadding;
         }
@@ -264,18 +278,14 @@ namespace SearchHelper.Editor
 
         protected float DrawEmptyContent(Rect rect, ObjectContext mainContext)
         {
-            EditorGUI.LabelField(rect, "The object doesn't have any dependencies.");
+            EditorGUI.DrawRect(rect, BoxColor);
+            EditorGUI.LabelField(new Rect(rect.x + FirstElementIndent, rect.y, rect.width, rect.height), "The object doesn't have any dependencies.");
             return ContentHeightWithPadding;
         }
 
         protected float CalculateDependencyHeight(ObjectContext dependency, ObjectContext mainContext)
         {
             if (!mainContext.IsExpanded)
-            {
-                return 0.0f;
-            }
-
-            if (!dependency.IsValid)
             {
                 return 0.0f;
             }
@@ -310,7 +320,7 @@ namespace SearchHelper.Editor
             EditorGUI.DrawRect(rect, BoxColor);
 
             var elementWidth = 500.0f;
-            var x = rect.x + FoldOutIndent;
+            var x = rect.x + FirstElementIndent;
             EditorGUI.ObjectField(new Rect(x, rect.y, elementWidth, ContentHeight), context.Object, typeof(Object),
                 context.Object);
             x += elementWidth + HorizontalIndent;
@@ -321,7 +331,17 @@ namespace SearchHelper.Editor
 
             elementWidth = GuidTextAreaWidth;
             EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), context.Guid);
-            x += elementWidth + HorizontalIndent;
+            x += elementWidth + HorizontalIndent / 2;
+
+            elementWidth = ContentHeight;
+            if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(FolderIconName)))
+            {
+                if (!string.IsNullOrEmpty(context.Path))
+                {
+                    EditorUtility.RevealInFinder(context.Path);
+                }
+            }
+            x += elementWidth + HorizontalIndent / 2;
 
             elementWidth = 40.0f;
             EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "Path:");
@@ -393,7 +413,6 @@ namespace SearchHelper.Editor
             {
                 case SortVariant.ByName:
                     return objectContexts.OrderBy(el => el.Object.name);
-                    break;
                 case SortVariant.ByPath:
                     return objectContexts.OrderBy(el => el.Path);
                 case SortVariant.None:

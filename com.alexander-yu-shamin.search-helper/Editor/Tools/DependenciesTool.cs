@@ -1,30 +1,26 @@
-using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
-using Codice.Client.BaseCommands.Merge;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.UIElements;
-using Color = UnityEngine.Color;
 
 namespace SearchHelper.Editor.Tools
 {
     public class DependenciesTool : ToolBase
     {
-        public string Name { get; set; } = SearchHelperSettings.DependenciesToolName;
+        public override string Name { get; set; } = SearchHelperSettings.DependenciesToolName;
 
-        public Object SelectedObject { get; set; }
-        public Object UsedObject { get; set; }
-        public List<ObjectContext> Contexts { get; set; }
+        private Object SelectedObject { get; set; }
+        private Object UsedObject { get; set; }
+        private List<ObjectContext> Contexts { get; set; }
 
         public override void Draw(Rect windowRect)
         {
             EGuiKit.Horizontal(() =>
             {
-                SelectedObject = EditorGUILayout.ObjectField(SelectedObject, typeof(Object), true);
+                SelectedObject = EditorGUILayout.ObjectField(SelectedObject, typeof(Object), true,
+                    GUILayout.Width(SelectedObjectWidth));
                 if (UsedObject != SelectedObject)
                 {
                     UsedObject = null;
@@ -70,7 +66,7 @@ namespace SearchHelper.Editor.Tools
             }
             else
             {
-                var objectsInFolder = SearchHelperService.FindAssets(path);
+                var objectsInFolder = SearchHelperService.FindAssetObjects(path);
                 Contexts = objectsInFolder.Select(SearchHelperService.FindDependencies).ToList();
             }
 
@@ -89,18 +85,12 @@ namespace SearchHelper.Editor.Tools
                 return true;
             }
 
-            foreach (var context in Contexts)
+            foreach (var context in Contexts.Where(context => !context.Dependencies.IsNullOrEmpty()))
             {
-                if (context.Dependencies.IsNullOrEmpty())
-                {
-                    continue;
-                }
-
                 context.Dependencies = Sort(context.Dependencies, sortVariant).ToList();
             }
 
             return true;
         }
-
     }
 }

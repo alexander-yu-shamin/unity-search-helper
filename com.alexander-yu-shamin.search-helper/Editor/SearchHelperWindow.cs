@@ -21,7 +21,8 @@ namespace SearchHelper.Editor
 
         private Dictionary<ToolType, ToolBase> ToolMap { get; set; } = new()
         {
-            { ToolType.DependencyTool, new DependenciesTool() }
+            { ToolType.DependencyTool, new DependenciesTool() },
+            { ToolType.UsedByTool, new UsedByTool() }
         };
 
         [MenuItem(SearchHelperSettings.WindowMenuItemName)]
