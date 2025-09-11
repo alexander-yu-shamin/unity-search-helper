@@ -8,8 +8,11 @@ namespace SearchHelper.Editor
         public Object Object { get; set; }
         public string Path { get; set; }
         public string Guid { get; set; }
+        public bool IsFolder { get; set; }
 
         public List<ObjectContext> Dependencies;
+
+        public bool IsExpanded { get; set; } = true;
 
         public bool IsValid => Object != null && !string.IsNullOrEmpty(Path);
     }

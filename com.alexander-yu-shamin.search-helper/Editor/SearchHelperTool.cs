@@ -32,39 +32,6 @@ namespace SearchHelper.Editor
 
         //private Dictionary<Object, ObjectContext> Dictionary { get; set; } = new();
 
-        //public IEnumerable<ObjectContext> FindAllAssets(string root = null)
-        //{
-        //    EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets", 0f);
-
-        //    var searchFilter = "t:Object";
-        //    var searchDirs = new[] { "Assets" };
-        //    if (!string.IsNullOrEmpty(root))
-        //    {
-        //        searchDirs = new[] { root };
-        //    }
-
-        //    var guids = AssetDatabase.FindAssets(searchFilter, searchDirs);
-
-        //    var objects = guids.Select(guid =>
-        //    {
-        //        var path = AssetDatabase.GUIDToAssetPath(guid);
-        //        var obj = AssetDatabase.LoadMainAssetAtPath(path);
-
-        //        return new ObjectContext()
-        //        {
-        //            Guid = guid,
-        //            Path = path,
-        //            Object = obj,
-        //            Dependencies = new Dependencies()
-        //        };
-        //    });
-
-        //    EditorUtility.DisplayCancelableProgressBar("Search Helper Tool", "Find All Assets", 100f);
-        //    EditorUtility.ClearProgressBar();
-
-        //    return objects;
-        //}
-
         //public List<ObjectContext> FindUsedBy(Object obj, bool updatedDependencies = false)
         //{
         //    var results = new List<ObjectContext>();
@@ -169,47 +136,6 @@ namespace SearchHelper.Editor
         //    return string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<Object>(path);
         //}
 
-        //public IEnumerable<ObjectContext> ToObjectContexts(Object[] objects, Object mainObject = null)
-        //{
-        //    if (objects == null)
-        //    {
-        //        return null;
-        //    }
-
-        //    if (mainObject != null)
-        //    {
-        //        objects = objects.Where(value => value != mainObject).ToArray();
-        //    }
-
-        //    return objects.Select(element => new ObjectContext()
-        //    {
-        //        Object = element,
-        //        Path = AssetDatabase.GetAssetPath(element)
-        //    });
-        //}
-
-        //public ObjectContext FindDependencies(Object obj)
-        //{
-        //    if (obj == null)
-        //    {
-        //        return null;
-        //    }
-
-        //    var objectDependencies = ToObjectContexts(EditorUtility.CollectDependencies(new[] { obj }), obj);
-        //    var dependencies = new Dependencies(objectDependencies);
-        //    var path = AssetDatabase.GetAssetPath(obj);
-        //    var guid = AssetDatabase.AssetPathToGUID(path);
-
-        //    var objectContext = new ObjectContext()
-        //    {
-        //        Object = obj,
-        //        Path = path,
-        //        Guid = guid,
-        //        Dependencies = dependencies
-        //    };
-
-        //    return objectContext;
-        //}
 
         //public Dictionary<string, List<ObjectContext>> HashDictionary { get; set; }
 
@@ -337,17 +263,6 @@ namespace SearchHelper.Editor
         //        GUILayout.Space(10);
         //        DrawPanel(panel);
         //    }
-        //}
-
-        //private SearchHelperTool ChangePanel(Panel newPanel)
-        //{
-        //    if (CurrentPanel != newPanel)
-        //    {
-        //        CurrentPanel = newPanel;
-        //        ScrollViewPos = Vector2.zero;
-        //    }
-
-        //    return this;
         //}
 
         //private void DrawPanel(Panel panel)
@@ -555,27 +470,6 @@ namespace SearchHelper.Editor
 
         //#endregion
 
-        //private void DrawSelectedObjectField(Action<Object> horizontalElements = null,
-        //    Action<Object> verticalElements = null)
-        //{
-        //    GUIHelper.Horizontal(() =>
-        //    {
-        //        SelectedUsesObject = EditorGUILayout.ObjectField(SelectedUsesObject, typeof(Object), true);
-
-        //        if (CurrentUsesObject != null && SelectedUsesObject != null)
-        //        {
-        //            if (CurrentUsesObject.Object != SelectedUsesObject)
-        //            {
-        //                CurrentUsesObject = null;
-        //            }
-        //        }
-
-        //        GUIHelper.Enabled(SelectedUsesObject != null,
-        //            () => { horizontalElements?.Invoke(SelectedUsesObject); });
-        //    });
-
-        //    GUIHelper.Vertical(() => { verticalElements?.Invoke(SelectedUsesObject); });
-        //}
 
         //private void DrawObjectContext(ObjectContext objectContext, bool? expanded = null)
         //{

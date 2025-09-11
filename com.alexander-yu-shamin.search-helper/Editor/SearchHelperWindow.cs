@@ -1,70 +1,70 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
-//using Search.Helper.Runtime.Extensions;
+using System.Runtime.InteropServices;
+using SearchHelper.Editor.Tools;
 using UnityEditor;
 using UnityEngine;
+using Toolkit.Runtime.Extensions;
 
 namespace SearchHelper.Editor
 {
     public partial class SearchHelperWindow : EditorWindow
-
     {
-        private enum Panel
+        enum ToolType
         {
-            Uses,
-            FindByGuid,
-            UsedBy,
-            Duplicate,
-            Unused,
-            UsesInBuild,
-            AssetsByType
+            DependencyTool = 0,
+            UsedByTool,
         }
 
-        private const string WindowTitle = "Search Helper Tool";
-        private const string WindowMenuItemName = "Window/Search/Open Search Helper Tool";
-        private const string ContextMenuItemFindUsesName = "Assets/Search Helper Tool: Find Uses";
-        private const string ContextMenuFindUsedByItemName = "Assets/Search Helper Tool: Find Used By";
-        private const string ResourceString = "/Resources/";
-        private const string EditorString = "/Editor/";
+        private ToolType SelectedToolType { get; set; } = ToolType.DependencyTool;
 
-
-        private string[] PanelNames { get; set; }
-        private Color ErrorColor => Color.red;
-        private Color WarningColor => Color.yellow;
-
-
-
-        [MenuItem(WindowMenuItemName)]
-        public static SearchHelperTool OpenWindow()
+        private Dictionary<ToolType, ToolBase> ToolMap { get; set; } = new()
         {
-            return GetWindow<SearchHelperTool>(WindowTitle);
+            { ToolType.DependencyTool, new DependenciesTool() }
+        };
+
+        [MenuItem(SearchHelperSettings.WindowMenuItemName)]
+        private static SearchHelperWindow OpenWindow()
+        {
+            return GetWindow<SearchHelperWindow>(SearchHelperSettings.WindowTitle);
         }
 
-        [MenuItem(ContextMenuItemFindUsesName)]
-        public static void ShowUses()
-        {
-            //var window = OpenWindow().ChangePanel(Panel.Uses);
-            //window?.SetCurrentObject(window?.FindDependencies(Selection.activeObject));
-        }
-
-        [MenuItem(ContextMenuFindUsedByItemName)]
-        public static void ShowUsesBy()
-        {
-            //var window = OpenWindow().ChangePanel(Panel.UsedBy);
-            //window?.SetCurrentObjects(window?.FindUsedBy(Selection.activeObject, window.ShouldFindDependencies),
-            //    Selection.activeObject);
-        }
-
-        [MenuItem(ContextMenuItemFindUsesName, true)]
-        [MenuItem(ContextMenuFindUsedByItemName, true)]
+        [MenuItem(SearchHelperSettings.ContextMenuItemFindDependenciesName, true)]
+        [MenuItem(SearchHelperSettings.ContextMenuFindUsedByItemName, true)]
         public static bool ValidateActiveSelectedObject()
         {
             return Selection.activeObject;
         }
 
-        public SearchHelperWindow()
+        [MenuItem(SearchHelperSettings.ContextMenuItemFindDependenciesName)]
+        public static void ShowDependencies()
         {
-            //PanelNames = Enum.GetNames(typeof(Panel)).Select(element => element.AddSpacesBeforeUppercase()).ToArray();
+            OpenWindow().SelectTool(ToolType.DependencyTool)?.Run(Selection.activeObject);
+        }
+
+        [MenuItem(SearchHelperSettings.ContextMenuFindUsedByItemName)]
+        public static void ShowUsesBy()
+        {
+            OpenWindow().SelectTool(ToolType.UsedByTool)?.Run(Selection.activeObject);
+        }
+
+        public void OnGUI()
+        {
+            if (ToolMap.IsNullOrEmpty())
+            {
+                return;
+            }
+
+            var newToolType = (ToolType) GUILayout.SelectionGrid((int)SelectedToolType, ToolMap.Keys.Select(v => v.ToString()).ToArray(), ToolMap.Keys.Count);
+            EditorGUILayout.Space(10);
+            SelectTool(newToolType)?.Draw(position);
+        }
+
+        private ToolBase SelectTool(ToolType toolType)
+        {
+            SelectedToolType = toolType;
+            return ToolMap.TryGetValue(toolType, out var tool) ? tool : null;
         }
     }
 }

@@ -13,9 +13,7 @@ namespace SearchHelper.Editor
     {
         public string Name { get; set; }
 
-        public abstract void Draw(Rect windowRect);
-
-        public abstract void Run(Object selectedObject);
+        public virtual bool IsSortingSupported { get; set; } = true;
 
         protected enum SortVariant
         {
@@ -23,25 +21,6 @@ namespace SearchHelper.Editor
             ByName,
             ByPath
         }
-
-        protected SortVariant CurrentSortVariant { get; set; }
-        protected string FilterString { get; set; }
-        protected bool IsFoldersShown { get; set; } = false;
-        protected bool IsEditorBuiltInElementsShown { get; set; } = false;
-
-        protected static readonly Color ImportantColor = Color.yellow;
-        protected static readonly Color WarningColor = Color.yellow;
-        protected static readonly Color ErrorColor = Color.red;
-
-        protected const float DefaultSpace = 25;
-        protected const string FolderIconName = "d_Folder Icon";
-        protected const string EditorBuiltInPath = "Resources/unity_builtin_extra";
-
-        protected GUILayoutOption MiddleWidth = GUILayout.Width(270);
-
-
-        protected const float Intend = 20.0f;
-        protected const float BoxIntend = 4.0f;
 
         protected const float RowHeight = 20.0f;
         protected const float RowPadding = 2f;
@@ -54,15 +33,37 @@ namespace SearchHelper.Editor
         protected const float HeaderPadding = 6.0f;
         protected const float HeaderHeightWithPadding = ContentHeight + HeaderPadding * 2;
 
+        protected const float HorizontalIndent = 15.0f;
+        protected const float FoldOutIndent = 4.0f;
+        protected const float ScrollBarWidth = 16.0f;
+        protected const float NoScrollBarWidth = 4.0f;
+        protected const float GuidTextAreaWidth = 275.0f;
+        protected const float ExtraHeightToPreventBlinking = ContentHeightWithPadding * 5;
+        protected const float BottomIndent = ContentHeightWithPadding * 3;
+
         protected static readonly Color BoxColor = new Color(0.0f, 0.0f, 0.0f, 0.2f);
         protected static readonly Color EmptyColor = new Color(0.0f, 0.0f, 0.0f, 0.0f);
 
-        public Vector2 ScrollViewPosition { get; set; }
+        protected const string FolderIconName = "d_Folder Icon";
+        protected const string EditorBuiltInPath = "Resources/unity_builtin_extra";
 
-        protected static bool IsVisible(float itemTopY, float itemHeight, float visibleTopY, float visibleBottomY)
+        protected static readonly Color ImportantColor = Color.yellow;
+        protected static readonly Color WarningColor = Color.yellow;
+        protected static readonly Color ErrorColor = Color.red;
+
+        protected Vector2 ScrollViewPosition { get; set; }
+        protected SortVariant CurrentSortVariant { get; set; }
+        protected string FilterString { get; set; }
+        protected bool IsFoldersShown { get; set; } = false;
+        protected bool IsEditorBuiltInElementsShown { get; set; } = false;
+
+        public abstract void Draw(Rect windowRect);
+
+        public abstract void Run(Object selectedObject);
+
+        protected virtual bool Sort(SortVariant sortVariant)
         {
-            var itemBottom = itemTopY + itemHeight;
-            return !(itemBottom < visibleTopY || itemTopY > visibleBottomY);
+            return false;
         }
 
         protected void DrawVirtualScroll(Rect windowRect, List<ObjectContext> contexts)
@@ -72,7 +73,9 @@ namespace SearchHelper.Editor
                 return;
             }
 
-            ScrollViewPosition = EditorGUILayout.BeginScrollView(ScrollViewPosition, GUILayout.Height(windowRect.height - 100));
+            GUILayout.Space(HeaderPadding);
+
+            ScrollViewPosition = EditorGUILayout.BeginScrollView(ScrollViewPosition, GUILayout.Height(windowRect.height - BottomIndent));
 
             var totalHeight = CalculateDisplayedHeight(contexts);
             var fullRect = GUILayoutUtility.GetRect(0, totalHeight);
@@ -82,10 +85,15 @@ namespace SearchHelper.Editor
             var currentY = 0.0f;
             var drawnHeight = 0.0f;
 
+            var displayRect = new Rect(0, 0,
+                totalHeight > windowRect.height
+                    ? windowRect.width - ScrollBarWidth
+                    : windowRect.width - NoScrollBarWidth, windowRect.height + ExtraHeightToPreventBlinking);
+
             foreach (var ctx in contexts)
             {
-                if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, windowRect, 
-                        () => TryDrawObjectHeader(ref x, ref y, windowRect.width, ctx),
+                if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect, 
+                        () => TryDrawObjectHeader(ref x, ref y, displayRect.width, ctx),
                         () => CalculateHeaderHeight(ctx)))
                 {
                     break;
@@ -93,8 +101,8 @@ namespace SearchHelper.Editor
 
                 if (ctx.Dependencies.IsNullOrEmpty())
                 {
-                    if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, windowRect, 
-                            () => TryDrawEmptyContent(ref x, ref y, windowRect.width, ctx),
+                    if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect, 
+                            () => TryDrawEmptyContent(ref x, ref y, displayRect.width, ctx),
                             () => CalculateEmptyHeight(ctx)))
                     {
                         break;
@@ -102,10 +110,10 @@ namespace SearchHelper.Editor
                 }
                 else
                 {
-                    foreach (var dependency in Sort(ctx.Dependencies))
+                    foreach (var dependency in ctx.Dependencies)
                     {
-                        if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, windowRect, 
-                                () => TryDrawContent(ref x, ref y, windowRect.width, dependency, ctx),
+                        if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect, 
+                                () => TryDrawContent(ref x, ref y, displayRect.width, dependency, ctx),
                                 () => CalculateDependencyHeight(dependency, ctx)))
                         {
                             break;
@@ -185,10 +193,10 @@ namespace SearchHelper.Editor
             y += HeaderPadding / 2;
 
             var elementWidth = EditorStyles.foldoutHeader.CalcSize(new GUIContent(context.Path)).x;
-            context.IsExpanded = EditorGUI.BeginFoldoutHeaderGroup(new Rect(rect.x + BoxIntend, y, elementWidth, HeaderHeight), context.IsExpanded, context.Path);
+            context.IsExpanded = EditorGUI.BeginFoldoutHeaderGroup(new Rect(rect.x + FoldOutIndent, y, elementWidth, HeaderHeight), context.IsExpanded, context.Path);
 
-            elementWidth = 250.0f;
-            var x = rect.width - elementWidth - BoxIntend ;
+            elementWidth = GuidTextAreaWidth;
+            var x = rect.width - elementWidth;
             EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Guid);
 
             elementWidth = 40.0f;
@@ -196,7 +204,7 @@ namespace SearchHelper.Editor
             EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Guid:");
 
             elementWidth = 50.0f;
-            x -= elementWidth + Intend;
+            x -= elementWidth + HorizontalIndent;
             EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Dependencies?.Capacity.ToString());
 
             elementWidth = 100.0f;
@@ -204,12 +212,12 @@ namespace SearchHelper.Editor
             EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Dependencies:");
 
             elementWidth = 250.0f;
-            x -= elementWidth + Intend;
+            x -= elementWidth + HorizontalIndent;
             EditorGUI.ObjectField(new Rect(x, y, elementWidth, HeaderHeight), context.Object, typeof(Object),
                 context.Object);
 
             elementWidth = HeaderHeight;
-            x -= elementWidth + Intend;
+            x -= elementWidth + HorizontalIndent;
             if (GUI.Button(new Rect(x, y, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(FolderIconName)))
             {
                 if (!string.IsNullOrEmpty(context.Path))
@@ -302,24 +310,24 @@ namespace SearchHelper.Editor
             EditorGUI.DrawRect(rect, BoxColor);
 
             var elementWidth = 500.0f;
-            var x = rect.x + BoxIntend;
+            var x = rect.x + FoldOutIndent;
             EditorGUI.ObjectField(new Rect(x, rect.y, elementWidth, ContentHeight), context.Object, typeof(Object),
                 context.Object);
-            x += elementWidth + Intend;
+            x += elementWidth + HorizontalIndent;
 
             elementWidth = 40.0f;
             EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "Guid:");
             x += elementWidth;
 
-            elementWidth = 250.0f;
+            elementWidth = GuidTextAreaWidth;
             EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), context.Guid);
-            x += elementWidth + Intend;
+            x += elementWidth + HorizontalIndent;
 
             elementWidth = 40.0f;
             EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "Path:");
             x += elementWidth;
 
-            elementWidth = rect.width - x - BoxIntend;
+            elementWidth = rect.width - x;
             EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), context.Path);
 
             return ContentHeightWithPadding;
@@ -329,32 +337,28 @@ namespace SearchHelper.Editor
         {
             EGuiKit.Horizontal(() =>
             {
-                IsFoldersShown = EditorGUILayout.ToggleLeft("Show Folders", IsFoldersShown);
-                EGuiKit.Space(DefaultSpace);
-                IsEditorBuiltInElementsShown = EditorGUILayout.ToggleLeft("Show Editor Built-In", IsEditorBuiltInElementsShown);
-                EGuiKit.Label("Sorting:");
-                CurrentSortVariant = (SortVariant)GUILayout.Toolbar((int)CurrentSortVariant, System.Enum.GetNames(typeof(SortVariant)));
-                EGuiKit.Space(DefaultSpace);
+                IsFoldersShown = EditorGUILayout.ToggleLeft("Show Folders", IsFoldersShown, GUILayout.Width(100));
+                EGuiKit.Space(HorizontalIndent);
+                IsEditorBuiltInElementsShown = EditorGUILayout.ToggleLeft("Show Editor Built-In", IsEditorBuiltInElementsShown, GUILayout.Width(150));
+
+                if (IsSortingSupported)
+                {
+                    EGuiKit.Label("Sorting:");
+                    var newSortVariant = (SortVariant)GUILayout.Toolbar((int)CurrentSortVariant, System.Enum.GetNames(typeof(SortVariant)));
+                    if (CurrentSortVariant != newSortVariant)
+                    {
+                        if (Sort(newSortVariant))
+                        {
+                            CurrentSortVariant = newSortVariant;
+                        }
+                    }
+                    EGuiKit.Space(HorizontalIndent);
+                }
 
                 EGuiKit.Label("Path Contains:");
-                FilterString = EditorGUILayout.TextArea(FilterString, MiddleWidth);
-                EGuiKit.Space(DefaultSpace);
+                FilterString = EditorGUILayout.TextArea(FilterString, GUILayout.Width(250));
+                EGuiKit.Space(HorizontalIndent);
             });
-        }
-
-        protected IEnumerable<ObjectContext> Sort(IEnumerable<ObjectContext> objectContexts)
-        {
-            switch (CurrentSortVariant)
-            {
-                case SortVariant.ByName:
-                    return objectContexts.OrderBy(el => el.Object.name);
-                    break;
-                case SortVariant.ByPath:
-                    return objectContexts.OrderBy(el => el.Path);
-                case SortVariant.None:
-                default:
-                    return objectContexts;
-            }
         }
 
         protected bool ShouldBeShown(ObjectContext objectContext)
@@ -381,6 +385,21 @@ namespace SearchHelper.Editor
             }
 
             return true;
+        }
+
+        protected IEnumerable<ObjectContext> Sort(IEnumerable<ObjectContext> objectContexts, SortVariant sortVariant)
+        {
+            switch (sortVariant)
+            {
+                case SortVariant.ByName:
+                    return objectContexts.OrderBy(el => el.Object.name);
+                    break;
+                case SortVariant.ByPath:
+                    return objectContexts.OrderBy(el => el.Path);
+                case SortVariant.None:
+                default:
+                    return objectContexts;
+            }
         }
     }
 }

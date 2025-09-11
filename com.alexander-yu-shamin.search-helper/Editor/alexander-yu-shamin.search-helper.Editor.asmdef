@@ -2,7 +2,9 @@
     "name": "alexander-yu-shamin.search-helper.Editor",
     "rootNamespace": "",
     "references": [
-        "GUID:073bd99d7d3eec4408b49b7077e63719"
+        "GUID:073bd99d7d3eec4408b49b7077e63719",
+        "GUID:fce0dac941f9a9f4bbae193dbc7699e7",
+        "GUID:470217ba8cf66f948a61c2247881d92c"
     ],
     "includePlatforms": [
         "Editor"
