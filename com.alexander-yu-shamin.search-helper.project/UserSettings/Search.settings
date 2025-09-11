@@ -9,9 +9,9 @@ onBoardingDoNotAskAgain = true
 showPackageIndexes = false
 showStatusBar = false
 scopes = {
-	"picker_window_position_offset.075BCD15" = "680;116;320;550"
+	"picker_window_position_offset.075BCD15" = "-273.3333;116;728;550"
 	"picker_visibility_flags.075BCD15" = "264"
-	"picker_item_size.075BCD15" = "96"
+	"picker_item_size.075BCD15" = "0"
 	"picker_inspector.075BCD15" = "0"
 	"last_search.66F56946" = "ref:\"Assets/TestScript.cs\""
 	"OpenInspectorPreview.66F56946" = "0"
@@ -83,10 +83,17 @@ providers = {
 		priority = 10
 		defaultAction = null
 	}
+	presets_provider = {
+		active = false
+		priority = -10
+		defaultAction = null
+	}
 }
 objectSelectors = {
 }
 recentSearches = [
+	"t:AssemblyDefinitionAsset toolkit.ed"
+	"t:AssemblyDefinitionAsset toolkit"
 	"ref=\"Assets/TestScript.cs\""
 	""
 ]
