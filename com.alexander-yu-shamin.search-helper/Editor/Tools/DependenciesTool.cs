@@ -58,18 +58,8 @@ namespace SearchHelper.Editor.Tools
             }
 
             UsedObject = obj;
-
-            var path = AssetDatabase.GetAssetPath(UsedObject);
-            if (!string.IsNullOrEmpty(path) && !AssetDatabase.IsValidFolder(path))
-            {
-                Contexts = new List<ObjectContext> { SearchHelperService.FindDependencies(obj) };
-            }
-            else
-            {
-                var objectsInFolder = SearchHelperService.FindAssetObjects(path);
-                Contexts = objectsInFolder.Select(SearchHelperService.FindDependencies).ToList();
-            }
-
+            Contexts = FolderOrFile(obj).Select(SearchHelperService.FindDependencies).ToList();
+            Sort(CurrentSortVariant);
             return Contexts;
         }
 

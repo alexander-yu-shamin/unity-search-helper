@@ -107,6 +107,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             result.Add(searchedCtx);
+            Sort(CurrentSortVariant);
             return result;
         }
     }

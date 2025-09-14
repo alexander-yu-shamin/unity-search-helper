@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
+using UnityEditor.Search;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -46,7 +48,11 @@ namespace SearchHelper.Editor
         protected static readonly Color EmptyColor = new Color(0.0f, 0.0f, 0.0f, 0.0f);
 
         protected const string FolderIconName = "d_Folder Icon";
+        protected const string InspectorIconName = "d_UnityEditor.InspectorWindow";
         protected const string EditorBuiltInPath = "Resources/unity_builtin_extra";
+        protected const string HierarchyIconName = "d_UnityEditor.SceneHierarchyWindow";
+
+        protected const string SceneHierarchySearchReferenceFormat = "ref:{0}";
 
         protected static readonly Color ImportantColor = Color.yellow;
         protected static readonly Color WarningColor = Color.yellow;
@@ -169,12 +175,22 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
+            if (!context.Dependencies.Any(ShouldBeShown))
+            {
+                return 0.0f;
+            }
+
             return HeaderHeightWithPadding;
         }
 
         protected float TryDrawObjectHeader(ref float x, ref float y, float width, ObjectContext context)
         {
             if (context.IsFolder && !IsFoldersShown)
+            {
+                return 0.0f;
+            }
+
+            if (!context.Dependencies.Any(ShouldBeShown))
             {
                 return 0.0f;
             }
@@ -197,10 +213,7 @@ namespace SearchHelper.Editor
             var elementWidth = HeaderHeight;
             if (GUI.Button(new Rect(x, y - 1, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(FolderIconName)))
             {
-                if (!string.IsNullOrEmpty(context.Path))
-                {
-                    EditorUtility.RevealInFinder(context.Path);
-                }
+                OpenInDefaultFileBrowser(context);
             }
 
             x += elementWidth + HorizontalIndent / 2;
@@ -321,9 +334,30 @@ namespace SearchHelper.Editor
 
             var elementWidth = 500.0f;
             var x = rect.x + FirstElementIndent;
-            EditorGUI.ObjectField(new Rect(x, rect.y, elementWidth, ContentHeight), context.Object, typeof(Object),
+            var objectFieldRect = new Rect(x, rect.y, elementWidth, ContentHeight);
+            EditorGUI.ObjectField(objectFieldRect, context.Object, typeof(Object),
                 context.Object);
-            x += elementWidth + HorizontalIndent;
+            x += elementWidth + HorizontalIndent / 2;
+
+            var e = Event.current;
+            if (e.type == EventType.MouseDown && e.button == 1 && objectFieldRect.Contains(e.mousePosition))
+            {
+                ShowContextMenu(context);
+            }
+
+            elementWidth = ContentHeight;
+            if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(HierarchyIconName)))
+            {
+                FindInHierarchyWindow(context);
+            }
+            x += elementWidth + HorizontalIndent / 2;
+
+            elementWidth = ContentHeight;
+            if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(InspectorIconName)))
+            {
+                OpenProperty(context);
+            }
+            x += elementWidth + HorizontalIndent / 2;
 
             elementWidth = 40.0f;
             EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "Guid:");
@@ -420,5 +454,81 @@ namespace SearchHelper.Editor
                     return objectContexts;
             }
         }
+
+        protected IEnumerable<Object> FolderOrFile(Object obj)
+        {
+            var path = AssetDatabase.GetAssetPath(obj);
+            if (!string.IsNullOrEmpty(path) && !AssetDatabase.IsValidFolder(path))
+            {
+                return obj.ToIEnumerable();
+            }
+            else
+            {
+                return SearchHelperService.FindAssetObjects(path);
+            }
+        }
+
+        protected void ShowContextMenu(ObjectContext context)
+        {
+            var menu = new GenericMenu();
+
+            menu.AddItem(new GUIContent("Open Folder"), false, () => { OpenInDefaultFileBrowser(context); });
+            menu.AddItem(new GUIContent("Find In Project"), false, () => { FindInProject(context); });
+            menu.AddItem(new GUIContent("Find In Scene"), false, () => { FindInHierarchyWindow(context); });
+            menu.AddItem(new GUIContent("Open Property"), false, () => { OpenProperty(context); });
+
+            menu.ShowAsContext();
+        }
+
+        protected void FindInHierarchyWindow(ObjectContext context)
+        {
+            if (context?.Path == null)
+            {
+                return;
+            }
+
+            var sceneHierarchyType = typeof(EditorWindow).Assembly.GetType("UnityEditor.SceneHierarchyWindow");
+            var window = EditorWindow.GetWindow(sceneHierarchyType);
+            var method = sceneHierarchyType.GetMethod("SetSearchFilter", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            if (method == null)
+            {
+                Debug.LogError("Method SetSearchFilter isn't found.");
+                return;
+            }
+
+            method.Invoke(window, new object[]
+            {
+                string.Format(SceneHierarchySearchReferenceFormat, context.Path),
+                0, // SearchableEditorWindow.SearchMode.All
+                false, // setAll
+                false // delayed
+            });
+        }
+
+        protected void OpenInDefaultFileBrowser(ObjectContext context)
+        {
+            if (!string.IsNullOrEmpty(context?.Path))
+            {
+                EditorUtility.RevealInFinder(context.Path);
+            }
+        }
+
+        protected void FindInProject(ObjectContext context)
+        {
+            if (context?.Object != null)
+            {
+                EditorGUIUtility.PingObject(context.Object);
+            }
+        }
+
+        protected void OpenProperty(ObjectContext context)
+        {
+            if (context?.Object != null)
+            {
+                EditorUtility.OpenPropertyEditor(context.Object);
+            }
+        }
+
     }
 }
