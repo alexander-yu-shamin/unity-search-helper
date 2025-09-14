@@ -1,9 +1,9 @@
 # TODO
 
 - Add tools:
-  - [ ] 'Dependency' tool
-  - [ ] 'Used By' tool
-  - [ ] 'Find By Guid' tool
+  - [x] 'Dependency' tool
+  - [x] 'Used By' tool
+  - [x] 'Find By Guid' tool
   - [ ] 'Duplicates' tool
   - [ ] 'Unused' tool
   - [ ] 'Uses in Build' tool

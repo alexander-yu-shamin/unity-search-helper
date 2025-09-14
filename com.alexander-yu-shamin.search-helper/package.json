@@ -9,7 +9,7 @@
   "__changelogUrl": "https://example.com/changelog.html",
   "__licensesUrl": "https://example.com/licensing.html",
   "dependencies": {
-    "com.alexander-yu-shamin.toolkit": "0.0.1"
+    "com.alexander-yu-shamin.toolkit": "0.0.2"
   },
   "__keywords": [
     "keyword1",
