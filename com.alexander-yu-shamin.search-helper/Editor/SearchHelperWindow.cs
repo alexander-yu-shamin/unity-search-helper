@@ -15,6 +15,7 @@ namespace SearchHelper.Editor
         {
             DependencyTool = 0,
             UsedByTool,
+            FindByGuidTool
         }
 
         private ToolType SelectedToolType { get; set; } = ToolType.DependencyTool;
@@ -22,7 +23,8 @@ namespace SearchHelper.Editor
         private Dictionary<ToolType, ToolBase> ToolMap { get; set; } = new()
         {
             { ToolType.DependencyTool, new DependenciesTool() },
-            { ToolType.UsedByTool, new UsedByTool() }
+            { ToolType.UsedByTool, new UsedByTool() },
+            { ToolType.FindByGuidTool, new FindByGuidTool() },
         };
 
         [MenuItem(SearchHelperSettings.WindowMenuItemName)]
@@ -48,6 +50,12 @@ namespace SearchHelper.Editor
         public static void ShowUsesBy()
         {
             OpenWindow().SelectTool(ToolType.UsedByTool)?.Run(Selection.activeObject);
+        }
+
+        [MenuItem(SearchHelperSettings.ContextMenuShowObjectGuidItemName)]
+        public static void ShowObjectGuid()
+        {
+            OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(Selection.activeObject);
         }
 
         public void OnGUI()

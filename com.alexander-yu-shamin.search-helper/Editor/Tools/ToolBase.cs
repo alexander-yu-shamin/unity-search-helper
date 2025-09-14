@@ -16,6 +16,8 @@ namespace SearchHelper.Editor
         public abstract string Name { get; set; }
 
         public virtual bool IsSortingSupported { get; set; } = true;
+        public virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
+        public virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
         protected enum SortVariant
         {
@@ -73,7 +75,7 @@ namespace SearchHelper.Editor
             return false;
         }
 
-        protected void DrawVirtualScroll(Rect windowRect, List<ObjectContext> contexts)
+        protected void DrawVirtualScroll(Rect windowRect, List<ObjectContext> contexts, bool drawDependencies = true)
         {
             if (contexts.IsNullOrEmpty())
             {
@@ -104,6 +106,11 @@ namespace SearchHelper.Editor
                         () => CalculateHeaderHeight(ctx)))
                 {
                     break;
+                }
+
+                if (!drawDependencies)
+                {
+                    continue;
                 }
 
                 if (ctx.Dependencies.IsNullOrEmpty())
@@ -175,7 +182,7 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            if (!context.Dependencies.Any(ShouldBeShown))
+            if (!DrawObjectWithEmptyDependencies && !context.Dependencies.Any(ShouldBeShown))
             {
                 return 0.0f;
             }
@@ -190,7 +197,7 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            if (!context.Dependencies.Any(ShouldBeShown))
+            if (!DrawObjectWithEmptyDependencies && !context.Dependencies.Any(ShouldBeShown))
             {
                 return 0.0f;
             }
@@ -218,8 +225,11 @@ namespace SearchHelper.Editor
 
             x += elementWidth + HorizontalIndent / 2;
             elementWidth = 250.0f;
-            EditorGUI.ObjectField(new Rect(x, y - 1, elementWidth, HeaderHeight), context.Object, typeof(Object),
+            var objectFieldRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
+            EditorGUI.ObjectField(objectFieldRect, context.Object, typeof(Object),
                 context.Object);
+
+            DrawContextMenu(context, objectFieldRect);
 
             x += elementWidth + HorizontalIndent / 2;
             elementWidth = EditorStyles.foldoutHeader.CalcSize(new GUIContent(context.Path)).x;
@@ -240,7 +250,7 @@ namespace SearchHelper.Editor
 
                 elementWidth = 40.0f;
                 x -= elementWidth;
-                EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Guid:");
+                EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "GUID:");
             }
 
             if (leftWidth > neededWidthForDependency)
@@ -284,15 +294,18 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            var result = DrawEmptyContent(new Rect(x, y, width, ContentHeightWithPadding), mainContext);
+            var result = DrawEmptyContent(new Rect(x, y, width, ContentHeightWithPadding), EmptyObjectContextText);
             y += result;
             return result;
         }
 
-        protected float DrawEmptyContent(Rect rect, ObjectContext mainContext)
+        protected float DrawEmptyContent(Rect rect, string text)
         {
             EditorGUI.DrawRect(rect, BoxColor);
-            EditorGUI.LabelField(new Rect(rect.x + FirstElementIndent, rect.y, rect.width, rect.height), "The object doesn't have any dependencies.");
+            EGuiKit.Color(ErrorColor, () =>
+            {
+                EditorGUI.LabelField(new Rect(rect.x + FirstElementIndent, rect.y, rect.width, rect.height), text);
+            });
             return ContentHeightWithPadding;
         }
 
@@ -339,11 +352,7 @@ namespace SearchHelper.Editor
                 context.Object);
             x += elementWidth + HorizontalIndent / 2;
 
-            var e = Event.current;
-            if (e.type == EventType.MouseDown && e.button == 1 && objectFieldRect.Contains(e.mousePosition))
-            {
-                ShowContextMenu(context);
-            }
+            DrawContextMenu(context, objectFieldRect);
 
             elementWidth = ContentHeight;
             if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(HierarchyIconName)))
@@ -360,7 +369,7 @@ namespace SearchHelper.Editor
             x += elementWidth + HorizontalIndent / 2;
 
             elementWidth = 40.0f;
-            EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "Guid:");
+            EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "GUID:");
             x += elementWidth;
 
             elementWidth = GuidTextAreaWidth;
@@ -385,6 +394,15 @@ namespace SearchHelper.Editor
             EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), context.Path);
 
             return ContentHeightWithPadding;
+        }
+
+        private void DrawContextMenu(ObjectContext context, Rect objectFieldRect)
+        {
+            var e = Event.current;
+            if (e.type == EventType.MouseDown && e.button == 1 && objectFieldRect.Contains(e.mousePosition))
+            {
+                ShowContextMenu(context);
+            }
         }
 
         protected void DrawHeaderControls()
@@ -529,6 +547,5 @@ namespace SearchHelper.Editor
                 EditorUtility.OpenPropertyEditor(context.Object);
             }
         }
-
     }
 }

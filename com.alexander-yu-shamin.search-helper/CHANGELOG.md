@@ -1,8 +1,8 @@
-# Changelog 
+# Changelog
 
 ## [Unreleased]
 
-### Added 
+### Added
 
 - 'Used By' tool
 - 'Find By Guid' tool
@@ -15,7 +15,7 @@
 
 ## [0.0.1] - 2025-09-11
 
-### Added 
+### Added
 
 - Dependency tool
 - Virtual Scroll

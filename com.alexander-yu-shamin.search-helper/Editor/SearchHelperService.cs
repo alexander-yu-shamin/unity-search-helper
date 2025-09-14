@@ -94,6 +94,38 @@ namespace SearchHelper.Editor
             return objectContext;
         }
 
+        public static Object FindObjectByGuid(string guid)
+        {
+            if (string.IsNullOrEmpty(guid))
+            {
+                return null;
+            }
+
+            var path = AssetDatabase.GUIDToAssetPath(guid);
+            if (string.IsNullOrEmpty(path))
+            {
+                return null;
+            }
+
+            return AssetDatabase.LoadMainAssetAtPath(path);
+        }
+
+        public static string GetObjectGuid(Object obj)
+        {
+            if (obj == null)
+            {
+                return string.Empty;
+            }
+
+            var path = AssetDatabase.GetAssetPath(obj);
+            if (string.IsNullOrEmpty(path))
+            {
+                return "Object has no GUID";
+            }
+
+            return AssetDatabase.AssetPathToGUID(path, AssetPathToGUIDOptions.OnlyExistingAssets);
+        }
+
         private static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets,
             string[] movedAssets, string[] movedFromAssetPaths, bool didDomainReload)
         {
