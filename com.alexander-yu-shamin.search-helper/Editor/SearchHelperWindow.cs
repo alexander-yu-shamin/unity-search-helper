@@ -17,6 +17,7 @@ namespace SearchHelper.Editor
             UsedByTool,
             FindByGuidTool,
             UnusedTool,
+            DuplicatesTool,
         }
 
         private ToolType SelectedToolType { get; set; } = ToolType.DependencyTool;
@@ -27,6 +28,7 @@ namespace SearchHelper.Editor
             { ToolType.UsedByTool, new UsedByTool() },
             { ToolType.FindByGuidTool, new FindByGuidTool() },
             { ToolType.UnusedTool, new UnusedTool() },
+            { ToolType.DuplicatesTool, new DuplicatesTool() },
         };
 
         [MenuItem(SearchHelperSettings.WindowMenuItemName)]
@@ -40,6 +42,23 @@ namespace SearchHelper.Editor
         public static bool ValidateActiveSelectedObject()
         {
             return Selection.activeObject;
+        }
+
+        [MenuItem(SearchHelperSettings.ContextMenuFindDuplicatesItemName, true)]
+        public static bool ValidateActiveSelectedObjectIsFolder()
+        {
+            if (!Selection.activeObject)
+            {
+                return false;
+            }
+
+            var path = AssetDatabase.GetAssetPath(Selection.activeObject);
+            if (string.IsNullOrEmpty(path))
+            {
+                return false;
+            }
+
+            return AssetDatabase.IsValidFolder(path);
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuItemFindDependenciesName)]
@@ -58,13 +77,18 @@ namespace SearchHelper.Editor
         public static void ShowObjectGuid()
         {
             OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(Selection.activeObject);
-
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuFindUnusedItemName)]
         public static void FindUnusedObjects()
         {
             OpenWindow().SelectTool(ToolType.UnusedTool)?.Run(Selection.activeObject);
+        }
+
+        [MenuItem(SearchHelperSettings.ContextMenuFindDuplicatesItemName)]
+        public static void FindDuplicates()
+        {
+            OpenWindow().SelectTool(ToolType.DuplicatesTool)?.Run(Selection.activeObject);
         }
 
         public void OnGUI()

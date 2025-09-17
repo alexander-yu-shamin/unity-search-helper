@@ -1,13 +1,19 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using PlasticGui.WorkspaceWindow;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
+using UnityEditor.VersionControl;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace SearchHelper.Editor.Tools
 {
-    public class UnusedTool : ToolBase
+    public class DuplicatesTool : ToolBase
     {
         public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
         private Object SelectedObject { get; set; }
@@ -26,7 +32,7 @@ namespace SearchHelper.Editor.Tools
                     UsedObject = null;
                 }
 
-                EGuiKit.Button("Find", () => { Contexts = FindUnused(SelectedObject); });
+                EGuiKit.Button("Find", () => { Contexts = FindDuplicates(SelectedObject); });
 
                 EGuiKit.FlexibleSpace();
                 DrawHeaderControls();
@@ -44,7 +50,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             SelectedObject = selectedObject;
-            Contexts = FindUnused(SelectedObject);
+            Contexts = FindDuplicates(SelectedObject);
         }
 
         protected override bool Sort(SortVariant sortVariant)
@@ -67,41 +73,59 @@ namespace SearchHelper.Editor.Tools
             return true;
         }
 
-        private List<ObjectContext> FindUnused(Object obj)
+        private List<ObjectContext> FindDuplicates(Object obj)
         {
+            IEnumerable<string> paths;
             if (obj == null)
             {
-                return null;
+                paths = SearchHelperService.FindAssetPaths();
+                if (!paths.Any())
+                {
+                    return null;
+                }
             }
-
-            UsedObject = obj;
-
-            var map = FolderOrFile(UsedObject).Select(ObjectContext.ToObjectContext).ToDictionary(key => key.Path);
-
-            var paths = SearchHelperService.FindAssetPaths();
-            if (!paths.Any())
+            else
             {
-                return null;
+                UsedObject = obj;
+                paths = FolderOrFile(UsedObject).Select(AssetDatabase.GetAssetPath);
+
+                if (paths.Count() <= 1)
+                {
+                    return null;
+                }
             }
+
+            var md5 = MD5.Create();
+            var dict = new Dictionary<string, List<string>>();
 
             foreach (var path in paths)
             {
-                if (map.ContainsKey(path))
+                try
                 {
-                    continue;
-                }
-
-                var dependencies = AssetDatabase.GetDependencies(path);
-                foreach (var dependency in dependencies)
-                {
-                    if (map.ContainsKey(dependency))
+                    var hashBytes = md5.ComputeHash(File.ReadAllBytes(path));
+                    var hash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                    if (dict.ContainsKey(hash))
                     {
-                        map[dependency].Dependencies.Add(ObjectContext.FromPath(path));
+                        dict[hash].Add(path);
                     }
+                    else
+                    {
+                        dict.Add(hash, new List<string>() { path });
+                    }
+                }
+                catch
+                {
+                    // ignored
                 }
             }
 
-            Contexts = map.Select(kv => kv.Value).Where(ctx => ctx.Dependencies.Count == 0).ToList();
+            Contexts = dict.Where(kv => kv.Value.Count > 1).Select(kv =>
+            {
+                var ctx = ObjectContext.FromPath(kv.Value.First());
+                ctx.Dependencies = kv.Value.Select(ObjectContext.FromPath).ToList();
+                return ctx;
+            }).ToList();
+
             Sort(CurrentSortVariant);
             return Contexts;
         }

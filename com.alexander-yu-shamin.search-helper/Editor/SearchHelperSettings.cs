@@ -13,10 +13,12 @@ namespace SearchHelper.Editor
         public const string FindUsedByToolName = "Find Used By";
         public const string FindByGuidToolName = "Find by GUID";
         public const string FindUnusedToolName = "Find Unused";
+        public const string FindDuplicatesToolName = "Find Duplicates";
 
         public const string ContextMenuItemFindDependenciesName = ContextMenuBase + FindDependenciesToolName;
         public const string ContextMenuFindUsedByItemName = ContextMenuBase + FindUsedByToolName;
         public const string ContextMenuShowObjectGuidItemName = ContextMenuBase + FindByGuidToolName;
         public const string ContextMenuFindUnusedItemName = ContextMenuBase + FindUnusedToolName;
+        public const string ContextMenuFindDuplicatesItemName = ContextMenuBase + FindDuplicatesToolName;
     }
 }

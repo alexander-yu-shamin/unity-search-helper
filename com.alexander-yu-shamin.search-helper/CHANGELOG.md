@@ -2,9 +2,15 @@
 
 ## [Unreleased]
 
+## [0.0.4] - 2025-09-17
+
+## Added
+
+- 'Duplicates' tool
+
 ## [0.0.3] - 2025-09-17
 
-## Added 
+## Added
 
 - 'Unused' tool - the same as 'Used by' but can be used for folders
 
