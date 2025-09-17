@@ -10,7 +10,7 @@ namespace SearchHelper.Editor.Tools
 {
     public class UsedByTool : ToolBase
     {
-        public override string Name { get; set; } = SearchHelperSettings.UsedByToolName;
+        public override string Name { get; set; } = SearchHelperSettings.FindUsedByToolName;
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
 
@@ -26,7 +26,7 @@ namespace SearchHelper.Editor.Tools
                     UsedObject = null;
                 }
 
-                EGuiKit.Button(SearchHelperSettings.UsesToolButtonText, () =>
+                EGuiKit.Button("Find", () =>
                 {
                     Contexts = FindUsedBy(SelectedObject);
                 });

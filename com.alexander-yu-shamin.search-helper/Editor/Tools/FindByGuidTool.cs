@@ -31,7 +31,7 @@ namespace SearchHelper.Editor.Tools
                 }
 
                 EGuiKit.Space(HorizontalIndent);
-                EGuiKit.Button(SearchHelperSettings.FindByGuidButtonText, () =>
+                EGuiKit.Button("Find", () =>
                 {
                     FindAssetByGuid(CurrentGuid);
                 });

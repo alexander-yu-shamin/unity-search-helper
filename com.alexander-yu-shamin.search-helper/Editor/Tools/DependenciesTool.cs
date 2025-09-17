@@ -9,7 +9,7 @@ namespace SearchHelper.Editor.Tools
 {
     public class DependenciesTool : ToolBase
     {
-        public override string Name { get; set; } = SearchHelperSettings.DependenciesToolName;
+        public override string Name { get; set; } = SearchHelperSettings.FindDependenciesToolName;
 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
@@ -26,7 +26,7 @@ namespace SearchHelper.Editor.Tools
                     UsedObject = null;
                 }
 
-                EGuiKit.Button(SearchHelperSettings.UsesToolButtonText, () =>
+                EGuiKit.Button("Find", () =>
                 {
                     FindDependencies(SelectedObject);
                 });

@@ -60,10 +60,6 @@ namespace SearchHelper.Editor
 
         public bool IsExpanded { get; set; } = true;
 
-        //public bool IsValid => Object != null && !string.IsNullOrEmpty(Path);
-
-        private const string NoGuidText = "NO GUID";
-
         public static ObjectContext ToObjectContext(Object obj)
         {
             if (obj == null)
@@ -72,7 +68,6 @@ namespace SearchHelper.Editor
             }
 
             var path = AssetDatabase.GetAssetPath(obj);
-            var guid = NoGuidText;
 
             return new ObjectContext()
             {
