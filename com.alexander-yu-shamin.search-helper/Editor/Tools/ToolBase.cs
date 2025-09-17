@@ -13,8 +13,6 @@ namespace SearchHelper.Editor
 {
     public abstract class ToolBase
     {
-        public abstract string Name { get; set; }
-
         public virtual bool IsSortingSupported { get; set; } = true;
         public virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
         public virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
@@ -218,7 +216,8 @@ namespace SearchHelper.Editor
             y += HeaderPadding / 2;
 
             var elementWidth = HeaderHeight;
-            if (GUI.Button(new Rect(x, y - 1, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(FolderIconName)))
+            if (GUI.Button(new Rect(x, y - 1, elementWidth, HeaderHeight),
+                    EditorGUIUtility.IconContent(FolderIconName)))
             {
                 OpenInDefaultFileBrowser(context);
             }
@@ -226,14 +225,14 @@ namespace SearchHelper.Editor
             x += elementWidth + HorizontalIndent / 2;
             elementWidth = 250.0f;
             var objectFieldRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
-            EditorGUI.ObjectField(objectFieldRect, context.Object, typeof(Object),
-                context.Object);
+            EditorGUI.ObjectField(objectFieldRect, context.Object, typeof(Object), context.Object);
 
             DrawContextMenu(context, objectFieldRect);
 
             x += elementWidth + HorizontalIndent / 2;
             elementWidth = EditorStyles.foldoutHeader.CalcSize(new GUIContent(context.Path)).x;
-            context.IsExpanded = EditorGUI.BeginFoldoutHeaderGroup(new Rect(x, y, elementWidth, HeaderHeight), context.IsExpanded, context.Path);
+            context.IsExpanded = EditorGUI.BeginFoldoutHeaderGroup(new Rect(x, y, elementWidth, HeaderHeight),
+                context.IsExpanded, context.Path);
             EditorGUI.EndFoldoutHeaderGroup();
 
             x += elementWidth + HorizontalIndent;
@@ -257,7 +256,8 @@ namespace SearchHelper.Editor
             {
                 elementWidth = 50.0f;
                 x -= elementWidth + HorizontalIndent;
-                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Dependencies?.Capacity.ToString());
+                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight),
+                    context.Dependencies?.Capacity.ToString());
 
                 elementWidth = 100.0f;
                 x -= elementWidth;

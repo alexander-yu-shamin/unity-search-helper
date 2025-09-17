@@ -9,8 +9,6 @@ namespace SearchHelper.Editor.Tools
 {
     public class DependenciesTool : ToolBase
     {
-        public override string Name { get; set; } = SearchHelperSettings.FindDependenciesToolName;
-
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
         private List<ObjectContext> Contexts { get; set; }

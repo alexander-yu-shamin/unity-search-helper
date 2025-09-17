@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.0.3] - 2025-09-17
+
+## Added 
+
+- 'Unused' tool - the same as 'Used by' but can be used for folders
+
+## Fixed
+
+- displaying a context with empty dependencies
+
 ## [0.0.2] - 2025-09-14
 
 ### Added

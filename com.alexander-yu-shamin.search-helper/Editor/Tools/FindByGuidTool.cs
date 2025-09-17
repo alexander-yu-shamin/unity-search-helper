@@ -8,7 +8,6 @@ namespace SearchHelper.Editor.Tools
 {
     public class FindByGuidTool : ToolBase
     {
-        public override string Name { get; set; } = SearchHelperSettings.FindByGuidToolName;
         private string CurrentGuid { get; set; } 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }

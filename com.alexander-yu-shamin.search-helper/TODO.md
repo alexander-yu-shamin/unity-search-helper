@@ -5,6 +5,6 @@
   - [x] 'Used By' tool
   - [x] 'Find By Guid' tool
   - [ ] 'Duplicates' tool
-  - [ ] 'Unused' tool
+  - [x] 'Unused' tool
   - [ ] 'Uses in Build' tool
   - [ ] 'Assets By Type' tool

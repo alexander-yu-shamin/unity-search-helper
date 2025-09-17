@@ -7,13 +7,14 @@ using UnityEngine;
 
 namespace SearchHelper.Editor.Tools
 {
-    public class UsedByTool : ToolBase
+    public class UnusedTool : ToolBase
     {
         public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
 
         private List<ObjectContext> Contexts { get; set; }
+
         public override void Draw(Rect windowRect)
         {
             EGuiKit.Horizontal(() =>
@@ -25,10 +26,7 @@ namespace SearchHelper.Editor.Tools
                     UsedObject = null;
                 }
 
-                EGuiKit.Button("Find", () =>
-                {
-                    FindUsedBy(SelectedObject);
-                });
+                EGuiKit.Button("Find", () => { Contexts = FindUnused(SelectedObject); });
 
                 EGuiKit.FlexibleSpace();
                 DrawHeaderControls();
@@ -46,7 +44,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             SelectedObject = selectedObject;
-            FindUsedBy(SelectedObject);
+            Contexts = FindUnused(SelectedObject);
         }
 
         protected override bool Sort(SortVariant sortVariant)
@@ -69,7 +67,7 @@ namespace SearchHelper.Editor.Tools
             return true;
         }
 
-        private List<ObjectContext> FindUsedBy(Object obj)
+        private List<ObjectContext> FindUnused(Object obj)
         {
             if (obj == null)
             {
@@ -77,7 +75,8 @@ namespace SearchHelper.Editor.Tools
             }
 
             UsedObject = obj;
-            var searchedCtx = ObjectContext.ToObjectContext(obj);
+
+            var map = FolderOrFile(UsedObject).Select(el => ObjectContext.ToObjectContext(el)).ToDictionary(key => key.Path);
 
             var paths = SearchHelperService.FindAssetPaths();
             if (!paths.Any())
@@ -87,7 +86,7 @@ namespace SearchHelper.Editor.Tools
 
             foreach (var path in paths)
             {
-                if (path == searchedCtx.Path)
+                if (map.ContainsKey(path))
                 {
                     continue;
                 }
@@ -95,15 +94,14 @@ namespace SearchHelper.Editor.Tools
                 var dependencies = AssetDatabase.GetDependencies(path);
                 foreach (var dependency in dependencies)
                 {
-                    if (dependency == searchedCtx.Path)
+                    if (map.ContainsKey(dependency))
                     {
-                        searchedCtx.Dependencies.Add(ObjectContext.FromPath(path));
-                        break;
+                        map[dependency].Dependencies.Add(ObjectContext.FromPath(path));
                     }
                 }
             }
 
-            Contexts = new List<ObjectContext>() { searchedCtx };
+            Contexts = map.Select(kv => kv.Value).Where(ctx => ctx.Dependencies.Count == 0).ToList();
             Sort(CurrentSortVariant);
             return Contexts;
         }

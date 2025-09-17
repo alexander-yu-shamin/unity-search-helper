@@ -15,7 +15,8 @@ namespace SearchHelper.Editor
         {
             DependencyTool = 0,
             UsedByTool,
-            FindByGuidTool
+            FindByGuidTool,
+            UnusedTool,
         }
 
         private ToolType SelectedToolType { get; set; } = ToolType.DependencyTool;
@@ -25,6 +26,7 @@ namespace SearchHelper.Editor
             { ToolType.DependencyTool, new DependenciesTool() },
             { ToolType.UsedByTool, new UsedByTool() },
             { ToolType.FindByGuidTool, new FindByGuidTool() },
+            { ToolType.UnusedTool, new UnusedTool() },
         };
 
         [MenuItem(SearchHelperSettings.WindowMenuItemName)]
@@ -56,6 +58,13 @@ namespace SearchHelper.Editor
         public static void ShowObjectGuid()
         {
             OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(Selection.activeObject);
+
+        }
+
+        [MenuItem(SearchHelperSettings.ContextMenuFindUnusedItemName)]
+        public static void FindUnusedObjects()
+        {
+            OpenWindow().SelectTool(ToolType.UnusedTool)?.Run(Selection.activeObject);
         }
 
         public void OnGUI()
@@ -65,7 +74,7 @@ namespace SearchHelper.Editor
                 return;
             }
 
-            var newToolType = (ToolType) GUILayout.SelectionGrid((int)SelectedToolType, ToolMap.Keys.Select(v => v.ToString()).ToArray(), ToolMap.Keys.Count);
+            var newToolType = (ToolType) GUILayout.SelectionGrid((int)SelectedToolType, ToolMap.Keys.Select(v => v.ToString().ToSpacedWords()).ToArray(), ToolMap.Keys.Count);
             EditorGUILayout.Space(10);
             SelectTool(newToolType)?.Draw(position);
         }
