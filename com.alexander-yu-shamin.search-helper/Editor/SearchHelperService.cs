@@ -12,32 +12,6 @@ namespace SearchHelper.Editor
     {
         private const string ObjectSearchFilter = "t:Object";
 
-        public static IEnumerable<ObjectContext> FindAllAssets(string root = null)
-        {
-            var guids = AssetDatabase.FindAssets(ObjectSearchFilter, GetSearchDirs(root));
-
-            var objects = guids.Select(guid =>
-            {
-                var path = AssetDatabase.GUIDToAssetPath(guid);
-                var obj = AssetDatabase.LoadMainAssetAtPath(path);
-
-                if (obj == null)
-                {
-                    return null;
-                }
-
-                return new ObjectContext()
-                {
-                    Guid = guid,
-                    Path = path,
-                    Object = obj,
-                    Dependencies = new List<ObjectContext>()
-                };
-            }).Where(ctx => ctx != null);
-
-            return objects;
-        }
-
         public static IEnumerable<string> FindAssetPaths(string root = null)
         {
             return AssetDatabase.FindAssets(ObjectSearchFilter, GetSearchDirs(root))
@@ -51,17 +25,6 @@ namespace SearchHelper.Editor
                                 .Select(AssetDatabase.GUIDToAssetPath)
                                 .Select(AssetDatabase.LoadMainAssetAtPath)
                                 .Where(asset => asset != null);
-        }
-
-        private static string[] GetSearchDirs(string root = null)
-        {
-            var searchDirs = new[] { "Assets" };
-            if (!string.IsNullOrEmpty(root))
-            {
-                searchDirs = new[] { root };
-            }
-
-            return searchDirs;
         }
 
         public static ObjectContext FindDependencies(Object obj)
@@ -124,6 +87,16 @@ namespace SearchHelper.Editor
             }
 
             return AssetDatabase.AssetPathToGUID(path, AssetPathToGUIDOptions.OnlyExistingAssets);
+        }
+        private static string[] GetSearchDirs(string root = null)
+        {
+            var searchDirs = new[] { "Assets" };
+            if (!string.IsNullOrEmpty(root))
+            {
+                searchDirs = new[] { root };
+            }
+
+            return searchDirs;
         }
 
         private static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets,

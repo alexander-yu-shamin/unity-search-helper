@@ -4,6 +4,14 @@
 
 ## [0.0.4] - 2025-09-17
 
+## Fixed
+
+- Fix UI in some tools
+- Fix 'Unused' tool
+
+
+## [0.0.4] - 2025-09-17
+
 ## Added
 
 - 'Duplicates' tool

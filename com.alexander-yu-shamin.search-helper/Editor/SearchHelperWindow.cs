@@ -6,10 +6,11 @@ using SearchHelper.Editor.Tools;
 using UnityEditor;
 using UnityEngine;
 using Toolkit.Runtime.Extensions;
+using Object = UnityEngine.Object;
 
 namespace SearchHelper.Editor
 {
-    public partial class SearchHelperWindow : EditorWindow
+    public class SearchHelperWindow : EditorWindow
     {
         enum ToolType
         {
@@ -31,6 +32,10 @@ namespace SearchHelper.Editor
             { ToolType.DuplicatesTool, new DuplicatesTool() },
         };
 
+        private static Object SelectedObject => !Selection.assetGUIDs.IsNullOrEmpty()
+            ? AssetDatabase.LoadMainAssetAtPath(AssetDatabase.GUIDToAssetPath(Selection.assetGUIDs.First()))
+            : null;
+
         [MenuItem(SearchHelperSettings.WindowMenuItemName)]
         private static SearchHelperWindow OpenWindow()
         {
@@ -39,56 +44,41 @@ namespace SearchHelper.Editor
 
         [MenuItem(SearchHelperSettings.ContextMenuItemFindDependenciesName, true)]
         [MenuItem(SearchHelperSettings.ContextMenuFindUsedByItemName, true)]
+        [MenuItem(SearchHelperSettings.ContextMenuFindDuplicatesItemName, true)]
+        [MenuItem(SearchHelperSettings.ContextMenuShowObjectGuidItemName, true)]
         public static bool ValidateActiveSelectedObject()
         {
-            return Selection.activeObject;
-        }
-
-        [MenuItem(SearchHelperSettings.ContextMenuFindDuplicatesItemName, true)]
-        public static bool ValidateActiveSelectedObjectIsFolder()
-        {
-            if (!Selection.activeObject)
-            {
-                return false;
-            }
-
-            var path = AssetDatabase.GetAssetPath(Selection.activeObject);
-            if (string.IsNullOrEmpty(path))
-            {
-                return false;
-            }
-
-            return AssetDatabase.IsValidFolder(path);
+            return SelectedObject != null;
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuItemFindDependenciesName)]
         public static void ShowDependencies()
         {
-            OpenWindow().SelectTool(ToolType.DependencyTool)?.Run(Selection.activeObject);
+            OpenWindow().SelectTool(ToolType.DependencyTool)?.Run(SelectedObject);
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuFindUsedByItemName)]
         public static void ShowUsesBy()
         {
-            OpenWindow().SelectTool(ToolType.UsedByTool)?.Run(Selection.activeObject);
+            OpenWindow().SelectTool(ToolType.UsedByTool)?.Run(SelectedObject);
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuShowObjectGuidItemName)]
         public static void ShowObjectGuid()
         {
-            OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(Selection.activeObject);
+            OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(SelectedObject);
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuFindUnusedItemName)]
         public static void FindUnusedObjects()
         {
-            OpenWindow().SelectTool(ToolType.UnusedTool)?.Run(Selection.activeObject);
+            OpenWindow().SelectTool(ToolType.UnusedTool)?.Run(SelectedObject);
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuFindDuplicatesItemName)]
         public static void FindDuplicates()
         {
-            OpenWindow().SelectTool(ToolType.DuplicatesTool)?.Run(Selection.activeObject);
+            OpenWindow().SelectTool(ToolType.DuplicatesTool)?.Run(SelectedObject);
         }
 
         public void OnGUI()

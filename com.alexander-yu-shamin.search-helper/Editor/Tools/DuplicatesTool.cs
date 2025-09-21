@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
-using PlasticGui.WorkspaceWindow;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
@@ -16,6 +15,9 @@ namespace SearchHelper.Editor.Tools
     public class DuplicatesTool : ToolBase
     {
         public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
+        public override bool IsShowFoldersSupported { get; set; } = false;
+        public override bool IsShowEditorBuiltInSupported { get; set; } = false;
+
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
 
@@ -43,12 +45,6 @@ namespace SearchHelper.Editor.Tools
 
         public override void Run(Object selectedObject)
         {
-            if (selectedObject == null)
-            {
-                Debug.LogError($"Selected Object is null!");
-                return;
-            }
-
             SelectedObject = selectedObject;
             Contexts = FindDuplicates(SelectedObject);
         }
@@ -75,35 +71,53 @@ namespace SearchHelper.Editor.Tools
 
         private List<ObjectContext> FindDuplicates(Object obj)
         {
+            var searchedPath = string.Empty;
+
             IEnumerable<string> paths;
-            if (obj == null)
+            if (obj != null)
             {
-                paths = SearchHelperService.FindAssetPaths();
-                if (!paths.Any())
+                UsedObject = obj;
+                var objPath = AssetDatabase.GetAssetPath(obj);
+                if (!string.IsNullOrEmpty(objPath) && AssetDatabase.IsValidFolder(objPath))
                 {
-                    return null;
+                    paths = SearchHelperService.FindAssetPaths(objPath);
+                }
+                else
+                {
+                    searchedPath = objPath;
+                    paths = SearchHelperService.FindAssetPaths();
                 }
             }
             else
             {
-                UsedObject = obj;
-                paths = FolderOrFile(UsedObject).Select(AssetDatabase.GetAssetPath);
+                UsedObject = AssetDatabase.LoadMainAssetAtPath("Assets");
+                paths = SearchHelperService.FindAssetPaths();
+            }
 
-                if (paths.Count() <= 1)
-                {
-                    return null;
-                }
+            if (!paths.Any())
+            {
+                return null;
             }
 
             var md5 = MD5.Create();
             var dict = new Dictionary<string, List<string>>();
 
+            var searchedHash = string.Empty;
+            if (!string.IsNullOrEmpty(searchedPath))
+            {
+                searchedHash = Hash(ref md5, searchedPath);
+                if (string.IsNullOrEmpty(searchedHash))
+                {
+                    Debug.Log($"Can't count Hash for {searchedPath}");
+                    return null;
+                }
+            }
+
             foreach (var path in paths)
             {
                 try
                 {
-                    var hashBytes = md5.ComputeHash(File.ReadAllBytes(path));
-                    var hash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                    var hash = Hash(ref md5, path);
                     if (dict.ContainsKey(hash))
                     {
                         dict[hash].Add(path);
@@ -119,15 +133,23 @@ namespace SearchHelper.Editor.Tools
                 }
             }
 
-            Contexts = dict.Where(kv => kv.Value.Count > 1).Select(kv =>
-            {
-                var ctx = ObjectContext.FromPath(kv.Value.First());
-                ctx.Dependencies = kv.Value.Select(ObjectContext.FromPath).ToList();
-                return ctx;
-            }).ToList();
+            Contexts = 
+                dict.Where(kv => (string.IsNullOrEmpty(searchedHash) || kv.Key == searchedHash) && kv.Value.Count > 1).Select(kv =>
+                {
+                    var ctx = ObjectContext.FromPath(kv.Value.First());
+                    ctx.Dependencies = kv.Value.Select(ObjectContext.FromPath).ToList();
+                    return ctx;
+                }).ToList();
 
             Sort(CurrentSortVariant);
             return Contexts;
+        }
+
+        private static string Hash(ref MD5 md5, string path)
+        {
+            var hashBytes = md5.ComputeHash(File.ReadAllBytes(path));
+            var hash = BitConverter.ToString(hashBytes);
+            return hash;
         }
     }
 }

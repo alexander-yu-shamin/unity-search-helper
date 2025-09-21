@@ -5,7 +5,6 @@ using System.Reflection;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
-using UnityEditor.Search;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -14,6 +13,8 @@ namespace SearchHelper.Editor
     public abstract class ToolBase
     {
         public virtual bool IsSortingSupported { get; set; } = true;
+        public virtual bool IsShowFoldersSupported { get; set; } = true;
+        public virtual bool IsShowEditorBuiltInSupported { get; set; } = true;
         public virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
         public virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
@@ -257,7 +258,7 @@ namespace SearchHelper.Editor
                 elementWidth = 50.0f;
                 x -= elementWidth + HorizontalIndent;
                 EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight),
-                    context.Dependencies?.Capacity.ToString());
+                    context.Dependencies?.Count.ToString());
 
                 elementWidth = 100.0f;
                 x -= elementWidth;
@@ -409,9 +410,17 @@ namespace SearchHelper.Editor
         {
             EGuiKit.Horizontal(() =>
             {
-                IsFoldersShown = EditorGUILayout.ToggleLeft("Show Folders", IsFoldersShown, GUILayout.Width(100));
-                EGuiKit.Space(HorizontalIndent);
-                IsEditorBuiltInElementsShown = EditorGUILayout.ToggleLeft("Show Editor Built-In", IsEditorBuiltInElementsShown, GUILayout.Width(150));
+                if (IsShowFoldersSupported)
+                {
+                    IsFoldersShown = EditorGUILayout.ToggleLeft("Show Folders", IsFoldersShown, GUILayout.Width(100));
+                    EGuiKit.Space(HorizontalIndent);
+                }
+
+                if (IsShowEditorBuiltInSupported)
+                {
+                    IsEditorBuiltInElementsShown = EditorGUILayout.ToggleLeft("Show Editor Built-In", IsEditorBuiltInElementsShown, GUILayout.Width(130));
+                    EGuiKit.Space(HorizontalIndent);
+                }
 
                 if (IsSortingSupported)
                 {
@@ -478,7 +487,7 @@ namespace SearchHelper.Editor
             var path = AssetDatabase.GetAssetPath(obj);
             if (!string.IsNullOrEmpty(path) && !AssetDatabase.IsValidFolder(path))
             {
-                return obj.ToIEnumerable();
+                return obj.AsIEnumerable();
             }
             else
             {
@@ -494,8 +503,45 @@ namespace SearchHelper.Editor
             menu.AddItem(new GUIContent("Find In Project"), false, () => { FindInProject(context); });
             menu.AddItem(new GUIContent("Find In Scene"), false, () => { FindInHierarchyWindow(context); });
             menu.AddItem(new GUIContent("Open Property"), false, () => { OpenProperty(context); });
+            if (!context.Dependencies.IsNullOrEmpty())
+            {
+                menu.AddItem(new GUIContent("Select All"), false, () => { SelectAll(context); });
+                menu.AddItem(new GUIContent("Select Dependencies"), false, () => { SelectDependencies(context); });
+            }
 
             menu.ShowAsContext();
+        }
+
+        private void SelectDependencies(ObjectContext context)
+        {
+            if (context == null)
+            {
+                return;
+            }
+
+            if (context.Dependencies.IsNullOrEmpty())
+            {
+                return;
+            }
+
+            Selection.objects = context.Dependencies.Select(el => el.Object).ToArray();
+        }
+
+        private void SelectAll(ObjectContext context)
+        {
+            if (context == null)
+            {
+                return;
+            }
+
+            if (context.Dependencies.IsNullOrEmpty())
+            {
+                return;
+            }
+
+            Selection.objects = new[] { context.Object }
+                                .Concat(context.Dependencies.Select(el => el.Object))
+                                .ToArray();
         }
 
         protected void FindInHierarchyWindow(ObjectContext context)

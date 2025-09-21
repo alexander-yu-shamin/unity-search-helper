@@ -10,8 +10,12 @@ namespace SearchHelper.Editor.Tools
     public class UnusedTool : ToolBase
     {
         public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
+        public override bool IsShowFoldersSupported { get; set; } = false;
+        public override bool IsShowEditorBuiltInSupported { get; set; } = false;
+
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
+        private bool ShowAll { get; set; } = false;
 
         private List<ObjectContext> Contexts { get; set; }
 
@@ -29,6 +33,10 @@ namespace SearchHelper.Editor.Tools
                 EGuiKit.Button("Find", () => { Contexts = FindUnused(SelectedObject); });
 
                 EGuiKit.FlexibleSpace();
+
+                ShowAll = EditorGUILayout.ToggleLeft("Show All", ShowAll, GUILayout.Width(100));
+                EGuiKit.Space(HorizontalIndent);
+
                 DrawHeaderControls();
             });
 
@@ -37,12 +45,6 @@ namespace SearchHelper.Editor.Tools
 
         public override void Run(Object selectedObject)
         {
-            if (selectedObject == null)
-            {
-                Debug.LogError($"Selected Object is null!");
-                return;
-            }
-
             SelectedObject = selectedObject;
             Contexts = FindUnused(SelectedObject);
         }
@@ -101,8 +103,8 @@ namespace SearchHelper.Editor.Tools
                 }
             }
 
-            Contexts = map.Select(kv => kv.Value).Where(ctx => ctx.Dependencies.Count == 0).ToList();
-            Sort(CurrentSortVariant);
+            Contexts = ShowAll ? map.Values.OrderBy(ctx => ctx.Dependencies.Count).ToList() : map.Values.Where(ctx => ctx.Dependencies.Count == 0).ToList();
+            Sort(Contexts, CurrentSortVariant);
             return Contexts;
         }
     }
