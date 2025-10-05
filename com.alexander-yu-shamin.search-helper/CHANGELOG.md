@@ -2,13 +2,11 @@
 
 ## [Unreleased]
 
-## [0.0.4] - 2025-09-17
+## [0.0.5] - 2025-10-05
 
-## Fixed
+## Added 
 
-- Fix UI in some tools
-- Fix 'Unused' tool
-
+- 'Merge too'
 
 ## [0.0.4] - 2025-09-17
 

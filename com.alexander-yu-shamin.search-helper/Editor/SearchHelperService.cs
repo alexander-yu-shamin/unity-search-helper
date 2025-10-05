@@ -12,6 +12,8 @@ namespace SearchHelper.Editor
     {
         private const string ObjectSearchFilter = "t:Object";
 
+        public static event Action OnPostprocessAllAssetsEvent;
+
         public static IEnumerable<string> FindAssetPaths(string root = null)
         {
             return AssetDatabase.FindAssets(ObjectSearchFilter, GetSearchDirs(root))
@@ -25,6 +27,42 @@ namespace SearchHelper.Editor
                                 .Select(AssetDatabase.GUIDToAssetPath)
                                 .Select(AssetDatabase.LoadMainAssetAtPath)
                                 .Where(asset => asset != null);
+        }
+
+        public static ObjectContext FindUsedBy(Object obj)
+        {
+            if (obj == null)
+            {
+                return null;
+            }
+
+            var searchedCtx = ObjectContext.ToObjectContext(obj);
+
+            var paths = SearchHelperService.FindAssetPaths();
+            if (!paths.Any())
+            {
+                return null;
+            }
+
+            foreach (var path in paths)
+            {
+                if (path == searchedCtx.Path)
+                {
+                    continue;
+                }
+
+                var dependencies = AssetDatabase.GetDependencies(path);
+                foreach (var dependency in dependencies)
+                {
+                    if (dependency == searchedCtx.Path)
+                    {
+                        searchedCtx.Dependencies.Add(ObjectContext.FromPath(path));
+                        break;
+                    }
+                }
+            }
+
+            return searchedCtx;
         }
 
         public static ObjectContext FindDependencies(Object obj)
@@ -109,6 +147,7 @@ namespace SearchHelper.Editor
 
             if (!didDomainReload)
             {
+                OnPostprocessAllAssetsEvent?.Invoke();
             }
         }
     }

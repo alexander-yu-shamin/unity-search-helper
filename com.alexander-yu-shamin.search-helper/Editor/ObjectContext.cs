@@ -12,9 +12,9 @@ namespace SearchHelper.Editor
         {
             get
             {
-                if (_object == null && !string.IsNullOrEmpty(Path))
+                if (_object == null && !string.IsNullOrEmpty(_path))
                 {
-                    _object = AssetDatabase.LoadMainAssetAtPath(Path);
+                    _object = AssetDatabase.LoadMainAssetAtPath(_path);
                 }
 
                 return _object;
@@ -28,9 +28,9 @@ namespace SearchHelper.Editor
         {
             get
             {
-                if (string.IsNullOrEmpty(_path) && !string.IsNullOrEmpty(Guid))
+                if (string.IsNullOrEmpty(_path) && !string.IsNullOrEmpty(_guid))
                 {
-                    _path = AssetDatabase.GUIDToAssetPath(Guid);
+                    _path = AssetDatabase.GUIDToAssetPath(_guid);
                 }
 
                 return _path;
@@ -44,9 +44,9 @@ namespace SearchHelper.Editor
         {
             get
             {
-                if (string.IsNullOrEmpty(_guid) && !string.IsNullOrEmpty(Path))
+                if (string.IsNullOrEmpty(_guid) && !string.IsNullOrEmpty(_path))
                 {
-                    _guid = AssetDatabase.AssetPathToGUID(Path);
+                    _guid = AssetDatabase.AssetPathToGUID(_path);
                 }
 
                 return _guid;
@@ -59,6 +59,17 @@ namespace SearchHelper.Editor
         public List<ObjectContext> Dependencies;
 
         public bool IsExpanded { get; set; } = true;
+
+        public ObjectContext()
+        {
+        }
+
+        public ObjectContext(ObjectContext context)
+        {
+            _guid = context._guid;
+            _object = context._object;
+            _path = context._path;
+        }
 
         public static ObjectContext ToObjectContext(Object obj)
         {

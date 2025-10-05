@@ -37,6 +37,10 @@ namespace SearchHelper.Editor.Tools
                 EGuiKit.Button("Find", () => { Contexts = FindDuplicates(SelectedObject); });
 
                 EGuiKit.FlexibleSpace();
+                EGuiKit.Button(UsedObject != null && !Contexts.IsNullOrEmpty(), "Open in Merge Tool", () =>
+                {
+                    SearchHelperWindow.TransferToTool(SearchHelperWindow.ToolType.MergeTool, Contexts);
+                });
                 DrawHeaderControls();
             });
 

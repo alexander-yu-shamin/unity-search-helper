@@ -77,31 +77,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             UsedObject = obj;
-            var searchedCtx = ObjectContext.ToObjectContext(obj);
-
-            var paths = SearchHelperService.FindAssetPaths();
-            if (!paths.Any())
-            {
-                return null;
-            }
-
-            foreach (var path in paths)
-            {
-                if (path == searchedCtx.Path)
-                {
-                    continue;
-                }
-
-                var dependencies = AssetDatabase.GetDependencies(path);
-                foreach (var dependency in dependencies)
-                {
-                    if (dependency == searchedCtx.Path)
-                    {
-                        searchedCtx.Dependencies.Add(ObjectContext.FromPath(path));
-                        break;
-                    }
-                }
-            }
+            var searchedCtx = SearchHelperService.FindUsedBy(obj);
 
             Contexts = new List<ObjectContext>() { searchedCtx };
             Sort(CurrentSortVariant);

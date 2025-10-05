@@ -12,13 +12,14 @@ namespace SearchHelper.Editor
 {
     public class SearchHelperWindow : EditorWindow
     {
-        enum ToolType
+        public enum ToolType
         {
             DependencyTool = 0,
             UsedByTool,
             FindByGuidTool,
             UnusedTool,
             DuplicatesTool,
+            MergeTool
         }
 
         private ToolType SelectedToolType { get; set; } = ToolType.DependencyTool;
@@ -30,6 +31,7 @@ namespace SearchHelper.Editor
             { ToolType.FindByGuidTool, new FindByGuidTool() },
             { ToolType.UnusedTool, new UnusedTool() },
             { ToolType.DuplicatesTool, new DuplicatesTool() },
+            { ToolType.MergeTool, new MergeTool() },
         };
 
         private static Object SelectedObject => !Selection.assetGUIDs.IsNullOrEmpty()
@@ -80,6 +82,18 @@ namespace SearchHelper.Editor
         {
             OpenWindow().SelectTool(ToolType.DuplicatesTool)?.Run(SelectedObject);
         }
+
+        [MenuItem(SearchHelperSettings.ContextMenuMergeItemName)]
+        public static void MergeFiles()
+        {
+            OpenWindow().SelectTool(ToolType.MergeTool)?.Run(SelectedObject);
+        }
+
+        public static void TransferToTool(ToolType toolType, List<ObjectContext> contexts)
+        {
+            OpenWindow()?.SelectTool(toolType).GetDataFromAnotherTool(contexts);
+        }
+
 
         public void OnGUI()
         {

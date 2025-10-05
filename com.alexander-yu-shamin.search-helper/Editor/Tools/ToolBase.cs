@@ -69,6 +69,10 @@ namespace SearchHelper.Editor
 
         public abstract void Run(Object selectedObject);
 
+        public virtual void GetDataFromAnotherTool(List<ObjectContext> contexts)
+        {
+        }
+
         protected virtual bool Sort(SortVariant sortVariant)
         {
             return false;
