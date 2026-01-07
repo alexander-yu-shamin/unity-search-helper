@@ -94,22 +94,20 @@ namespace SearchHelper.Editor.Tools
 
         private void Merge(MergeObjectContext baseObject, List<MergeObjectContext> contexts)
         {
+            if (contexts.IsNullOrEmpty())
+            {
+                return;
+            }
+
             AssetDatabase.StartAssetEditing();
             foreach (var context in contexts)
             {
-                var dependencies = SearchHelperService.FindUsedBy(context.Object);
-                foreach (var dependency in dependencies.Dependencies)
+                if (context == null)
                 {
-                    if (!string.IsNullOrEmpty(dependency.Path))
-                    {
-                        if (File.Exists(dependency.Path))
-                        {
-                            var text = File.ReadAllText(dependency.Path);
-                            var replaced = text.Replace(context.Guid, baseObject.Guid);
-                            File.WriteAllText(dependency.Path, replaced);
-                        }
-                    }
+                    continue;
                 }
+
+                Merge(baseObject, context);
 
                 File.Delete(context.Path);
                 File.Delete(context.MetaPath);
@@ -117,6 +115,35 @@ namespace SearchHelper.Editor.Tools
             AssetDatabase.StopAssetEditing();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+        }
+
+        private static void Merge(MergeObjectContext baseObject, MergeObjectContext theirsObject)
+        {
+            var dependencies = SearchHelperService.FindUsedBy(theirsObject.Object);
+            foreach (var dependency in dependencies.Dependencies)
+            {
+                var mergeObject = new MergeObjectContext(dependency);
+
+                if (!string.IsNullOrEmpty(mergeObject.Path))
+                {
+                    if (File.Exists(mergeObject.Path))
+                    {
+                        var text = File.ReadAllText(mergeObject.Path);
+                        var replaced = text.Replace(mergeObject.Guid, baseObject.Guid);
+                        File.WriteAllText(mergeObject.Path, replaced);
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(mergeObject.MetaPath))
+                {
+                    if (File.Exists(mergeObject.MetaPath))
+                    {
+                        var text = File.ReadAllText(mergeObject.MetaPath);
+                        var replaced = text.Replace(mergeObject.Guid, baseObject.Guid);
+                        File.WriteAllText(mergeObject.MetaPath, replaced);
+                    }
+                }
+            }
         }
 
         private void DrawElement(MergeObjectContext context)
