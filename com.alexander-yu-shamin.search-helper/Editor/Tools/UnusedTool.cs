@@ -32,9 +32,21 @@ namespace SearchHelper.Editor.Tools
 
                 EGuiKit.Button("Find", () => { Contexts = FindUnused(SelectedObject); });
 
+                EGuiKit.Space();
+                EGuiKit.Color(Color.gray, () =>
+                {
+                    EGuiKit.Label("Similar to 'Used By', but scans all files within a folder instead of searching for dependencies on the folder itself.");
+                });
+
                 EGuiKit.FlexibleSpace();
 
-                ShowAll = EditorGUILayout.ToggleLeft("Show All", ShowAll, GUILayout.Width(100));
+                var newValue = EditorGUILayout.ToggleLeft("Show All", ShowAll, GUILayout.Width(100));
+                if (ShowAll != newValue)
+                {
+                    ShowAll = newValue;
+                    Contexts = FindUnused(SelectedObject);
+                }
+
                 EGuiKit.Space(HorizontalIndent);
 
                 DrawHeaderControls();

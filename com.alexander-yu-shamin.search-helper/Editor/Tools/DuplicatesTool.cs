@@ -36,6 +36,12 @@ namespace SearchHelper.Editor.Tools
 
                 EGuiKit.Button("Find", () => { Contexts = FindDuplicates(SelectedObject); });
 
+                EGuiKit.Space();
+                EGuiKit.Color(Color.gray, () =>
+                {
+                    EGuiKit.Label("Find object duplicates or scan the selected folder for all duplicates (defaults to Assets).");
+                });
+
                 EGuiKit.FlexibleSpace();
                 EGuiKit.Button(UsedObject != null && !Contexts.IsNullOrEmpty(), "Open in Merge Tool", () =>
                 {
