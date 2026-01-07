@@ -94,6 +94,7 @@ namespace SearchHelper.Editor.Tools
 
         private void Merge(MergeObjectContext baseObject, List<MergeObjectContext> contexts)
         {
+            AssetDatabase.StartAssetEditing();
             foreach (var context in contexts)
             {
                 var dependencies = SearchHelperService.FindUsedBy(context.Object);
@@ -113,6 +114,9 @@ namespace SearchHelper.Editor.Tools
                 File.Delete(context.Path);
                 File.Delete(context.MetaPath);
             }
+            AssetDatabase.StopAssetEditing();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
         }
 
         private void DrawElement(MergeObjectContext context)
@@ -288,7 +292,7 @@ namespace SearchHelper.Editor.Tools
                 return ValidationError.BaseObject;
             }
 
-            if(Contexts.Any(ctx => ctx.Path == context.Path))
+            if (Contexts.Any(ctx => ctx.Path == context.Path))
             {
                 Debug.LogError($"File {context.Path} has already added.");
                 return ValidationError.InContexts;
