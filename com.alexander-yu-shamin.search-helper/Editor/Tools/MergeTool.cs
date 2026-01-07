@@ -100,6 +100,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             AssetDatabase.StartAssetEditing();
+
             foreach (var context in contexts)
             {
                 if (context == null)
@@ -114,7 +115,7 @@ namespace SearchHelper.Editor.Tools
             }
             AssetDatabase.StopAssetEditing();
             AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
         }
 
         private static void Merge(MergeObjectContext baseObject, MergeObjectContext theirsObject)
@@ -122,25 +123,25 @@ namespace SearchHelper.Editor.Tools
             var dependencies = SearchHelperService.FindUsedBy(theirsObject.Object);
             foreach (var dependency in dependencies.Dependencies)
             {
-                var mergeObject = new MergeObjectContext(dependency);
+                var dependencyObject = new MergeObjectContext(dependency);
 
-                if (!string.IsNullOrEmpty(mergeObject.Path))
+                if (!string.IsNullOrEmpty(dependencyObject.Path))
                 {
-                    if (File.Exists(mergeObject.Path))
+                    if (File.Exists(dependencyObject.Path))
                     {
-                        var text = File.ReadAllText(mergeObject.Path);
-                        var replaced = text.Replace(mergeObject.Guid, baseObject.Guid);
-                        File.WriteAllText(mergeObject.Path, replaced);
+                        var text = File.ReadAllText(dependencyObject.Path);
+                        var replaced = text.Replace(theirsObject.Guid, baseObject.Guid);
+                        File.WriteAllText(dependencyObject.Path, replaced);
                     }
                 }
 
-                if (!string.IsNullOrEmpty(mergeObject.MetaPath))
+                if (!string.IsNullOrEmpty(dependencyObject.MetaPath))
                 {
-                    if (File.Exists(mergeObject.MetaPath))
+                    if (File.Exists(dependencyObject.MetaPath))
                     {
-                        var text = File.ReadAllText(mergeObject.MetaPath);
-                        var replaced = text.Replace(mergeObject.Guid, baseObject.Guid);
-                        File.WriteAllText(mergeObject.MetaPath, replaced);
+                        var text = File.ReadAllText(dependencyObject.MetaPath);
+                        var replaced = text.Replace(theirsObject.Guid, baseObject.Guid);
+                        File.WriteAllText(dependencyObject.MetaPath, replaced);
                     }
                 }
             }
