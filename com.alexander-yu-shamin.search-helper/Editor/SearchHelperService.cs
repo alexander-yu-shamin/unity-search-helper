@@ -12,21 +12,22 @@ namespace SearchHelper.Editor
     {
         private const string ObjectSearchFilter = "t:Object";
 
-        public static event Action OnPostprocessAllAssetsEvent;
-
         public static IEnumerable<string> FindAssetPaths(string root = null)
         {
-            return AssetDatabase.FindAssets(ObjectSearchFilter, GetSearchDirs(root))
-                                .Select(AssetDatabase.GUIDToAssetPath)
-                                .Where(path => !string.IsNullOrEmpty(path));
+            return FindAssets(ObjectSearchFilter, root).Select(AssetDatabase.GUIDToAssetPath)
+                                                       .Where(path => !string.IsNullOrEmpty(path));
         }
 
         public static IEnumerable<Object> FindAssetObjects(string root = null)
         {
-            return AssetDatabase.FindAssets(ObjectSearchFilter, GetSearchDirs(root))
-                                .Select(AssetDatabase.GUIDToAssetPath)
-                                .Select(AssetDatabase.LoadMainAssetAtPath)
-                                .Where(asset => asset != null);
+            return FindAssets(ObjectSearchFilter, root).Select(AssetDatabase.GUIDToAssetPath)
+                                                       .Select(AssetDatabase.LoadMainAssetAtPath)
+                                                       .Where(asset => asset != null);
+        }
+
+        public static IEnumerable<string> FindAssets(string searchFilter, string root = null)
+        {
+            return AssetDatabase.FindAssets(searchFilter, GetSearchDirs(root));
         }
 
         public static ObjectContext FindUsedBy(Object obj)
@@ -143,11 +144,6 @@ namespace SearchHelper.Editor
             if (Application.isPlaying)
             {
                 return;
-            }
-
-            if (!didDomainReload)
-            {
-                OnPostprocessAllAssetsEvent?.Invoke();
             }
         }
     }

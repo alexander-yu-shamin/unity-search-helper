@@ -2,11 +2,22 @@
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-1-07
+
+### Added
+- some comments for better understanding
+
+### Fixed
+- the 'Merge' Tool replace GUIDs in meta-files 
+
+### Removed
+- unnecessary things (Runtime and so on)
+
 ## [0.0.5] - 2025-10-05
 
 ## Added 
 
-- 'Merge too'
+- 'Merge' tool
 
 ## [0.0.4] - 2025-09-17
 
