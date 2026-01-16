@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+- some comments for better understanding
+- Global and Local mode for unused files
+
+### Fixed
+- the 'Merge' Tool replace GUIDs in meta-files 
+- Fixed the Unused files search algo. It has errors
+
+
+### Removed
+
 ## [0.0.6] - 2026-1-07
 
 ### Added

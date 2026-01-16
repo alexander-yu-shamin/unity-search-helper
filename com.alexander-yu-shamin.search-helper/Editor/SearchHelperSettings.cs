@@ -19,7 +19,8 @@ namespace SearchHelper.Editor
         public const string ContextMenuItemFindDependenciesName = ContextMenuBase + FindDependenciesToolName;
         public const string ContextMenuFindUsedByItemName = ContextMenuBase + FindUsedByToolName;
         public const string ContextMenuShowObjectGuidItemName = ContextMenuBase + FindByGuidToolName;
-        public const string ContextMenuFindUnusedItemName = ContextMenuBase + FindUnusedToolName;
+        public const string ContextMenuFindUnusedGlobalItemName = ContextMenuBase + FindUnusedToolName + " (Global)";
+        public const string ContextMenuFindUnusedLocalItemName = ContextMenuBase + FindUnusedToolName + " (Local)";
         public const string ContextMenuFindDuplicatesItemName = ContextMenuBase + FindDuplicatesToolName;
         public const string ContextMenuMergeItemName = ContextMenuBase + MergeToolName;
     }

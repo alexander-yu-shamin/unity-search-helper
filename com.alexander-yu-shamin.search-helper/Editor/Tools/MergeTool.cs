@@ -189,7 +189,7 @@ namespace SearchHelper.Editor.Tools
             return true;
         }
 
-        public override void Run(Object selectedObject)
+        public override void Run(Object selectedObject, Settings settings)
         {
             if (selectedObject != null)
             {

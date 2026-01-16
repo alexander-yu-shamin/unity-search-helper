@@ -53,7 +53,7 @@ namespace SearchHelper.Editor.Tools
             EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
         }
 
-        public override void Run(Object selectedObject)
+        public override void Run(Object selectedObject, Settings settings)
         {
             SelectedObject = selectedObject;
             Contexts = FindDuplicates(SelectedObject);

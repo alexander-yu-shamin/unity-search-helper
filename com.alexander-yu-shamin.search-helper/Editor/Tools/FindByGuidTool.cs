@@ -53,7 +53,7 @@ namespace SearchHelper.Editor.Tools
             DrawContexts(windowRect);
         }
 
-        public override void Run(Object selectedObject)
+        public override void Run(Object selectedObject, Settings settings)
         {
             if (selectedObject == null)
             {

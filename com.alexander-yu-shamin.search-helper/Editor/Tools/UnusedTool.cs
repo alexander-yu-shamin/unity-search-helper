@@ -16,6 +16,7 @@ namespace SearchHelper.Editor.Tools
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
         private bool ShowAll { get; set; } = false;
+        private bool IsGlobal { get; set; } = true;
 
         private List<ObjectContext> Contexts { get; set; }
 
@@ -40,6 +41,12 @@ namespace SearchHelper.Editor.Tools
 
                 EGuiKit.FlexibleSpace();
 
+                EGuiKit.Button(IsGlobal ? "Global" : "Local", () =>
+                {
+                    IsGlobal = !IsGlobal;
+                    Contexts = FindUnused(SelectedObject);
+                });
+
                 var newValue = EditorGUILayout.ToggleLeft("Show All", ShowAll, GUILayout.Width(100));
                 if (ShowAll != newValue)
                 {
@@ -55,9 +62,10 @@ namespace SearchHelper.Editor.Tools
             EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
         }
 
-        public override void Run(Object selectedObject)
+        public override void Run(Object selectedObject, Settings settings)
         {
             SelectedObject = selectedObject;
+            IsGlobal = settings?.IsGlobal ?? IsGlobal;
             Contexts = FindUnused(SelectedObject);
         }
 
@@ -92,7 +100,9 @@ namespace SearchHelper.Editor.Tools
 
             var map = FolderOrFile(UsedObject).Select(ObjectContext.ToObjectContext).ToDictionary(key => key.Path);
 
-            var paths = SearchHelperService.FindAssetPaths();
+            string root = IsGlobal ? null : FolderPathFromObject(obj);
+
+            var paths = SearchHelperService.FindAssetPaths(root);
             if (!paths.Any())
             {
                 return null;
@@ -100,11 +110,6 @@ namespace SearchHelper.Editor.Tools
 
             foreach (var path in paths)
             {
-                if (map.ContainsKey(path))
-                {
-                    continue;
-                }
-
                 var dependencies = AssetDatabase.GetDependencies(path);
                 foreach (var dependency in dependencies)
                 {
@@ -113,6 +118,11 @@ namespace SearchHelper.Editor.Tools
                         map[dependency].Dependencies.Add(ObjectContext.FromPath(path));
                     }
                 }
+            }
+
+            foreach (var element in map.Values)
+            {
+                element.Dependencies = element.Dependencies.Where(dependency => dependency.Guid != element.Guid).ToList();
             }
 
             Contexts = ShowAll ? map.Values.OrderBy(ctx => ctx.Dependencies.Count).ToList() : map.Values.Where(ctx => ctx.Dependencies.Count == 0).ToList();

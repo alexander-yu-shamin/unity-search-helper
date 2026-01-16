@@ -12,6 +12,12 @@ namespace SearchHelper.Editor
 {
     public abstract class ToolBase
     {
+        public class Settings
+        {
+            public bool IsGlobal { get; set; } = true;
+        }
+
+
         public virtual bool IsSortingSupported { get; set; } = true;
         public virtual bool IsShowFoldersSupported { get; set; } = true;
         public virtual bool IsShowEditorBuiltInSupported { get; set; } = true;
@@ -67,7 +73,7 @@ namespace SearchHelper.Editor
 
         public abstract void Draw(Rect windowRect);
 
-        public abstract void Run(Object selectedObject);
+        public abstract void Run(Object selectedObject, Settings settings);
 
         public virtual void GetDataFromAnotherTool(List<ObjectContext> contexts)
         {
@@ -488,15 +494,24 @@ namespace SearchHelper.Editor
 
         protected IEnumerable<Object> FolderOrFile(Object obj)
         {
-            var path = AssetDatabase.GetAssetPath(obj);
-            if (!string.IsNullOrEmpty(path) && !AssetDatabase.IsValidFolder(path))
+            var path = PathFromObject(obj);
+            return string.IsNullOrEmpty(FolderPathFromObject(obj)) ? obj.AsIEnumerable() : SearchHelperService.FindAssetObjects(path);
+        }
+
+        protected string PathFromObject(Object obj)
+        {
+            return AssetDatabase.GetAssetPath(obj);
+        }
+
+        protected string FolderPathFromObject(Object obj)
+        {
+            var path = PathFromObject(obj);
+            if (string.IsNullOrEmpty(path))
             {
-                return obj.AsIEnumerable();
+                return null;
             }
-            else
-            {
-                return SearchHelperService.FindAssetObjects(path);
-            }
+
+            return AssetDatabase.IsValidFolder(path) ? path : null;
         }
 
         protected void ShowContextMenu(ObjectContext context)
