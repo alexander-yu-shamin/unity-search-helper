@@ -522,10 +522,14 @@ namespace SearchHelper.Editor
             menu.AddItem(new GUIContent("Find In Project"), false, () => { FindInProject(context); });
             menu.AddItem(new GUIContent("Find In Scene"), false, () => { FindInHierarchyWindow(context); });
             menu.AddItem(new GUIContent("Open Property"), false, () => { OpenProperty(context); });
+            menu.AddItem(new GUIContent("Copy/Path"), false, () => { CopyToClipboard(context.Path); });
+            menu.AddItem(new GUIContent("Copy/GUID"), false, () => { CopyToClipboard(context.Guid); });
             if (!context.Dependencies.IsNullOrEmpty())
             {
                 menu.AddItem(new GUIContent("Select All"), false, () => { SelectAll(context); });
                 menu.AddItem(new GUIContent("Select Dependencies"), false, () => { SelectDependencies(context); });
+                menu.AddItem(new GUIContent("Copy/Dependency paths"), false,
+                    () => { CopyToClipboard(string.Join(", ", context.Dependencies.Select(element => element.Path))); });
             }
 
             menu.ShowAsContext();
@@ -611,6 +615,11 @@ namespace SearchHelper.Editor
             {
                 EditorUtility.OpenPropertyEditor(context.Object);
             }
+        }
+
+        protected void CopyToClipboard(string text)
+        {
+            EditorGUIUtility.systemCopyBuffer = text;
         }
     }
 }
