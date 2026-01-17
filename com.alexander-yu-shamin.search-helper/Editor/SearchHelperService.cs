@@ -73,7 +73,7 @@ namespace SearchHelper.Editor
                 return null;
             }
 
-            var dependencies = ObjectContext.ToObjectContexts(EditorUtility.CollectDependencies(new[] { obj }), obj);
+            var dependencies = ObjectContext.ToObjectContexts(EditorUtility.CollectDeepHierarchy(new[] { obj }), obj);
             var path = AssetDatabase.GetAssetPath(obj);
             var guid = string.Empty;
             var isFolder = false;

@@ -66,7 +66,7 @@ namespace SearchHelper.Editor
         protected static readonly Color ErrorColor = Color.red;
 
         protected Vector2 ScrollViewPosition { get; set; }
-        protected SortVariant CurrentSortVariant { get; set; } = SortVariant.Natural;
+        protected SortVariant CurrentSortVariant { get; set; } = SortVariant.None;
         protected string FilterString { get; set; }
         protected bool IsFoldersShown { get; set; } = false;
         protected bool IsEditorBuiltInElementsShown { get; set; } = false;
