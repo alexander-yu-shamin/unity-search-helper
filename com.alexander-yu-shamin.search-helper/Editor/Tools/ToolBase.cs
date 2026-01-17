@@ -17,7 +17,6 @@ namespace SearchHelper.Editor
             public bool IsGlobal { get; set; } = true;
         }
 
-
         public virtual bool IsSortingSupported { get; set; } = true;
         public virtual bool IsShowFoldersSupported { get; set; } = true;
         public virtual bool IsShowEditorBuiltInSupported { get; set; } = true;
@@ -28,7 +27,8 @@ namespace SearchHelper.Editor
         {
             None = 0,
             ByName,
-            ByPath
+            ByPath,
+            Natural
         }
 
         protected const float RowHeight = 20.0f;
@@ -66,7 +66,7 @@ namespace SearchHelper.Editor
         protected static readonly Color ErrorColor = Color.red;
 
         protected Vector2 ScrollViewPosition { get; set; }
-        protected SortVariant CurrentSortVariant { get; set; }
+        protected SortVariant CurrentSortVariant { get; set; } = SortVariant.Natural;
         protected string FilterString { get; set; }
         protected bool IsFoldersShown { get; set; } = false;
         protected bool IsEditorBuiltInElementsShown { get; set; } = false;
@@ -486,6 +486,8 @@ namespace SearchHelper.Editor
                     return objectContexts.OrderBy(el => el.Object.name);
                 case SortVariant.ByPath:
                     return objectContexts.OrderBy(el => el.Path);
+                case SortVariant.Natural:
+                    return objectContexts.OrderBy(el => el.Object.name, Comparer<string>.Create(EditorUtility.NaturalCompare));
                 case SortVariant.None:
                 default:
                     return objectContexts;

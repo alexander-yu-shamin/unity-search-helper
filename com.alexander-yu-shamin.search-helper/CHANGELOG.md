@@ -5,6 +5,8 @@
 ### Added
 - some comments for better understanding
 - Global and Local mode for unused files
+- Natural sorting order
+- The "Report" button to the Unused tools
 
 ### Fixed
 - the 'Merge' Tool replace GUIDs in meta-files 

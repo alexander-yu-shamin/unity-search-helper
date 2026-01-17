@@ -41,6 +41,11 @@ namespace SearchHelper.Editor.Tools
 
                 EGuiKit.FlexibleSpace();
 
+                EGuiKit.Button(SelectedObject != null && !Contexts.IsNullOrEmpty(), "Report", () =>
+                {
+                    CopyToClipboard(string.Join("\n", Contexts.Select(context => context.Path)));
+                });
+
                 EGuiKit.Button(IsGlobal ? "Global" : "Local", () =>
                 {
                     IsGlobal = !IsGlobal;
