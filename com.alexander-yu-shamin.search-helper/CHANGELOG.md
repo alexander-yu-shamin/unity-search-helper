@@ -7,13 +7,17 @@
 - Global and Local mode for unused files
 - Natural sorting order
 - The "Report" button to the Unused tools
+- Filter by path, name, type
+- Ignored rules
 
 ### Fixed
-- the 'Merge' Tool replace GUIDs in meta-files 
+- The 'Merge' Tool replace GUIDs in meta-files 
 - Fixed the Unused files search algo. It has errors
+- Fixed the dependency search
 
+### Changed
+- Added a cache to improve UI.
 
-### Removed
 
 ## [0.0.6] - 2026-1-07
 

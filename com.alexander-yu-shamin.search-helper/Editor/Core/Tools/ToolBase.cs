@@ -141,7 +141,7 @@ namespace SearchHelper.Editor
                 }
             }
 
-            Sort(contexts, CurrentSortVariant);
+            Sort(CurrentSortVariant);
         }
 
         protected void DrawVirtualScroll(Rect windowRect, List<ObjectContext> contexts, bool drawDependencies = true)
