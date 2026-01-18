@@ -15,6 +15,8 @@ namespace SearchHelper.Editor.Tools
         private Object UsedObject { get; set; }
 
         private List<ObjectContext> Contexts { get; set; }
+        protected override IEnumerable<ObjectContext> Data => Contexts;
+
         public override void Draw(Rect windowRect)
         {
             EGuiKit.Horizontal(() =>
@@ -50,26 +52,6 @@ namespace SearchHelper.Editor.Tools
             FindUsedBy(SelectedObject);
         }
 
-        protected override bool Sort(SortVariant sortVariant)
-        {
-            if (Contexts.IsNullOrEmpty())
-            {
-                return false;
-            }
-
-            if (sortVariant == SortVariant.None)
-            {
-                return true;
-            }
-
-            foreach (var context in Contexts.Where(context => !context.Dependencies.IsNullOrEmpty()))
-            {
-                context.Dependencies = Sort(context.Dependencies, sortVariant).ToList();
-            }
-
-            return true;
-        }
-
         private List<ObjectContext> FindUsedBy(Object obj)
         {
             if (obj == null)
@@ -81,7 +63,7 @@ namespace SearchHelper.Editor.Tools
             var searchedCtx = SearchHelperService.FindUsedBy(obj);
 
             Contexts = new List<ObjectContext>() { searchedCtx };
-            Sort(CurrentSortVariant);
+            UpdateData(Contexts);
             return Contexts;
         }
     }

@@ -32,6 +32,7 @@ namespace SearchHelper.Editor.Tools
         private MergeObjectContext BaseObject { get; set; }
 
         private List<MergeObjectContext> Contexts { get; set; } = new List<MergeObjectContext>();
+        protected override IEnumerable<ObjectContext> Data => Contexts;
 
         private void OnPostprocessAllAssets()
         {
@@ -113,6 +114,7 @@ namespace SearchHelper.Editor.Tools
                 File.Delete(context.Path);
                 File.Delete(context.MetaPath);
             }
+
             AssetDatabase.StopAssetEditing();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
@@ -169,26 +171,6 @@ namespace SearchHelper.Editor.Tools
             });
         }
 
-        protected override bool Sort(SortVariant sortVariant)
-        {
-            if (Contexts.IsNullOrEmpty())
-            {
-                return false;
-            }
-
-            if (sortVariant == SortVariant.None)
-            {
-                return true;
-            }
-
-            foreach (var context in Contexts.Where(context => !context.Dependencies.IsNullOrEmpty()))
-            {
-                context.Dependencies = Sort(context.Dependencies, sortVariant).ToList();
-            }
-
-            return true;
-        }
-
         public override void Run(Object selectedObject, Settings settings)
         {
             if (selectedObject != null)
@@ -238,7 +220,7 @@ namespace SearchHelper.Editor.Tools
                 {
                     CompareWithBaseObject(context, BaseObject);
                     Contexts.Add(context);
-                    Sort(Contexts, CurrentSortVariant);
+                    UpdateData(Contexts);
                 }
             }
         }

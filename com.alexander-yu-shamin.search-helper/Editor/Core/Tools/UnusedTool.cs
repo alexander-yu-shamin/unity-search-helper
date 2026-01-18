@@ -14,6 +14,7 @@ namespace SearchHelper.Editor.Tools
     {
         public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
         public override bool IsShowFoldersSupported { get; set; } = false;
+        public override bool ShouldMainObjectsBeSorted { get; set; } = true;
 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
@@ -22,10 +23,10 @@ namespace SearchHelper.Editor.Tools
 
         private List<ObjectContext> Contexts { get; set; }
 
+        protected override IEnumerable<ObjectContext> Data => Contexts;
+
         public override void Draw(Rect windowRect)
         {
-            UpdatePatterns();
-
             EGuiKit.Horizontal(() =>
             {
                 SelectedObject = EditorGUILayout.ObjectField(SelectedObject, typeof(Object), true,
@@ -81,26 +82,6 @@ namespace SearchHelper.Editor.Tools
             Contexts = FindUnused(SelectedObject);
         }
 
-        protected override bool Sort(SortVariant sortVariant)
-        {
-            if (Contexts.IsNullOrEmpty())
-            {
-                return false;
-            }
-
-            if (sortVariant == SortVariant.None)
-            {
-                return true;
-            }
-
-            foreach (var context in Contexts.Where(context => !context.Dependencies.IsNullOrEmpty()))
-            {
-                context.Dependencies = Sort(context.Dependencies, sortVariant).ToList();
-            }
-
-            return true;
-        }
-
         private List<ObjectContext> FindUnused(Object obj)
         {
             if (obj == null)
@@ -138,7 +119,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             Contexts = ShowAll ? map.Values.OrderBy(ctx => ctx.Dependencies.Count).ToList() : map.Values.Where(ctx => ctx.Dependencies.Count == 0).ToList();
-            Sort(Contexts, CurrentSortVariant);
+            UpdateData(Contexts);
             return Contexts;
         }
     }

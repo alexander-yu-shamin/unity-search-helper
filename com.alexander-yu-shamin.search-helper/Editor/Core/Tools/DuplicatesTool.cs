@@ -17,11 +17,14 @@ namespace SearchHelper.Editor.Tools
     {
         public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
         public override bool IsShowFoldersSupported { get; set; } = false;
+        public override bool ShouldMainObjectsBeSorted { get; set; } = true;
 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
 
         private List<ObjectContext> Contexts { get; set; }
+
+        protected override IEnumerable<ObjectContext> Data => Contexts;
 
         public override void Draw(Rect windowRect)
         {
@@ -57,26 +60,6 @@ namespace SearchHelper.Editor.Tools
         {
             SelectedObject = selectedObject;
             Contexts = FindDuplicates(SelectedObject);
-        }
-
-        protected override bool Sort(SortVariant sortVariant)
-        {
-            if (Contexts.IsNullOrEmpty())
-            {
-                return false;
-            }
-
-            if (sortVariant == SortVariant.None)
-            {
-                return true;
-            }
-
-            foreach (var context in Contexts.Where(context => !context.Dependencies.IsNullOrEmpty()))
-            {
-                context.Dependencies = Sort(context.Dependencies, sortVariant).ToList();
-            }
-
-            return true;
         }
 
         private List<ObjectContext> FindDuplicates(Object obj)
@@ -151,7 +134,7 @@ namespace SearchHelper.Editor.Tools
                     return ctx;
                 }).ToList();
 
-            Sort(CurrentSortVariant);
+            UpdateData(Contexts);
             return Contexts;
         }
 

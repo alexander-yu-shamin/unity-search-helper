@@ -15,6 +15,7 @@ namespace SearchHelper.Editor.Tools
         private string CurrentUsedObjectGuid { get; set; }
 
         private List<ObjectContext> Contexts { get; set; }
+        protected override IEnumerable<ObjectContext> Data => Contexts;
 
         public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
 

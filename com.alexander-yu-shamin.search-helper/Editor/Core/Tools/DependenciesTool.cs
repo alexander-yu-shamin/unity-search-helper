@@ -13,8 +13,7 @@ namespace SearchHelper.Editor.Tools
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
         private List<ObjectContext> Contexts { get; set; }
-
-        //public override bool IsIgnoredFilesSupported { get; set; } = false;
+        protected override IEnumerable<ObjectContext> Data => Contexts;
 
         public override void Draw(Rect windowRect)
         {
@@ -60,28 +59,8 @@ namespace SearchHelper.Editor.Tools
 
             UsedObject = obj;
             Contexts = FolderOrFile(obj).Select(SearchHelperService.FindDependencies).ToList();
-            Sort(CurrentSortVariant);
+            UpdateData(Contexts);
             return Contexts;
-        }
-
-        protected override bool Sort(SortVariant sortVariant)
-        {
-            if (Contexts.IsNullOrEmpty())
-            {
-                return false;
-            }
-
-            if (sortVariant == SortVariant.None)
-            {
-                return true;
-            }
-
-            foreach (var context in Contexts.Where(context => !context.Dependencies.IsNullOrEmpty()))
-            {
-                context.Dependencies = Sort(context.Dependencies, sortVariant).ToList();
-            }
-
-            return true;
         }
     }
 }

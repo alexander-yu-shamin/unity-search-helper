@@ -23,6 +23,7 @@ namespace SearchHelper.Editor
 
         public virtual bool IsIgnoredFilesSupported { get; set; } = true;
         public virtual bool IsSortingSupported { get; set; } = true;
+        public virtual bool ShouldMainObjectsBeSorted { get; set; } = false;
         public virtual bool IsShowFoldersSupported { get; set; } = true;
         public virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
         public virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
@@ -68,16 +69,18 @@ namespace SearchHelper.Editor
         protected static readonly Color WarningColor = Color.yellow;
         protected static readonly Color ErrorColor = Color.red;
 
-        protected Vector2 ScrollViewPosition { get; set; }
+        private Vector2 ScrollViewPosition { get; set; }
         protected SortVariant CurrentSortVariant { get; set; } = SortVariant.None;
-        protected string FilterString { get; set; }
-        protected bool IsFoldersShown { get; set; } = false;
+        private string FilterString { get; set; }
+        private bool IsFoldersShown { get; set; } = false;
 
         private DataDescription<SearchHelperIgnoredFiles> ChosenPattern { get; set; }
         private List<DataDescription<SearchHelperIgnoredFiles>> Patterns { get; set; }
         private List<Regex> RegexIgnoredPaths { get; set; }
         private List<Regex> RegexIgnoredNames { get; set; }
         private List<Regex> RegexIgnoredTypes { get; set; }
+
+        protected abstract IEnumerable<ObjectContext> Data { get; }
 
         public abstract void Draw(Rect windowRect);
 
@@ -87,9 +90,50 @@ namespace SearchHelper.Editor
         {
         }
 
-        protected virtual bool Sort(SortVariant sortVariant)
+        protected bool Sort(SortVariant sortVariant)
         {
-            return false;
+            if (Data.IsNullOrEmpty())
+            {
+                return false;
+            }
+
+            if (sortVariant == SortVariant.None)
+            {
+                return true;
+            }
+
+            if (ShouldMainObjectsBeSorted)
+            {
+                Sort(Data, sortVariant);
+            }
+
+            foreach (var context in Data.Where(context => !context.Dependencies.IsNullOrEmpty()))
+            {
+                context.Dependencies = Sort(context.Dependencies, sortVariant).ToList();
+            }
+
+            return true;
+        }
+
+        protected void UpdateData(IEnumerable<ObjectContext> contexts = null)
+        {
+            contexts ??= Data;
+
+            if (contexts.IsNullOrEmpty())
+            {
+                return;
+            }
+
+            foreach (var context in contexts)
+            {
+                context.ShouldBeShown = ShouldBeShown(context);
+                foreach (var dependency in context.Dependencies)
+                {
+                    dependency.ShouldBeShown = ShouldBeShown(dependency);
+                }
+            }
+
+            Sort(contexts, CurrentSortVariant);
         }
 
         protected void DrawVirtualScroll(Rect windowRect, List<ObjectContext> contexts, bool drawDependencies = true)
@@ -156,7 +200,7 @@ namespace SearchHelper.Editor
             EditorGUILayout.EndScrollView();
         }
 
-        protected bool IsVisible(float accumulatedHeight, Vector2 scrollViewPosition, Rect visibleRect,
+        private bool IsVisible(float accumulatedHeight, Vector2 scrollViewPosition, Rect visibleRect,
             out bool beforeVisibleRect, out bool afterVisibleRect)
         {
             beforeVisibleRect = accumulatedHeight < scrollViewPosition.y;
@@ -164,12 +208,12 @@ namespace SearchHelper.Editor
             return !beforeVisibleRect && !afterVisibleRect;
         }
 
-        protected float CalculateDisplayedHeight(List<ObjectContext> contexts)
+        private float CalculateDisplayedHeight(List<ObjectContext> contexts)
         {
             return contexts.Sum(ctx => CalculateHeaderHeight(ctx) + CalculateDependenciesHeight(ctx));
         }
 
-        protected bool TryDraw(ref float currentY, Vector2 scrollViewPosition, ref float drawnHeight, Rect windowRect, Func<float> tryDraw, Func<float> calculateHeight)
+        private bool TryDraw(ref float currentY, Vector2 scrollViewPosition, ref float drawnHeight, Rect windowRect, Func<float> tryDraw, Func<float> calculateHeight)
         {
             if (IsVisible(currentY, scrollViewPosition, windowRect, out _, out var afterVisibleRect))
             {
@@ -180,7 +224,7 @@ namespace SearchHelper.Editor
             return !afterVisibleRect;
         }
 
-        protected float CalculateDependenciesHeight(ObjectContext context)
+        private float CalculateDependenciesHeight(ObjectContext context)
         {
             if (context.Dependencies.IsNullOrEmpty())
             {
@@ -199,12 +243,12 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            if (IsIgnoredFilesSupported && !ShouldBeShown(context))
+            if (IsIgnoredFilesSupported && !context.ShouldBeShown)
             {
                 return 0.0f;
             }
 
-            if (!DrawObjectWithEmptyDependencies && !context.Dependencies.Any(ShouldBeShown))
+            if (!DrawObjectWithEmptyDependencies && !context.Dependencies.Any(dependency => dependency.ShouldBeShown))
             {
                 return 0.0f;
             }
@@ -212,19 +256,19 @@ namespace SearchHelper.Editor
             return HeaderHeightWithPadding;
         }
 
-        protected float TryDrawObjectHeader(ref float x, ref float y, float width, ObjectContext context)
+        private float TryDrawObjectHeader(ref float x, ref float y, float width, ObjectContext context)
         {
             if (context.IsFolder && !IsFoldersShown)
             {
                 return 0.0f;
             }
 
-            if (IsIgnoredFilesSupported && !ShouldBeShown(context))
+            if (IsIgnoredFilesSupported && !context.ShouldBeShown)
             {
                 return 0.0f;
             }
 
-            if (!DrawObjectWithEmptyDependencies && !context.Dependencies.Any(ShouldBeShown))
+            if (!DrawObjectWithEmptyDependencies && !context.Dependencies.Any(dependency => dependency.ShouldBeShown))
             {
                 return 0.0f;
             }
@@ -308,7 +352,7 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            if (IsIgnoredFilesSupported && !ShouldBeShown(mainContext))
+            if (IsIgnoredFilesSupported && !mainContext.ShouldBeShown)
             {
                 return 0.0f;
             }
@@ -316,7 +360,7 @@ namespace SearchHelper.Editor
             return ContentHeight;
         }
 
-        protected float TryDrawEmptyContent(ref float x, ref float y, float width, ObjectContext mainContext)
+        private float TryDrawEmptyContent(ref float x, ref float y, float width, ObjectContext mainContext)
         {
             if (mainContext.IsFolder)
             {
@@ -328,7 +372,7 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            if (IsIgnoredFilesSupported && !ShouldBeShown(mainContext))
+            if (IsIgnoredFilesSupported && !mainContext.ShouldBeShown)
             {
                 return 0.0f;
             }
@@ -338,7 +382,7 @@ namespace SearchHelper.Editor
             return result;
         }
 
-        protected float DrawEmptyContent(Rect rect, string text)
+        private float DrawEmptyContent(Rect rect, string text)
         {
             EditorGUI.DrawRect(rect, BoxColor);
             EGuiKit.Color(ErrorColor, () =>
@@ -348,14 +392,14 @@ namespace SearchHelper.Editor
             return ContentHeightWithPadding;
         }
 
-        protected float CalculateDependencyHeight(ObjectContext dependency, ObjectContext mainContext)
+        private float CalculateDependencyHeight(ObjectContext dependency, ObjectContext mainContext)
         {
             if (!mainContext.IsExpanded)
             {
                 return 0.0f;
             }
 
-            if (!ShouldBeShown(dependency))
+            if (!dependency.ShouldBeShown)
             {
                 return 0.0f;
             }
@@ -363,14 +407,14 @@ namespace SearchHelper.Editor
             return ContentHeightWithPadding;
         }
 
-        protected float TryDrawContent(ref float x, ref float y, float width, ObjectContext context, ObjectContext mainContext)
+        private float TryDrawContent(ref float x, ref float y, float width, ObjectContext context, ObjectContext mainContext)
         {
             if (!mainContext.IsExpanded)
             {
                 return 0.0f;
             }
 
-            if (!ShouldBeShown(context))
+            if (!context.ShouldBeShown)
             {
                 return 0.0f;
             }
@@ -380,7 +424,7 @@ namespace SearchHelper.Editor
             return result;
         }
 
-        protected float DrawContent(Rect rect, ObjectContext context)
+        private float DrawContent(Rect rect, ObjectContext context)
         {
             EditorGUI.DrawRect(rect, BoxColor);
 
@@ -507,7 +551,7 @@ namespace SearchHelper.Editor
             });
         }
 
-        protected bool ShouldBeShown(ObjectContext objectContext)
+        private bool ShouldBeShown(ObjectContext objectContext)
         {
             if (string.IsNullOrEmpty(objectContext.Path))
             {
@@ -565,7 +609,7 @@ namespace SearchHelper.Editor
             return string.IsNullOrEmpty(FolderPathFromObject(obj)) ? obj.AsIEnumerable() : SearchHelperService.FindAssetObjects(path);
         }
 
-        protected string PathFromObject(Object obj)
+        private string PathFromObject(Object obj)
         {
             return AssetDatabase.GetAssetPath(obj);
         }
@@ -581,7 +625,70 @@ namespace SearchHelper.Editor
             return AssetDatabase.IsValidFolder(path) ? path : null;
         }
 
-        protected void ShowContextMenu(ObjectContext context)
+        private void UpdatePattern(DataDescription<SearchHelperIgnoredFiles> newPattern)
+        {
+            ChosenPattern = newPattern;
+            if (newPattern == null)
+            {
+                RegexIgnoredPaths = null;
+                RegexIgnoredNames = null;
+                RegexIgnoredTypes = null;
+            }
+            else
+            {
+                RegexIgnoredPaths = new List<Regex>(ChosenPattern.Data.IgnoredPaths.Count);
+                foreach (var ignoredPath in ChosenPattern.Data.IgnoredPaths)
+                {
+                    if (!string.IsNullOrEmpty(ignoredPath))
+                    {
+                        RegexIgnoredPaths.Add(new Regex(ignoredPath, RegexOptions.Compiled));
+                    }
+                }
+
+                RegexIgnoredNames = new List<Regex>(ChosenPattern.Data.IgnoredNames.Count);
+                foreach (var ignoredName in ChosenPattern.Data.IgnoredNames)
+                {
+                    if (!string.IsNullOrEmpty(ignoredName))
+                    {
+                        RegexIgnoredNames.Add(new Regex(ignoredName, RegexOptions.Compiled));
+                    }
+                }
+
+                RegexIgnoredTypes = new List<Regex>(ChosenPattern.Data.IgnoredTypes.Count);
+                foreach (var ignoredType in ChosenPattern.Data.IgnoredTypes)
+                {
+                    if (!string.IsNullOrEmpty(ignoredType))
+                    {
+                        RegexIgnoredTypes.Add(new Regex(ignoredType, RegexOptions.Compiled));
+                    }
+                }
+            }
+
+            UpdateData();
+        }
+
+        private void UpdatePatterns(bool force = false)
+        {
+            var shouldBeUpdated = Patterns == null;
+
+            if (shouldBeUpdated || force)
+            {
+                Patterns = SearchHelperDataSource.GetAllUnusedPatterns();
+
+                foreach (var pattern in Patterns)
+                {
+                    if (pattern.Path.StartsWith("Packages"))
+                    {
+                        pattern.Name = "Default: " + Path.GetFileName(Path.GetDirectoryName(pattern.Path)) + "/" + Path.GetFileNameWithoutExtension(pattern.Path);
+                        continue;
+                    }
+
+                    pattern.Name = Path.GetFileName(Path.GetDirectoryName(pattern.Path)) + "/" + Path.GetFileNameWithoutExtension(pattern.Path);
+                }
+            }
+        }
+
+        private void ShowContextMenu(ObjectContext context)
         {
             var menu = new GenericMenu();
 
@@ -635,7 +742,7 @@ namespace SearchHelper.Editor
                                 .ToArray();
         }
 
-        protected void FindInHierarchyWindow(ObjectContext context)
+        private void FindInHierarchyWindow(ObjectContext context)
         {
             if (context?.Path == null)
             {
@@ -661,7 +768,7 @@ namespace SearchHelper.Editor
             });
         }
 
-        protected void OpenInDefaultFileBrowser(ObjectContext context)
+        private void OpenInDefaultFileBrowser(ObjectContext context)
         {
             if (!string.IsNullOrEmpty(context?.Path))
             {
@@ -669,7 +776,7 @@ namespace SearchHelper.Editor
             }
         }
 
-        protected void FindInProject(ObjectContext context)
+        private void FindInProject(ObjectContext context)
         {
             if (context?.Object != null)
             {
@@ -677,7 +784,7 @@ namespace SearchHelper.Editor
             }
         }
 
-        protected void OpenProperty(ObjectContext context)
+        private void OpenProperty(ObjectContext context)
         {
             if (context?.Object != null)
             {
@@ -688,67 +795,6 @@ namespace SearchHelper.Editor
         protected void CopyToClipboard(string text)
         {
             EditorGUIUtility.systemCopyBuffer = text;
-        }
-
-        protected void UpdatePattern(DataDescription<SearchHelperIgnoredFiles> newPattern)
-        {
-            ChosenPattern = newPattern;
-            if (newPattern == null)
-            {
-                RegexIgnoredPaths = null;
-                RegexIgnoredNames = null;
-                RegexIgnoredTypes = null;
-            }
-            else
-            {
-                RegexIgnoredPaths = new List<Regex>(ChosenPattern.Data.IgnoredPaths.Count);
-                foreach (var ignoredPath in ChosenPattern.Data.IgnoredPaths)
-                {
-                    if (!string.IsNullOrEmpty(ignoredPath))
-                    {
-                        RegexIgnoredPaths.Add(new Regex(ignoredPath, RegexOptions.Compiled));
-                    }
-                }
-
-                RegexIgnoredNames = new List<Regex>(ChosenPattern.Data.IgnoredNames.Count);
-                foreach (var ignoredName in ChosenPattern.Data.IgnoredNames)
-                {
-                    if (!string.IsNullOrEmpty(ignoredName))
-                    {
-                        RegexIgnoredNames.Add(new Regex(ignoredName, RegexOptions.Compiled));
-                    }
-                }
-
-                RegexIgnoredTypes = new List<Regex>(ChosenPattern.Data.IgnoredTypes.Count);
-                foreach (var ignoredType in ChosenPattern.Data.IgnoredTypes)
-                {
-                    if (!string.IsNullOrEmpty(ignoredType))
-                    {
-                        RegexIgnoredTypes.Add(new Regex(ignoredType, RegexOptions.Compiled));
-                    }
-                }
-            }
-        }
-
-        protected void UpdatePatterns(bool force = false)
-        {
-            var shouldBeUpdated = Patterns == null;
-
-            if (shouldBeUpdated || force)
-            {
-                Patterns = SearchHelperDataSource.GetAllUnusedPatterns();
-
-                foreach (var pattern in Patterns)
-                {
-                    if (pattern.Path.StartsWith("Packages"))
-                    {
-                        pattern.Name = "Default: " + Path.GetFileName(Path.GetDirectoryName(pattern.Path)) + "/" + Path.GetFileNameWithoutExtension(pattern.Path);
-                        continue;
-                    }
-
-                    pattern.Name = Path.GetFileName(Path.GetDirectoryName(pattern.Path)) + "/" + Path.GetFileNameWithoutExtension(pattern.Path);
-                }
-            }
         }
     }
 }
