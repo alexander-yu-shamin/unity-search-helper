@@ -60,6 +60,8 @@ namespace SearchHelper.Editor
 
         public bool IsExpanded { get; set; } = true;
 
+        public bool ShouldBeShown { get; set; } = true;
+
         public ObjectContext()
         {
         }

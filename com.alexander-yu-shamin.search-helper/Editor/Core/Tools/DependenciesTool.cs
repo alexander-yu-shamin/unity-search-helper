@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using SearchHelper.Editor.Core;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
@@ -12,6 +13,8 @@ namespace SearchHelper.Editor.Tools
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
         private List<ObjectContext> Contexts { get; set; }
+
+        //public override bool IsIgnoredFilesSupported { get; set; } = false;
 
         public override void Draw(Rect windowRect)
         {

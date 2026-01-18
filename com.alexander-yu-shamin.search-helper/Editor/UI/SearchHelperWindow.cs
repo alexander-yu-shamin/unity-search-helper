@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using SearchHelper.Editor.Core;
 using SearchHelper.Editor.Tools;
 using UnityEditor;
 using UnityEngine;
 using Toolkit.Runtime.Extensions;
 using Object = UnityEngine.Object;
 
-namespace SearchHelper.Editor
+namespace SearchHelper.Editor.UI
 {
     public class SearchHelperWindow : EditorWindow
     {

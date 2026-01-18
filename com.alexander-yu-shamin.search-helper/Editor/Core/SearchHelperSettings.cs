@@ -1,6 +1,7 @@
+using System.IO;
 using UnityEngine;
 
-namespace SearchHelper.Editor
+namespace SearchHelper.Editor.Core
 {
     public class SearchHelperSettings
     {

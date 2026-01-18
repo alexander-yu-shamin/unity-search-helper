@@ -1,5 +1,8 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
+using SearchHelper.Editor.Core;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
@@ -11,7 +14,6 @@ namespace SearchHelper.Editor.Tools
     {
         public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
         public override bool IsShowFoldersSupported { get; set; } = false;
-        public override bool IsShowEditorBuiltInSupported { get; set; } = false;
 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
@@ -22,6 +24,8 @@ namespace SearchHelper.Editor.Tools
 
         public override void Draw(Rect windowRect)
         {
+            UpdatePatterns();
+
             EGuiKit.Horizontal(() =>
             {
                 SelectedObject = EditorGUILayout.ObjectField(SelectedObject, typeof(Object), true,
@@ -31,12 +35,15 @@ namespace SearchHelper.Editor.Tools
                     UsedObject = null;
                 }
 
-                EGuiKit.Button("Find", () => { Contexts = FindUnused(SelectedObject); });
+                EGuiKit.Button("Find", () =>
+                {
+                    Contexts = FindUnused(SelectedObject);
+                });
 
                 EGuiKit.Space();
                 EGuiKit.Color(Color.gray, () =>
                 {
-                    EGuiKit.Label("Similar to 'Used By', but scans all files within a folder instead of searching for dependencies on the folder itself.");
+                    EGuiKit.Label("Similar to 'Used By', but scans all files within the folder");
                 });
 
                 EGuiKit.FlexibleSpace();
@@ -105,7 +112,7 @@ namespace SearchHelper.Editor.Tools
 
             var map = FolderOrFile(UsedObject).Select(ObjectContext.ToObjectContext).ToDictionary(key => key.Path);
 
-            string root = IsGlobal ? null : FolderPathFromObject(obj);
+            var root = IsGlobal ? null : FolderPathFromObject(obj);
 
             var paths = SearchHelperService.FindAssetPaths(root);
             if (!paths.Any())

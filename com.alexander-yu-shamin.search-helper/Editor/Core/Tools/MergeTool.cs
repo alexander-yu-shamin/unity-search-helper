@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using SearchHelper.Editor.Core;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
@@ -27,7 +28,6 @@ namespace SearchHelper.Editor.Tools
         }
 
         public override bool IsShowFoldersSupported { get; set; } = false;
-        public override bool IsShowEditorBuiltInSupported { get; set; } = false;
 
         private MergeObjectContext BaseObject { get; set; }
 

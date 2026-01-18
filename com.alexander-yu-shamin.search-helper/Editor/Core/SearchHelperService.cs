@@ -1,12 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using Unity.Android.Gradle;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace SearchHelper.Editor
+namespace SearchHelper.Editor.Core
 {
     public class SearchHelperService : AssetPostprocessor
     {
@@ -73,7 +71,7 @@ namespace SearchHelper.Editor
                 return null;
             }
 
-            var dependencies = ObjectContext.ToObjectContexts(EditorUtility.CollectDeepHierarchy(new[] { obj }), obj);
+            var dependencies = ObjectContext.ToObjectContexts(EditorUtility.CollectDependencies(new[] { obj }), obj);
             var path = AssetDatabase.GetAssetPath(obj);
             var guid = string.Empty;
             var isFolder = false;

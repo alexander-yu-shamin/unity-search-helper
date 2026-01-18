@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using SearchHelper.Editor.Core;
+using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
-using UnityEditor.VersionControl;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -16,7 +17,6 @@ namespace SearchHelper.Editor.Tools
     {
         public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
         public override bool IsShowFoldersSupported { get; set; } = false;
-        public override bool IsShowEditorBuiltInSupported { get; set; } = false;
 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }

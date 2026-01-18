@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
+using SearchHelper.Editor.Core;
+using SearchHelper.Editor.Data;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
@@ -17,9 +21,9 @@ namespace SearchHelper.Editor
             public bool IsGlobal { get; set; } = true;
         }
 
+        public virtual bool IsIgnoredFilesSupported { get; set; } = true;
         public virtual bool IsSortingSupported { get; set; } = true;
         public virtual bool IsShowFoldersSupported { get; set; } = true;
-        public virtual bool IsShowEditorBuiltInSupported { get; set; } = true;
         public virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
         public virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
@@ -56,7 +60,6 @@ namespace SearchHelper.Editor
 
         protected const string FolderIconName = "d_Folder Icon";
         protected const string InspectorIconName = "d_UnityEditor.InspectorWindow";
-        protected const string EditorBuiltInPath = "Resources/unity_builtin_extra";
         protected const string HierarchyIconName = "d_UnityEditor.SceneHierarchyWindow";
 
         protected const string SceneHierarchySearchReferenceFormat = "ref:{0}";
@@ -69,7 +72,12 @@ namespace SearchHelper.Editor
         protected SortVariant CurrentSortVariant { get; set; } = SortVariant.None;
         protected string FilterString { get; set; }
         protected bool IsFoldersShown { get; set; } = false;
-        protected bool IsEditorBuiltInElementsShown { get; set; } = false;
+
+        private DataDescription<SearchHelperIgnoredFiles> ChosenPattern { get; set; }
+        private List<DataDescription<SearchHelperIgnoredFiles>> Patterns { get; set; }
+        private List<Regex> RegexIgnoredPaths { get; set; }
+        private List<Regex> RegexIgnoredNames { get; set; }
+        private List<Regex> RegexIgnoredTypes { get; set; }
 
         public abstract void Draw(Rect windowRect);
 
@@ -191,6 +199,11 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
+            if (IsIgnoredFilesSupported && !ShouldBeShown(context))
+            {
+                return 0.0f;
+            }
+
             if (!DrawObjectWithEmptyDependencies && !context.Dependencies.Any(ShouldBeShown))
             {
                 return 0.0f;
@@ -202,6 +215,11 @@ namespace SearchHelper.Editor
         protected float TryDrawObjectHeader(ref float x, ref float y, float width, ObjectContext context)
         {
             if (context.IsFolder && !IsFoldersShown)
+            {
+                return 0.0f;
+            }
+
+            if (IsIgnoredFilesSupported && !ShouldBeShown(context))
             {
                 return 0.0f;
             }
@@ -290,6 +308,11 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
+            if (IsIgnoredFilesSupported && !ShouldBeShown(mainContext))
+            {
+                return 0.0f;
+            }
+
             return ContentHeight;
         }
 
@@ -301,6 +324,11 @@ namespace SearchHelper.Editor
             }
 
             if (!mainContext.IsExpanded)
+            {
+                return 0.0f;
+            }
+
+            if (IsIgnoredFilesSupported && !ShouldBeShown(mainContext))
             {
                 return 0.0f;
             }
@@ -426,10 +454,37 @@ namespace SearchHelper.Editor
                     EGuiKit.Space(HorizontalIndent);
                 }
 
-                if (IsShowEditorBuiltInSupported)
+                if (IsIgnoredFilesSupported)
                 {
-                    IsEditorBuiltInElementsShown = EditorGUILayout.ToggleLeft("Show Editor Built-In", IsEditorBuiltInElementsShown, GUILayout.Width(130));
-                    EGuiKit.Space(HorizontalIndent);
+                    UpdatePatterns();
+
+                    var content = new GUIContent(ChosenPattern?.Name ?? "Ignored Files");
+                    if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
+                    {
+                        var menu = new GenericMenu();
+                        if (Patterns != null)
+                        {
+                            foreach (var pattern in Patterns)
+                            {
+                                menu.AddItem(new GUIContent(pattern.Name), ChosenPattern?.Name == pattern.Name, () =>
+                                {
+                                    UpdatePattern(pattern);
+                                });
+                            }
+                        }
+
+                        menu.AddItem(new GUIContent("Load more from disk"), false, () =>
+                        {
+                            UpdatePatterns(true);
+                        });
+
+                        menu.AddItem(new GUIContent("Remove Pattern"), false, () =>
+                        {
+                            UpdatePattern(null);
+                        });
+
+                        menu.ShowAsContext();
+                    }
                 }
 
                 if (IsSortingSupported)
@@ -459,17 +514,27 @@ namespace SearchHelper.Editor
                 return true;
             }
 
-            if (!IsEditorBuiltInElementsShown)
+            if (!string.IsNullOrEmpty(FilterString))
             {
-                if (objectContext.Path == EditorBuiltInPath)
+                if (!objectContext.Path.Contains(FilterString))
                 {
                     return false;
                 }
             }
 
-            if (!string.IsNullOrEmpty(FilterString))
+            if (IsIgnoredFilesSupported)
             {
-                if (!objectContext.Path.Contains(FilterString))
+                if (RegexIgnoredPaths?.Any(regex => regex.IsMatch(objectContext.Path)) ?? false)
+                {
+                    return false;
+                }
+
+                if (RegexIgnoredNames?.Any(regex => regex.IsMatch(objectContext.Object.name)) ?? false)
+                {
+                    return false;
+                }
+
+                if (RegexIgnoredTypes?.Any(regex => regex.IsMatch(objectContext.Object.GetType().FullName)) ?? false)
                 {
                     return false;
                 }
@@ -526,6 +591,7 @@ namespace SearchHelper.Editor
             menu.AddItem(new GUIContent("Open Property"), false, () => { OpenProperty(context); });
             menu.AddItem(new GUIContent("Copy/Path"), false, () => { CopyToClipboard(context.Path); });
             menu.AddItem(new GUIContent("Copy/GUID"), false, () => { CopyToClipboard(context.Guid); });
+            menu.AddItem(new GUIContent("Copy/Type"), false, () => { CopyToClipboard(context.Object.GetType().FullName); });
             if (!context.Dependencies.IsNullOrEmpty())
             {
                 menu.AddItem(new GUIContent("Select All"), false, () => { SelectAll(context); });
@@ -622,6 +688,67 @@ namespace SearchHelper.Editor
         protected void CopyToClipboard(string text)
         {
             EditorGUIUtility.systemCopyBuffer = text;
+        }
+
+        protected void UpdatePattern(DataDescription<SearchHelperIgnoredFiles> newPattern)
+        {
+            ChosenPattern = newPattern;
+            if (newPattern == null)
+            {
+                RegexIgnoredPaths = null;
+                RegexIgnoredNames = null;
+                RegexIgnoredTypes = null;
+            }
+            else
+            {
+                RegexIgnoredPaths = new List<Regex>(ChosenPattern.Data.IgnoredPaths.Count);
+                foreach (var ignoredPath in ChosenPattern.Data.IgnoredPaths)
+                {
+                    if (!string.IsNullOrEmpty(ignoredPath))
+                    {
+                        RegexIgnoredPaths.Add(new Regex(ignoredPath, RegexOptions.Compiled));
+                    }
+                }
+
+                RegexIgnoredNames = new List<Regex>(ChosenPattern.Data.IgnoredNames.Count);
+                foreach (var ignoredName in ChosenPattern.Data.IgnoredNames)
+                {
+                    if (!string.IsNullOrEmpty(ignoredName))
+                    {
+                        RegexIgnoredNames.Add(new Regex(ignoredName, RegexOptions.Compiled));
+                    }
+                }
+
+                RegexIgnoredTypes = new List<Regex>(ChosenPattern.Data.IgnoredTypes.Count);
+                foreach (var ignoredType in ChosenPattern.Data.IgnoredTypes)
+                {
+                    if (!string.IsNullOrEmpty(ignoredType))
+                    {
+                        RegexIgnoredTypes.Add(new Regex(ignoredType, RegexOptions.Compiled));
+                    }
+                }
+            }
+        }
+
+        protected void UpdatePatterns(bool force = false)
+        {
+            var shouldBeUpdated = Patterns == null;
+
+            if (shouldBeUpdated || force)
+            {
+                Patterns = SearchHelperDataSource.GetAllUnusedPatterns();
+
+                foreach (var pattern in Patterns)
+                {
+                    if (pattern.Path.StartsWith("Packages"))
+                    {
+                        pattern.Name = "Default: " + Path.GetFileName(Path.GetDirectoryName(pattern.Path)) + "/" + Path.GetFileNameWithoutExtension(pattern.Path);
+                        continue;
+                    }
+
+                    pattern.Name = Path.GetFileName(Path.GetDirectoryName(pattern.Path)) + "/" + Path.GetFileNameWithoutExtension(pattern.Path);
+                }
+            }
         }
     }
 }
