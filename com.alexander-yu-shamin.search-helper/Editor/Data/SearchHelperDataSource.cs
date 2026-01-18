@@ -17,9 +17,9 @@ namespace SearchHelper.Editor.Data
 
     public static class SearchHelperDataSource
     {
-        private static string UnusedPatternSearchFilter = $"t:{nameof(SearchHelperIgnoredFiles)}";
+        private static string UnusedPatternSearchFilter = $"t:{nameof(SearchHelperIgnoreRule)}";
 
-        public static List<DataDescription<SearchHelperIgnoredFiles>> GetAllUnusedPatterns()
+        public static List<DataDescription<SearchHelperIgnoreRule>> GetAllUnusedPatterns()
         {
             AssetDatabase.Refresh();
             var guids = AssetDatabase.FindAssets(UnusedPatternSearchFilter);
@@ -28,13 +28,13 @@ namespace SearchHelper.Editor.Data
                 return null;
             }
 
-            var result = new List<DataDescription<SearchHelperIgnoredFiles>>();
+            var result = new List<DataDescription<SearchHelperIgnoreRule>>();
 
             foreach (var guid in guids)
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
-                var pattern = AssetDatabase.LoadAssetAtPath<SearchHelperIgnoredFiles>(path);
-                result.Add(new DataDescription<SearchHelperIgnoredFiles>
+                var pattern = AssetDatabase.LoadAssetAtPath<SearchHelperIgnoreRule>(path);
+                result.Add(new DataDescription<SearchHelperIgnoreRule>
                 {
                     Path = path, Data = pattern
                 });

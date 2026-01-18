@@ -21,13 +21,6 @@ namespace SearchHelper.Editor
             public bool IsGlobal { get; set; } = true;
         }
 
-        public virtual bool IsIgnoredFilesSupported { get; set; } = true;
-        public virtual bool IsSortingSupported { get; set; } = true;
-        public virtual bool ShouldMainObjectsBeSorted { get; set; } = false;
-        public virtual bool IsShowFoldersSupported { get; set; } = true;
-        public virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
-        public virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
-
         protected enum SortVariant
         {
             None = 0,
@@ -35,6 +28,20 @@ namespace SearchHelper.Editor
             ByPath,
             Natural
         }
+
+        protected enum FilterVariant
+        {
+            Path,
+            Name,
+            Type
+        }
+
+        public virtual bool IsIgnoredFilesSupported { get; set; } = true;
+        public virtual bool IsSortingSupported { get; set; } = true;
+        public virtual bool ShouldMainObjectsBeSorted { get; set; } = false;
+        public virtual bool IsShowFoldersSupported { get; set; } = true;
+        public virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
+        public virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
         protected const float RowHeight = 20.0f;
         protected const float RowPadding = 2f;
@@ -71,11 +78,12 @@ namespace SearchHelper.Editor
 
         private Vector2 ScrollViewPosition { get; set; }
         protected SortVariant CurrentSortVariant { get; set; } = SortVariant.None;
+        protected FilterVariant CurrentFilterVariant { get; set; } = FilterVariant.Path;
         private string FilterString { get; set; }
         private bool IsFoldersShown { get; set; } = false;
 
-        private DataDescription<SearchHelperIgnoredFiles> ChosenPattern { get; set; }
-        private List<DataDescription<SearchHelperIgnoredFiles>> Patterns { get; set; }
+        private DataDescription<SearchHelperIgnoreRule> ChosenPattern { get; set; }
+        private List<DataDescription<SearchHelperIgnoreRule>> Patterns { get; set; }
         private List<Regex> RegexIgnoredPaths { get; set; }
         private List<Regex> RegexIgnoredNames { get; set; }
         private List<Regex> RegexIgnoredTypes { get; set; }
@@ -498,57 +506,94 @@ namespace SearchHelper.Editor
                     EGuiKit.Space(HorizontalIndent);
                 }
 
-                if (IsIgnoredFilesSupported)
-                {
-                    UpdatePatterns();
-
-                    var content = new GUIContent(ChosenPattern?.Name ?? "Ignored Files");
-                    if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
-                    {
-                        var menu = new GenericMenu();
-                        if (Patterns != null)
-                        {
-                            foreach (var pattern in Patterns)
-                            {
-                                menu.AddItem(new GUIContent(pattern.Name), ChosenPattern?.Name == pattern.Name, () =>
-                                {
-                                    UpdatePattern(pattern);
-                                });
-                            }
-                        }
-
-                        menu.AddItem(new GUIContent("Load more from disk"), false, () =>
-                        {
-                            UpdatePatterns(true);
-                        });
-
-                        menu.AddItem(new GUIContent("Remove Pattern"), false, () =>
-                        {
-                            UpdatePattern(null);
-                        });
-
-                        menu.ShowAsContext();
-                    }
-                }
-
-                if (IsSortingSupported)
-                {
-                    EGuiKit.Label("Sorting:");
-                    var newSortVariant = (SortVariant)GUILayout.Toolbar((int)CurrentSortVariant, System.Enum.GetNames(typeof(SortVariant)));
-                    if (CurrentSortVariant != newSortVariant)
-                    {
-                        if (Sort(newSortVariant))
-                        {
-                            CurrentSortVariant = newSortVariant;
-                        }
-                    }
-                    EGuiKit.Space(HorizontalIndent);
-                }
-
-                EGuiKit.Label("Path Contains:");
-                FilterString = EditorGUILayout.TextArea(FilterString, GUILayout.Width(250));
-                EGuiKit.Space(HorizontalIndent);
+                DrawIgnoringRules();
+                DrawSortingRules();
+                DrawFilterRules();
             });
+        }
+
+        private void DrawFilterRules()
+        {
+            var content = new GUIContent($"{CurrentFilterVariant} contains:");
+            if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
+            {
+                var menu = new GenericMenu();
+                foreach (FilterVariant variant in Enum.GetValues(typeof(FilterVariant)))
+                {
+                    menu.AddItem(new GUIContent(variant.ToString()), CurrentFilterVariant == variant, () =>
+                    {
+                        UpdateFilterVariant(variant);
+                    });
+                }
+
+                menu.ShowAsContext();
+            }
+
+            var newFilterString = EditorGUILayout.TextArea(FilterString, GUILayout.Width(250));
+            if (FilterString != newFilterString)
+            {
+                FilterString = newFilterString;
+                UpdateData();
+            }
+
+            EGuiKit.Space(HorizontalIndent);
+        }
+
+        private void DrawSortingRules()
+        {
+            if (!IsSortingSupported)
+            {
+                return;
+            }
+
+            EGuiKit.Label("Sorting:");
+            var newSortVariant = (SortVariant)GUILayout.Toolbar((int)CurrentSortVariant, System.Enum.GetNames(typeof(SortVariant)));
+            if (CurrentSortVariant != newSortVariant)
+            {
+                if (Sort(newSortVariant))
+                {
+                    CurrentSortVariant = newSortVariant;
+                }
+            }
+            EGuiKit.Space(HorizontalIndent);
+        }
+
+        private void DrawIgnoringRules()
+        {
+            if (!IsIgnoredFilesSupported)
+            {
+                return;
+            }
+
+            UpdatePatternsIfNeeded();
+
+            var content = new GUIContent(ChosenPattern?.Name ?? "No Ignore Rule");
+            if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
+            {
+                var menu = new GenericMenu();
+                if (Patterns != null)
+                {
+                    foreach (var pattern in Patterns)
+                    {
+                        menu.AddItem(new GUIContent(pattern.Name), ChosenPattern?.Name == pattern.Name, () =>
+                        {
+                            UpdatePattern(pattern);
+                        });
+                    }
+                }
+
+                menu.AddItem(new GUIContent("Load more from disk"), false, () =>
+                {
+                    UpdatePatternsIfNeeded(true);
+                });
+
+                menu.AddItem(new GUIContent("Remove Pattern"), false, () =>
+                {
+                    UpdatePattern(null);
+                });
+
+                menu.ShowAsContext();
+            }
         }
 
         private bool ShouldBeShown(ObjectContext objectContext)
@@ -560,9 +605,27 @@ namespace SearchHelper.Editor
 
             if (!string.IsNullOrEmpty(FilterString))
             {
-                if (!objectContext.Path.Contains(FilterString))
+                switch (CurrentFilterVariant)
                 {
-                    return false;
+                    case FilterVariant.Name:
+                        if (!objectContext.Object.name.Contains(FilterString))
+                        {
+                            return false;
+                        }
+
+                        break;
+                    case FilterVariant.Path:
+                        if (!objectContext.Path.Contains(FilterString))
+                        {
+                            return false;
+                        }
+                        break;
+                    case FilterVariant.Type:
+                        if (!objectContext.Object.GetType().FullName.Contains(FilterString))
+                        {
+                            return false;
+                        }
+                        break;
                 }
             }
 
@@ -625,7 +688,13 @@ namespace SearchHelper.Editor
             return AssetDatabase.IsValidFolder(path) ? path : null;
         }
 
-        private void UpdatePattern(DataDescription<SearchHelperIgnoredFiles> newPattern)
+        private void UpdateFilterVariant(FilterVariant newFilterVariant)
+        {
+            CurrentFilterVariant = newFilterVariant;
+            UpdateData();
+        }
+
+        private void UpdatePattern(DataDescription<SearchHelperIgnoreRule> newPattern)
         {
             ChosenPattern = newPattern;
             if (newPattern == null)
@@ -667,7 +736,7 @@ namespace SearchHelper.Editor
             UpdateData();
         }
 
-        private void UpdatePatterns(bool force = false)
+        private void UpdatePatternsIfNeeded(bool force = false)
         {
             var shouldBeUpdated = Patterns == null;
 
