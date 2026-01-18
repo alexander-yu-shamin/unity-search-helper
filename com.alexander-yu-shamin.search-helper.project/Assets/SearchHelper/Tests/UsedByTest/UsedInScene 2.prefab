@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 6151281330406302156}
   - component: {fileID: 3759713639847127306}
   m_Layer: 0
-  m_Name: TestScriptPrefab1
+  m_Name: UsedInScene 2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

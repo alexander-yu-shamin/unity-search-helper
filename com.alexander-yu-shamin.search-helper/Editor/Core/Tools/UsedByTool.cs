@@ -16,6 +16,7 @@ namespace SearchHelper.Editor.Tools
 
         private List<ObjectContext> Contexts { get; set; }
         protected override IEnumerable<ObjectContext> Data => Contexts;
+        public override string EmptyObjectContextText { get; set; } = "This object is not referenced anywhere in the project.";
 
         public override void Draw(Rect windowRect)
         {

@@ -14,6 +14,7 @@
 - The 'Merge' Tool replace GUIDs in meta-files 
 - Fixed the Unused files search algo. It has errors
 - Fixed the dependency search
+- Added `AssetDatabase.SaveAssets` before calling another code from `AssetDatabase`
 
 ### Changed
 - Added a cache to improve UI.

@@ -289,7 +289,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2472802243669019731}
   m_Layer: 0
-  m_Name: TestElements
+  m_Name: NotUsedPrefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
