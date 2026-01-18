@@ -27,7 +27,7 @@ namespace SearchHelper.Editor.Tools
             }
         }
 
-        public override bool IsShowFoldersSupported { get; set; } = false;
+        protected override bool IsShowFoldersSupported { get; set; } = false;
 
         private MergeObjectContext BaseObject { get; set; }
 
@@ -42,18 +42,34 @@ namespace SearchHelper.Editor.Tools
             }
         }
 
-        public override void GetDataFromAnotherTool(List<ObjectContext> contexts)
+        public override void GetDataFromAnotherTool(ObjectContext context)
         {
-            Contexts = new List<MergeObjectContext>();
-
-            foreach (var context in contexts)
+            if (context == null)
             {
-                AddObjectToMerge(context.Object, true);
+                return;
+            }
 
-                foreach (var dependency in context.Dependencies)
-                {
-                    AddObjectToMerge(dependency.Object, false);
-                }
+            if (context.Dependencies.IsNullOrEmpty())
+            {
+                return;
+            }
+
+            Contexts ??= new List<MergeObjectContext>();
+
+            if (Contexts.Contains(context))
+            {
+                return;
+            }
+
+            if (Contexts.Any(element => element.Path == context.Path))
+            {
+                return;
+            }
+
+            AddObjectToMerge(context.Object, true);
+            foreach (var dependency in context.Dependencies)
+            {
+                AddObjectToMerge(dependency.Object);
             }
         }
 
@@ -78,6 +94,8 @@ namespace SearchHelper.Editor.Tools
 
                 DrawHeaderControls();
             });
+
+            EGuiKit.Space(HeaderPadding);
 
             if (Contexts.IsNullOrEmpty())
             {
@@ -171,7 +189,7 @@ namespace SearchHelper.Editor.Tools
             });
         }
 
-        public override void Run(Object selectedObject, Settings settings)
+        public override void Run(Object selectedObject)
         {
             if (selectedObject != null)
             {

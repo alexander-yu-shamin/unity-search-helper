@@ -12,12 +12,16 @@ namespace SearchHelper.Editor.Core
 
         public static IEnumerable<string> FindAssetPaths(string root = null)
         {
+            AssetDatabase.SaveAssets();
+
             return FindAssets(ObjectSearchFilter, root).Select(AssetDatabase.GUIDToAssetPath)
                                                        .Where(path => !string.IsNullOrEmpty(path));
         }
 
         public static IEnumerable<Object> FindAssetObjects(string root = null)
         {
+            AssetDatabase.SaveAssets();
+
             return FindAssets(ObjectSearchFilter, root).Select(AssetDatabase.GUIDToAssetPath)
                                                        .Select(AssetDatabase.LoadMainAssetAtPath)
                                                        .Where(asset => asset != null);
@@ -34,6 +38,8 @@ namespace SearchHelper.Editor.Core
             {
                 return null;
             }
+
+            AssetDatabase.SaveAssets();
 
             var searchedCtx = ObjectContext.ToObjectContext(obj);
 
@@ -70,6 +76,8 @@ namespace SearchHelper.Editor.Core
             {
                 return null;
             }
+
+            AssetDatabase.SaveAssets();
 
             var dependencies = ObjectContext.ToObjectContexts(EditorUtility.CollectDependencies(new[] { obj }), obj);
             var path = AssetDatabase.GetAssetPath(obj);

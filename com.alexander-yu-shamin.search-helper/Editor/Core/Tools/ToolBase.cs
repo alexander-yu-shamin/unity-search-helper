@@ -16,11 +16,6 @@ namespace SearchHelper.Editor
 {
     public abstract class ToolBase
     {
-        public class Settings
-        {
-            public bool IsGlobal { get; set; } = true;
-        }
-
         protected enum SortVariant
         {
             None = 0,
@@ -36,12 +31,13 @@ namespace SearchHelper.Editor
             Type
         }
 
-        public virtual bool IsIgnoredFilesSupported { get; set; } = true;
-        public virtual bool IsSortingSupported { get; set; } = true;
-        public virtual bool ShouldMainObjectsBeSorted { get; set; } = false;
-        public virtual bool IsShowFoldersSupported { get; set; } = true;
-        public virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
-        public virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
+        protected virtual bool IsScopeRulesSupported { get; set; } = false;
+        protected virtual bool IsIgnoredFilesSupported { get; set; } = true;
+        protected virtual bool IsSortingSupported { get; set; } = true;
+        protected virtual bool ShouldMainObjectsBeSorted { get; set; } = false;
+        protected virtual bool IsShowFoldersSupported { get; set; } = true;
+        protected virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
+        protected virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
         protected const float RowHeight = 20.0f;
         protected const float RowPadding = 2f;
@@ -89,12 +85,17 @@ namespace SearchHelper.Editor
         private List<Regex> RegexIgnoredTypes { get; set; }
 
         protected abstract IEnumerable<ObjectContext> Data { get; }
+        public bool IsGlobalScope { get; set; } = true;
 
         public abstract void Draw(Rect windowRect);
 
-        public abstract void Run(Object selectedObject, Settings settings);
+        public abstract void Run(Object selectedObject);
 
-        public virtual void GetDataFromAnotherTool(List<ObjectContext> contexts)
+        public virtual void GetDataFromAnotherTool(IEnumerable<ObjectContext> contexts)
+        {
+        }
+
+        public virtual void GetDataFromAnotherTool(ObjectContext context)
         {
         }
 
@@ -506,9 +507,23 @@ namespace SearchHelper.Editor
                     EGuiKit.Space(HorizontalIndent);
                 }
 
+                DrawScopeRules();
                 DrawIgnoringRules();
                 DrawSortingRules();
                 DrawFilterRules();
+            });
+        }
+
+        private void DrawScopeRules()
+        {
+            if (!IsScopeRulesSupported)
+            {
+                return;
+            }
+
+            EGuiKit.Button(IsGlobalScope ? "Global" : "Local", () =>
+            {
+                IsGlobalScope = !IsGlobalScope;
             });
         }
 
@@ -776,7 +791,13 @@ namespace SearchHelper.Editor
                     () => { CopyToClipboard(string.Join(", ", context.Dependencies.Select(element => element.Path))); });
             }
 
+            AddContextMenu(menu, context);
+
             menu.ShowAsContext();
+        }
+
+        protected virtual void AddContextMenu(GenericMenu menu, ObjectContext context)
+        {
         }
 
         private void SelectDependencies(ObjectContext context)

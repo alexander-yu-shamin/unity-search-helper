@@ -13,11 +13,9 @@ namespace SearchHelper.Editor.Tools
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
         private string CurrentUsedObjectGuid { get; set; }
-
         private List<ObjectContext> Contexts { get; set; }
         protected override IEnumerable<ObjectContext> Data => Contexts;
-
-        public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
+        protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
 
         public override void Draw(Rect windowRect)
         {
@@ -31,7 +29,6 @@ namespace SearchHelper.Editor.Tools
                     FindAssetByGuid(CurrentGuid);
                 }
 
-                EGuiKit.Space(HorizontalIndent);
                 EGuiKit.Button("Find", () =>
                 {
                     FindAssetByGuid(CurrentGuid);
@@ -55,7 +52,7 @@ namespace SearchHelper.Editor.Tools
             DrawContexts(windowRect);
         }
 
-        public override void Run(Object selectedObject, Settings settings)
+        public override void Run(Object selectedObject)
         {
             if (selectedObject == null)
             {

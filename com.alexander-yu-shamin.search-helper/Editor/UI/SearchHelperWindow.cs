@@ -57,46 +57,60 @@ namespace SearchHelper.Editor.UI
         [MenuItem(SearchHelperSettings.ContextMenuItemFindDependenciesName)]
         public static void ShowDependencies()
         {
-            OpenWindow().SelectTool(ToolType.DependencyTool)?.Run(SelectedObject, null);
+            OpenWindow().SelectTool(ToolType.DependencyTool)?.Run(SelectedObject);
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuFindUsedByItemName)]
         public static void ShowUsesBy()
         {
-            OpenWindow().SelectTool(ToolType.UsedByTool)?.Run(SelectedObject, null);
+            OpenWindow().SelectTool(ToolType.UsedByTool)?.Run(SelectedObject);
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuShowObjectGuidItemName)]
         public static void ShowObjectGuid()
         {
-            OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(SelectedObject, null);
+            OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(SelectedObject);
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuFindUnusedGlobalItemName)]
         public static void FindUnusedObjectsGlobal()
         {
-            OpenWindow().SelectTool(ToolType.UnusedTool)?.Run(SelectedObject, new () {IsGlobal = true });
+            var selectTool = OpenWindow().SelectTool(ToolType.UnusedTool);
+            if (selectTool != null)
+            {
+                selectTool.IsGlobalScope = true;
+                selectTool.Run(SelectedObject);
+            }
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuFindUnusedLocalItemName)]
         public static void FindUnusedObjectsLocal()
         {
-            OpenWindow().SelectTool(ToolType.UnusedTool)?.Run(SelectedObject, new () { IsGlobal = false });
+            var selectTool = OpenWindow().SelectTool(ToolType.UnusedTool);
+            if (selectTool != null)
+            {
+                selectTool.IsGlobalScope = false;
+                selectTool.Run(SelectedObject);
+            }
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuFindDuplicatesItemName)]
         public static void FindDuplicates()
         {
-            OpenWindow().SelectTool(ToolType.DuplicatesTool)?.Run(SelectedObject, null);
+            OpenWindow().SelectTool(ToolType.DuplicatesTool)?.Run(SelectedObject);
         }
 
         [MenuItem(SearchHelperSettings.ContextMenuMergeItemName)]
         public static void MergeFiles()
         {
-            OpenWindow().SelectTool(ToolType.MergeTool)?.Run(SelectedObject, null);
+            OpenWindow().SelectTool(ToolType.MergeTool)?.Run(SelectedObject);
         }
 
-        public static void TransferToTool(ToolType toolType, List<ObjectContext> contexts)
+        public static void TransferToTool(ToolType toolType, ObjectContext context)
+        {
+            OpenWindow()?.SelectTool(toolType).GetDataFromAnotherTool(context);
+        }
+        public static void TransferToTool(ToolType toolType, IEnumerable<ObjectContext> contexts)
         {
             OpenWindow()?.SelectTool(toolType).GetDataFromAnotherTool(contexts);
         }

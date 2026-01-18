@@ -38,7 +38,7 @@ namespace SearchHelper.Editor.Tools
             EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
         }
 
-        public override void Run(Object selectedObject, Settings settings)
+        public override void Run(Object selectedObject)
         {
             if (selectedObject == null)
             {

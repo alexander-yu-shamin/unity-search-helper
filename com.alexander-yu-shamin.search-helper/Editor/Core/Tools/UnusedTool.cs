@@ -12,14 +12,14 @@ namespace SearchHelper.Editor.Tools
 {
     public class UnusedTool : ToolBase
     {
-        public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
-        public override bool IsShowFoldersSupported { get; set; } = false;
-        public override bool ShouldMainObjectsBeSorted { get; set; } = true;
+        protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
+        protected override bool IsShowFoldersSupported { get; set; } = false;
+        protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
+        protected override bool IsScopeRulesSupported { get; set; } = true;
 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
         private bool ShowAll { get; set; } = false;
-        private bool IsGlobal { get; set; } = true;
 
         private List<ObjectContext> Contexts { get; set; }
 
@@ -49,25 +49,15 @@ namespace SearchHelper.Editor.Tools
 
                 EGuiKit.FlexibleSpace();
 
-                EGuiKit.Button(SelectedObject != null && !Contexts.IsNullOrEmpty(), "Copy Shown Items", () =>
-                {
-                    CopyToClipboard(string.Join("\n", Contexts.Where(context => context.ShouldBeShown).Select(context => context.Path)));
-                });
-
-                EGuiKit.Button(IsGlobal ? "Global" : "Local", () =>
-                {
-                    IsGlobal = !IsGlobal;
-                    Contexts = FindUnused(SelectedObject);
-                });
-
-                var newValue = EditorGUILayout.ToggleLeft("Show All", ShowAll, GUILayout.Width(100));
+                var newValue = EditorGUILayout.ToggleLeft("Show All", ShowAll, GUILayout.Width(70));
                 if (ShowAll != newValue)
                 {
                     ShowAll = newValue;
                     Contexts = FindUnused(SelectedObject);
                 }
 
-                EGuiKit.Space(HorizontalIndent);
+                EGuiKit.Button(!Contexts.IsNullOrEmpty(), "Remove Items", RemovedUnusedItems);
+                EGuiKit.Button(SelectedObject != null && !Contexts.IsNullOrEmpty(), "Copy Items to Clipboard", CopyToClipboard);
 
                 DrawHeaderControls();
             });
@@ -75,10 +65,9 @@ namespace SearchHelper.Editor.Tools
             EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
         }
 
-        public override void Run(Object selectedObject, Settings settings)
+        public override void Run(Object selectedObject)
         {
             SelectedObject = selectedObject;
-            IsGlobal = settings?.IsGlobal ?? IsGlobal;
             Contexts = FindUnused(SelectedObject);
         }
 
@@ -93,7 +82,7 @@ namespace SearchHelper.Editor.Tools
 
             var map = FolderOrFile(UsedObject).Select(ObjectContext.ToObjectContext).ToDictionary(key => key.Path);
 
-            var root = IsGlobal ? null : FolderPathFromObject(obj);
+            var root = IsGlobalScope ? null : FolderPathFromObject(obj);
 
             var paths = SearchHelperService.FindAssetPaths(root);
             if (!paths.Any())
@@ -121,6 +110,43 @@ namespace SearchHelper.Editor.Tools
             Contexts = ShowAll ? map.Values.OrderBy(ctx => ctx.Dependencies.Count).ToList() : map.Values.Where(ctx => ctx.Dependencies.Count == 0).ToList();
             UpdateData(Contexts);
             return Contexts;
+        }
+
+        private void RemovedUnusedItems()
+        {
+            if (Contexts.IsNullOrEmpty())
+            {
+                return;
+            }
+
+            AssetDatabase.StartAssetEditing();
+            foreach (var context in Contexts)
+            {
+                if (!context.ShouldBeShown)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(context.Path))
+                {
+                    continue;
+                }
+
+                File.Delete(context.Path);
+            }
+
+            AssetDatabase.StopAssetEditing();
+            AssetDatabase.SaveAssets();
+        }
+
+        private void CopyToClipboard()
+        {
+            if (Contexts.IsNullOrEmpty())
+            {
+                return;
+            }
+
+            CopyToClipboard(string.Join("\n", Contexts.Where(context => context.ShouldBeShown).Select(context => context.Path)));
         }
     }
 }

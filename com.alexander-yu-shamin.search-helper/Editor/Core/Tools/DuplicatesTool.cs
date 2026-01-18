@@ -15,9 +15,9 @@ namespace SearchHelper.Editor.Tools
 {
     public class DuplicatesTool : ToolBase
     {
-        public override bool DrawObjectWithEmptyDependencies { get; set; } = true;
-        public override bool IsShowFoldersSupported { get; set; } = false;
-        public override bool ShouldMainObjectsBeSorted { get; set; } = true;
+        protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
+        protected override bool IsShowFoldersSupported { get; set; } = false;
+        protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
@@ -46,9 +46,9 @@ namespace SearchHelper.Editor.Tools
                 });
 
                 EGuiKit.FlexibleSpace();
-                EGuiKit.Button(UsedObject != null && !Contexts.IsNullOrEmpty(), "Open in Merge Tool", () =>
+                EGuiKit.Button(UsedObject != null && !Contexts.IsNullOrEmpty() && Contexts.Count == 1, "Open in Merge Tool", () =>
                 {
-                    SearchHelperWindow.TransferToTool(SearchHelperWindow.ToolType.MergeTool, Contexts);
+                    SearchHelperWindow.TransferToTool(SearchHelperWindow.ToolType.MergeTool, Contexts.First());
                 });
                 DrawHeaderControls();
             });
@@ -56,7 +56,7 @@ namespace SearchHelper.Editor.Tools
             EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
         }
 
-        public override void Run(Object selectedObject, Settings settings)
+        public override void Run(Object selectedObject)
         {
             SelectedObject = selectedObject;
             Contexts = FindDuplicates(SelectedObject);
@@ -143,6 +143,19 @@ namespace SearchHelper.Editor.Tools
             var hashBytes = md5.ComputeHash(File.ReadAllBytes(path));
             var hash = BitConverter.ToString(hashBytes);
             return hash;
+        }
+
+        protected override void AddContextMenu(GenericMenu menu, ObjectContext context)
+        {
+            if (context.Dependencies.IsNullOrEmpty())
+            {
+                return;
+            }
+
+            menu.AddItem(new GUIContent("Open in Merge Tool"), false, () =>
+            {
+                SearchHelperWindow.TransferToTool(SearchHelperWindow.ToolType.MergeTool, context);
+            });
         }
     }
 }
