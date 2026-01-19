@@ -52,7 +52,7 @@ namespace SearchHelper.Editor.Tools
                 EGuiKit.FlexibleSpace();
                 EGuiKit.Button(UsedObject != null && !Contexts.IsNullOrEmpty() && Contexts.Count == 1, "Open in Merge Tool", () =>
                 {
-                    SearchHelperWindow.TransferToTool(SearchHelperWindow.ToolType.MergeTool, Contexts.First());
+                    TransferToMergeTool(Contexts.FirstOrDefault());
                 });
                 DrawHeaderControls();
             });
@@ -151,8 +151,28 @@ namespace SearchHelper.Editor.Tools
 
             menu.AddItem(new GUIContent("Open in Merge Tool"), false, () =>
             {
-                SearchHelperWindow.TransferToTool(SearchHelperWindow.ToolType.MergeTool, context);
+                TransferToMergeTool(context);
             });
+        }
+
+        private void TransferToMergeTool(ObjectContext context)
+        {
+            if (context == null)
+            {
+                return;
+            }
+
+            if (!context.ShouldBeShown)
+            {
+                return;
+            }
+
+            var transferContext = new ObjectContext(context)
+            {
+                Dependencies = context.Dependencies.Where(dependency => dependency.ShouldBeShown).ToList()
+            };
+
+            SearchHelperWindow.TransferToTool(SearchHelperWindow.ToolType.MergeTool, transferContext);
         }
     }
 }
