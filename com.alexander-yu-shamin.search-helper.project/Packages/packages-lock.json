@@ -5,7 +5,7 @@
       "depth": 0,
       "source": "local",
       "dependencies": {
-        "com.alexander-yu-shamin.toolkit": "0.0.1"
+        "com.alexander-yu-shamin.toolkit": "0.0.2"
       }
     },
     "com.alexander-yu-shamin.toolkit": {
@@ -13,7 +13,7 @@
       "depth": 0,
       "source": "git",
       "dependencies": {},
-      "hash": "9ccb2b77b9ac16efb3b5ab558dce2fe34e235b97"
+      "hash": "c385a7e79fc48cdf0df91d0fe951274cc1a32f0d"
     },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
@@ -118,7 +118,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.services.analytics": {
-      "version": "6.0.3",
+      "version": "6.1.0",
       "depth": 1,
       "source": "registry",
       "dependencies": {

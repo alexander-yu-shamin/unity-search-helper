@@ -10,6 +10,16 @@ A lightweight multi-tool for asset management:
 - [**Merge Tool**](README.md#Merge%20Tool): Consolidates duplicates
 - [**Find By GUID Tool**](README.md#Find%20By%20GUID%20Tool): Locates assets by identifier
 
+## Install
+
+Package Manager -> Install package from git URL:
+- `git@github.com:alexander-yu-shamin/unity-toolkit.git?path=/com.alexander-yu-shamin.toolkit`
+- `git@github.com:alexander-yu-shamin/unity-search-helper.git?path/com.alexander-yu-shamin.search-helper`
+
+## Entrypoints
+
+- Windows -> Search -> Open Search Helper Tool
+- The Project Window -> Context Menu -> Search Helper Tool
 
 ## Tool Overview
 
@@ -84,4 +94,5 @@ For meta-files, it compares hashes (SHA256) while ignoring the first two lines, 
 ### Find By GUID Tool
 
 The tool can locate objects by their GUID or display an object's GUID.
+
 ***Please note***: This tool is currently under development.The tool is under development now.

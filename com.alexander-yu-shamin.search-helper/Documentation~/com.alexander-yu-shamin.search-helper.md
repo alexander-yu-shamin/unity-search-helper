@@ -1,6 +1,6 @@
 # Search Helper
 
-![search-helper](Documentation~/images/search-helper.gif)
+![search-helper](images/search-helper.gif)
 
 A lightweight multi-tool for asset management:
 - [**Dependency Tool**](README.md#Dependency%20Tool): Maps asset relationships
@@ -10,10 +10,20 @@ A lightweight multi-tool for asset management:
 - [**Merge Tool**](README.md#Merge%20Tool): Consolidates duplicates
 - [**Find By GUID Tool**](README.md#Find%20By%20GUID%20Tool): Locates assets by identifier
 
+## Install
+
+Package Manager -> Install package from git URL:
+- `git@github.com:alexander-yu-shamin/unity-toolkit.git?path=/com.alexander-yu-shamin.toolkit`
+- `git@github.com:alexander-yu-shamin/unity-search-helper.git?path/com.alexander-yu-shamin.search-helper`
+
+## Entrypoints
+
+- Windows -> Search -> Open Search Helper Tool
+- The Project Window -> Context Menu -> Search Helper Tool
 
 ## Tool Overview
 
-![search-helper-capabilities](Documentation~/images/search-helper-capabilities.png)
+![search-helper-capabilities](images/search-helper-capabilities.png)
 
 The tool supports displaying unlimited items with comprehensive filtering and sorting functionality.
 
@@ -32,7 +42,7 @@ The tool supports displaying unlimited items with comprehensive filtering and so
 
 
 ### Ignore Rules
-![search-helper-ignore-rule](Documentation~/images/search-helper-ignore-rule.png)
+![search-helper-ignore-rule](images/search-helper-ignore-rule.png)
 
 You can create custom rule files to exclude specific files from search results. The system uses regex (regular expression) capabilities for matching, allowing you to filter by: 
 - **File path**
@@ -44,19 +54,19 @@ The tool automatically detects rule files by type, so you can organize them anyw
 
 ## Tools
 ### Dependency Tool
-![search-helper-dependencies-tool](Documentation~/images/search-helper-dependencies-tool.png)
+![search-helper-dependencies-tool](images/search-helper-dependencies-tool.png)
 
 The `EditorUtility.CollectDependencies` method is used to compile all dependencies of a given object or an entire folder.
 The tool doesn't check for direct script references (aka by filename from a script).
 
 ### Used By Tool
-![search-helper-used-by-tool](Documentation~/images/search-helper-used-by-tool.png)
+![search-helper-used-by-tool](images/search-helper-used-by-tool.png)
 
 The `AssetDatabase.GetDependencies` method is used to a dependency map and tracking object references.
 The tool doesn't check for direct script references (aka by filename from a script).
 
 ### Unused Tool
-![search-helper-unused-tool](Documentation~/images/search-helper-unused-tool.png)
+![search-helper-unused-tool](images/search-helper-unused-tool.png)
 
 Similar to 'Used By', but scans all files within a folder instead of searching for dependencies on the folder itself.
 
@@ -67,7 +77,7 @@ The tool operates in two modes: Local and Global ("Scan Rules")
 A common task is to safeguard critical files (for instance, "important") from accidental deletion. This can be automated by setting up a combination of Scan Rules and Ignore Rules, effectively streamlining the cleanup of unused files.
 
 ### Duplicates Tool
-![search-helper-duplicates](Documentation~/images/search-helper-duplicates-tool.png)
+![search-helper-duplicates](images/search-helper-duplicates-tool.png)
 
 The tool identifies duplicates by comparing file hashes (MD5) in a folder (defaults to "Assets"). 
 The results can be transfered to "Merge Tool" by the button "Open in Merge Tool" or the context menu "Open in Merge Tool".
@@ -78,10 +88,11 @@ For meta-files, it compares hashes (SHA256) while ignoring the first two lines, 
 
 ***Please note***: This tool is currently under development.The tool is under development now.
 
-![search-helper-merge-tool](Documentation~/images/search-helper-merge-tool.png)
+![search-helper-merge-tool](images/search-helper-merge-tool.png)
 
 
 ### Find By GUID Tool
 
 The tool can locate objects by their GUID or display an object's GUID.
+
 ***Please note***: This tool is currently under development.The tool is under development now.
