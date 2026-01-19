@@ -721,15 +721,27 @@ namespace SearchHelper.Editor
 
         private void UpdatePattern(DataDescription<SearchHelperIgnoreRule> newPattern)
         {
-            ChosenPattern = newPattern;
             if (newPattern == null)
             {
                 RegexIgnoredPaths = null;
                 RegexIgnoredNames = null;
                 RegexIgnoredTypes = null;
+                if (ChosenPattern != null)
+                {
+                    ChosenPattern.Data.OnDataChanged -= OnPatterChanged;
+                    ChosenPattern = null;
+                }
             }
             else
             {
+                if (ChosenPattern != null)
+                {
+                    ChosenPattern.Data.OnDataChanged -= OnPatterChanged;
+                }
+
+                ChosenPattern = newPattern;
+                ChosenPattern.Data.OnDataChanged += OnPatterChanged;
+
                 RegexIgnoredPaths = new List<Regex>(ChosenPattern.Data.IgnoredPaths.Count);
                 foreach (var ignoredPath in ChosenPattern.Data.IgnoredPaths)
                 {
@@ -759,6 +771,11 @@ namespace SearchHelper.Editor
             }
 
             UpdateData();
+        }
+
+        private void OnPatterChanged()
+        {
+            UpdatePattern(ChosenPattern);
         }
 
         private void UpdatePatternsIfNeeded(bool force = false)
