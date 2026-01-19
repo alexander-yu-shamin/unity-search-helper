@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using SearchHelper.Editor.Core;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
@@ -15,11 +13,20 @@ namespace SearchHelper.Editor.Tools
 {
     public class MergeTool : ToolBase
     {
+        private enum ObjectState
+        {
+            None,
+            BaseObject,
+            SameAsBaseObject,
+            NotTheSameAsBaseObject
+        }
+
         private class MergeObjectContext : ObjectContext
         {
             public bool IsSelected { get; set; } = true;
             public bool IsBaseObject { get; set; } = false;
-            public bool IsMetaAsBaseObject { get; set; } = false;
+            public bool IsMerged { get; set; } = false;
+            public ObjectState State { get; set; } = ObjectState.None;
             public string MetaPath => Path + ".meta";
 
             public MergeObjectContext(ObjectContext context) : base(context)
@@ -28,18 +35,16 @@ namespace SearchHelper.Editor.Tools
         }
 
         protected override bool IsShowFoldersSupported { get; set; } = false;
+        protected override bool IsIgnoredFilesSupported { get; set; } = false;
 
         private MergeObjectContext BaseObject { get; set; }
-
         private List<MergeObjectContext> Contexts { get; set; } = new List<MergeObjectContext>();
         protected override IEnumerable<ObjectContext> Data => Contexts;
 
-        private void OnPostprocessAllAssets()
+        public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
+            string[] movedFromAssetPaths)
         {
-            if (BaseObject != null && !Contexts.IsNullOrEmpty())
-            {
-                CompareWithBaseObject(Contexts, BaseObject);
-            }
+            CompareWithBaseObject(Contexts);
         }
 
         public override void GetDataFromAnotherTool(ObjectContext context)
@@ -66,10 +71,11 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            AddObjectToMerge(context.Object, true);
-            foreach (var dependency in context.Dependencies)
+            AddObjectToMergeAsBase(context.Object);
+
+            foreach (var dependency in context.Dependencies.Where(dependency => dependency.Path != context.Path))
             {
-                AddObjectToMerge(dependency.Object);
+                AddObjectToMergeAsTheirs(dependency.Object);
             }
         }
 
@@ -77,15 +83,8 @@ namespace SearchHelper.Editor.Tools
         {
             EGuiKit.Horizontal(() =>
             {
-                var newObject = EditorGUILayout.ObjectField(BaseObject?.Object, typeof(Object), true,
-                    GUILayout.Width(SelectedObjectWidth));
-                if (newObject != BaseObject?.Object)
-                {
-                    AddObjectToMerge(newObject, true);
-                }
-
-                EGuiKit.Button("Add Selected Object as Base Object", () => { AddObjectToMerge(Selection.activeObject, true); });
-                EGuiKit.Button("Add Selected Object for Merge", () => { AddObjectToMerge(Selection.activeObject);});
+                EGuiKit.Button("Add Selected Object as Base", () => { AddObjectToMergeAsBase(Selection.activeObject); });
+                EGuiKit.Button("Add Selected Object as Theirs", () => { AddObjectToMergeAsTheirs(Selection.activeObject);});
                 EGuiKit.FlexibleSpace();
                 EGuiKit.Button(BaseObject != null && !Contexts.IsNullOrEmpty(), "Merge", () =>
                 {
@@ -118,9 +117,14 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
+            if (baseObject == null)
+            {
+                return;
+            }
+
             AssetDatabase.StartAssetEditing();
 
-            foreach (var context in contexts)
+            foreach (var context in contexts.Where(context => !context.IsBaseObject && context.IsSelected))
             {
                 if (context == null)
                 {
@@ -169,128 +173,244 @@ namespace SearchHelper.Editor.Tools
 
         private void DrawElement(MergeObjectContext context)
         {
+            if (context == null)
+            {
+                return;
+            }
+
             EGuiKit.Horizontal(() =>
             {
-                context.IsExpanded = EditorGUILayout.ToggleLeft("Use for merge", context.IsExpanded, GUILayout.Width(100));
+                context.IsSelected = EditorGUILayout.ToggleLeft("Use for merge", context.IsExpanded, GUILayout.Width(100));
                 EGuiKit.Button("Remove", () =>
                 {
                     Contexts.RemoveAll(match => match.Path == context.Path);
                 }, GUILayout.Width(100));
 
-                EGuiKit.Color(context.IsMetaAsBaseObject ? Color.green : Color.red, () =>
+                EGuiKit.Button(context.IsBaseObject ? "Base" : "Theirs", () =>
+                {
+                    if (context.IsBaseObject)
+                    {
+                        context.IsBaseObject = false;
+                        BaseObject = null;
+                    }
+                    else
+                    {
+                        Contexts.ForEach(context =>
+                        {
+                            context.IsBaseObject = false;
+                            context.State = ObjectState.None;
+                        });
+                        context.IsBaseObject = true;
+                        BaseObject = context;
+                    }
+
+                    CompareWithBaseObject(Contexts);
+                }, GUILayout.Width(100));
+
+                EGuiKit.Color(GetColor(context), () =>
                 {
                     EditorGUILayout.ObjectField(context.Object, typeof(Object), true, GUILayout.Width(SelectedObjectWidth));
                 });
 
-                EditorGUILayout.LabelField("GUID:", GUILayout.Width(40));
-                EditorGUILayout.TextArea(context.Guid, GUILayout.Width(GuidTextAreaWidth));
-                EditorGUILayout.LabelField("Path:", GUILayout.Width(40));
-                EditorGUILayout.TextArea(context.Path, GUILayout.ExpandWidth(true));
-            });
+                EGuiKit.Color(context.IsMerged ? Color.cyan : GUI.color, () =>
+                {
+                    EditorGUILayout.LabelField("GUID:", GUILayout.Width(40));
+                    EditorGUILayout.TextArea(context.IsMerged ? "MERGED" : context.Guid, GUILayout.Width(GuidTextAreaWidth));
+                    EditorGUILayout.LabelField("Path:", GUILayout.Width(40));
+                    EditorGUILayout.TextArea(context.Path, GUILayout.ExpandWidth(true));
+                });
+            }, GUI.skin.box);
+        }
+
+        private Color GetColor(MergeObjectContext context)
+        {
+            switch (context.State)
+            {
+                case ObjectState.BaseObject:
+                    return Color.yellow;
+                case ObjectState.SameAsBaseObject:
+                    return Color.green;
+                case ObjectState.NotTheSameAsBaseObject:
+                    return Color.red;
+                case ObjectState.None:
+                default:
+                    return GUI.color;
+            }
         }
 
         public override void Run(Object selectedObject)
         {
             if (selectedObject != null)
             {
-                AddObjectToMerge(selectedObject);
+                AddObjectToMergeAsBase(selectedObject);
             }
         }
 
-        private void AddObjectToMerge(Object selectedObject, bool isBaseObject = false)
+        private void AddObjectToMergeAsBase(Object selectedObject)
         {
             if (selectedObject == null)
             {
                 return;
             }
 
-            if (Contexts == null)
+            Contexts ??= new List<MergeObjectContext>();
+
+            var newBaseObject = ToMergeObjectContext(selectedObject);
+            var validationError = ValidateMergeObjectContext(newBaseObject);
+
+            switch (validationError)
+            {
+                case ValidationError.InContexts:
+                {
+                    BaseObject.IsBaseObject = false;
+                    BaseObject = Contexts.FirstOrDefault(context => context.Path == newBaseObject.Path);
+                    if (BaseObject != null)
+                    {
+                        BaseObject.IsBaseObject = true;
+                        BaseObject.State = ObjectState.BaseObject;
+                    }
+                    return;
+                }
+
+                case ValidationError.NoError:
+                {
+                    break;
+                }
+                case ValidationError.BaseObject:
+                case ValidationError.Null:
+                case ValidationError.NotAFile:
+                {
+                    return;
+                }
+                default:
+                {
+                    throw new ArgumentOutOfRangeException();
+                }
+            }
+
+            if (BaseObject != null)
+            {
+                BaseObject.IsBaseObject = false;
+                BaseObject.State = ObjectState.None;
+                BaseObject = null;
+            }
+
+            Contexts.Add(newBaseObject);
+            BaseObject = newBaseObject;
+            BaseObject.State = ObjectState.BaseObject;
+            BaseObject.IsBaseObject = true;
+            CompareWithBaseObject(Contexts);
+        }
+
+        private void AddObjectToMergeAsTheirs(Object selectedObject)
+        {
+            if (selectedObject == null)
             {
                 return;
             }
 
-            if (BaseObject == null || isBaseObject)
-            {
-                var context = ToMergeObjectContext(selectedObject);
-                var validationError = ValidateMergeObjectContext(context);
+            Contexts ??= new List<MergeObjectContext>();
 
-                switch (validationError)
-                {
-                    case ValidationError.InContexts:
-                    case ValidationError.BaseObject:
-                    case ValidationError.NoError:
-                    {
-                        UpdateBaseObject(context);
-                        break;
-                    }
-                    default:
-                    {
-                        Debug.LogError($"The object {selectedObject.name} can't be used for merge. It a part of another object.");
-                        BaseObject = null;
-                        break;
-                    }
-                }
-            }
-            else
+            var mergeObject = ToMergeObjectContext(selectedObject);
+            var validationError = ValidateMergeObjectContext(mergeObject);
+
+            switch (validationError)
             {
-                var context = ToMergeObjectContext(selectedObject);
-                if (ValidateMergeObjectContext(context) == ValidationError.NoError)
+                case ValidationError.NoError:
                 {
-                    CompareWithBaseObject(context, BaseObject);
-                    Contexts.Add(context);
-                    UpdateData(Contexts);
+                    break;
+                }
+                case ValidationError.BaseObject:
+                {
+                    if (EditorUtility.DisplayDialog("WARNING",
+                            "This file is a base object. Would you like to add it to the merge list?", "Yes", "No"))
+                    {
+                        BaseObject.IsBaseObject = false;
+                        BaseObject = null;
+                    }
+                    return;
+                }
+                case ValidationError.Null:
+                case ValidationError.InContexts:
+                case ValidationError.NotAFile:
+                    return;
+                default:
+                {
+                    throw new ArgumentOutOfRangeException();
                 }
             }
+
+            Contexts.Add(mergeObject);
+            CompareWithBaseObject(mergeObject);
+            UpdateData(Contexts);
         }
 
-        private void CompareWithBaseObject(MergeObjectContext context, MergeObjectContext baseContext)
+        private void CompareWithBaseObject(MergeObjectContext context)
         {
-            if (!File.Exists(baseContext.MetaPath))
+            if (BaseObject == null || context == null)
             {
-                Debug.LogError($"Cannot find path {baseContext.MetaPath}.");
+                return;
+            }
+
+            if (!File.Exists(BaseObject.MetaPath))
+            {
+                Debug.LogError($"Cannot find base metafile [{BaseObject.MetaPath}].");
                 return;
             }
 
             if (!File.Exists(context.MetaPath))
             {
-                context.IsMetaAsBaseObject = false;
-                Debug.LogError($"Cannot find path {context.MetaPath}.");
+                context.State = ObjectState.None;
+                Debug.LogError($"Cannot find theirs metafile [{context.MetaPath}].");
                 return;
             }
 
-            var areMetasEqual = GetFileHash(baseContext.MetaPath, 2) == GetFileHash(context.MetaPath, 2);
-            context.IsMetaAsBaseObject = areMetasEqual;
+            var areMetasEqual = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2) == SearchHelperService.GetFileHashSHA256(context.MetaPath, 2);
+            context.State = areMetasEqual ? ObjectState.SameAsBaseObject : ObjectState.NotTheSameAsBaseObject;
         }
 
-        private void CompareWithBaseObject(List<MergeObjectContext> contexts, MergeObjectContext baseContext)
+        private void CompareWithBaseObject(List<MergeObjectContext> contexts)
         {
-            if (!File.Exists(baseContext.MetaPath))
+            if (contexts.IsNullOrEmpty())
             {
-                Debug.LogError($"Cannot find path {baseContext.MetaPath}.");
                 return;
             }
 
-            var baseContextMetaHash = GetFileHash(baseContext.MetaPath, 2);
+            if (BaseObject == null)
+            {
+                contexts.ForEach(context => context.State = ObjectState.None);
+                return;
+            }
+
+            if (!File.Exists(BaseObject.MetaPath))
+            {
+                Debug.LogError($"Cannot find base metafile [{BaseObject.MetaPath}].");
+                return;
+            }
+
+            var baseObjectMetaHash = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2);
 
             foreach (var context in contexts)
             {
                 if (!File.Exists(context.MetaPath))
                 {
-                    context.IsMetaAsBaseObject = false;
-                    Debug.LogError($"Cannot find path {context.MetaPath}.");
+                    context.State = ObjectState.None;
+                    Debug.LogError($"Cannot find theirs metafile [{context.MetaPath}].");
                     continue;
                 }
 
-                var hash = GetFileHash(context.MetaPath, 2);
-                context.IsMetaAsBaseObject = hash == baseContextMetaHash;
+                if (context.IsBaseObject)
+                {
+                    context.State = ObjectState.BaseObject;
+                }
+                else
+                {
+                    var hash = SearchHelperService.GetFileHashSHA256(context.MetaPath, 2);
+                    context.State = hash == baseObjectMetaHash
+                        ? ObjectState.SameAsBaseObject
+                        : ObjectState.NotTheSameAsBaseObject;
+                }
             }
-        }
-
-        private void UpdateBaseObject(MergeObjectContext baseObject)
-        {
-            BaseObject = baseObject;
-            Contexts.RemoveAll(match => match.Path == baseObject.Path);
-            CompareWithBaseObject(Contexts, BaseObject);
         }
 
         private enum ValidationError
@@ -314,6 +434,11 @@ namespace SearchHelper.Editor.Tools
                 return ValidationError.NotAFile;
             }
 
+            if (!File.Exists(context.Path))
+            {
+                return ValidationError.NotAFile;
+            }
+
             if (BaseObject?.Path == context.Path)
             {
                 Debug.LogError($"File {context.Path} is the base object.");
@@ -332,23 +457,6 @@ namespace SearchHelper.Editor.Tools
         private MergeObjectContext ToMergeObjectContext(Object obj)
         {
             return new MergeObjectContext(ObjectContext.ToObjectContext(obj));
-        }
-
-        static string GetFileHash(string path, int skipLines)
-        {
-            using var sha = SHA256.Create();
-            using var reader = new StreamReader(path, Encoding.UTF8);
-
-            for (int i = 0; i < skipLines; i++)
-            {
-                reader.ReadLine();
-            }
-
-            var remaining = reader.ReadToEnd();
-            var bytes = Encoding.UTF8.GetBytes(remaining);
-            var hash = sha.ComputeHash(bytes);
-
-            return Convert.ToBase64String(hash);
         }
     }
 }

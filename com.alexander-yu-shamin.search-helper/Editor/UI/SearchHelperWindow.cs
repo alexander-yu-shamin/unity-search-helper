@@ -17,22 +17,22 @@ namespace SearchHelper.Editor.UI
         {
             DependencyTool = 0,
             UsedByTool,
-            FindByGuidTool,
             UnusedTool,
             DuplicatesTool,
-            MergeTool
+            MergeTool,
+            FindByGuidTool,
         }
 
-        private ToolType SelectedToolType { get; set; } = ToolType.DependencyTool;
+        private static ToolType SelectedToolType { get; set; } = ToolType.DependencyTool;
 
         private Dictionary<ToolType, ToolBase> ToolMap { get; set; } = new()
         {
             { ToolType.DependencyTool, new DependenciesTool() },
             { ToolType.UsedByTool, new UsedByTool() },
-            { ToolType.FindByGuidTool, new FindByGuidTool() },
             { ToolType.UnusedTool, new UnusedTool() },
             { ToolType.DuplicatesTool, new DuplicatesTool() },
             { ToolType.MergeTool, new MergeTool() },
+            { ToolType.FindByGuidTool, new FindByGuidTool() },
         };
 
         private static Object SelectedObject => !Selection.assetGUIDs.IsNullOrEmpty()
@@ -40,6 +40,7 @@ namespace SearchHelper.Editor.UI
             : null;
 
         [MenuItem(SearchHelperSettings.WindowMenuItemName)]
+        [MenuItem(SearchHelperSettings.ContextMenuItemOpenWindowName, priority = 100)]
         private static SearchHelperWindow OpenWindow()
         {
             return GetWindow<SearchHelperWindow>(SearchHelperSettings.WindowTitle);
@@ -54,25 +55,19 @@ namespace SearchHelper.Editor.UI
             return SelectedObject != null;
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuItemFindDependenciesName)]
+        [MenuItem(SearchHelperSettings.ContextMenuItemFindDependenciesName, priority = 111)]
         public static void ShowDependencies()
         {
             OpenWindow().SelectTool(ToolType.DependencyTool)?.Run(SelectedObject);
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuFindUsedByItemName)]
+        [MenuItem(SearchHelperSettings.ContextMenuFindUsedByItemName, priority = 112)]
         public static void ShowUsesBy()
         {
             OpenWindow().SelectTool(ToolType.UsedByTool)?.Run(SelectedObject);
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuShowObjectGuidItemName)]
-        public static void ShowObjectGuid()
-        {
-            OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(SelectedObject);
-        }
-
-        [MenuItem(SearchHelperSettings.ContextMenuFindUnusedGlobalItemName)]
+        [MenuItem(SearchHelperSettings.ContextMenuFindUnusedGlobalItemName, priority = 113)]
         public static void FindUnusedObjectsGlobal()
         {
             var selectTool = OpenWindow().SelectTool(ToolType.UnusedTool);
@@ -83,7 +78,7 @@ namespace SearchHelper.Editor.UI
             }
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuFindUnusedLocalItemName)]
+        [MenuItem(SearchHelperSettings.ContextMenuFindUnusedLocalItemName, priority = 114)]
         public static void FindUnusedObjectsLocal()
         {
             var selectTool = OpenWindow().SelectTool(ToolType.UnusedTool);
@@ -94,16 +89,32 @@ namespace SearchHelper.Editor.UI
             }
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuFindDuplicatesItemName)]
+        [MenuItem(SearchHelperSettings.ContextMenuFindDuplicatesItemName, priority = 115)]
         public static void FindDuplicates()
         {
             OpenWindow().SelectTool(ToolType.DuplicatesTool)?.Run(SelectedObject);
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuMergeItemName)]
+        [MenuItem(SearchHelperSettings.ContextMenuMergeItemName, priority = 116)]
         public static void MergeFiles()
         {
             OpenWindow().SelectTool(ToolType.MergeTool)?.Run(SelectedObject);
+        }
+
+        [MenuItem(SearchHelperSettings.ContextMenuShowObjectGuidItemName, priority = 117)]
+        public static void ShowObjectGuid()
+        {
+            OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(SelectedObject);
+        }
+
+        private void OnEnable()
+        {
+            SearchHelperService.OnAssetChanged += AssetChangedHandler;
+        }
+
+        private void OnDisable()
+        {
+            SearchHelperService.OnAssetChanged -= AssetChangedHandler;
         }
 
         public static void TransferToTool(ToolType toolType, ObjectContext context)
@@ -131,6 +142,15 @@ namespace SearchHelper.Editor.UI
         {
             SelectedToolType = toolType;
             return ToolMap.TryGetValue(toolType, out var tool) ? tool : null;
+        }
+
+        private void AssetChangedHandler(string[] importedAssets, string[] deletedAssets,
+            string[] movedAssets, string[] movedFromAssetPaths)
+        {
+            foreach (var tool in ToolMap)
+            {
+                tool.Value?.AssetChanged(importedAssets, deletedAssets, movedAssets, movedFromAssetPaths);
+            }
         }
     }
 }

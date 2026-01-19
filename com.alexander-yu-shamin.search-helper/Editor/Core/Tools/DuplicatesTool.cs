@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using SearchHelper.Editor.Core;
@@ -25,6 +23,12 @@ namespace SearchHelper.Editor.Tools
         private List<ObjectContext> Contexts { get; set; }
 
         protected override IEnumerable<ObjectContext> Data => Contexts;
+
+        public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
+            string[] movedFromAssetPaths)
+        {
+            Contexts = FindDuplicates(SelectedObject);
+        }
 
         public override void Draw(Rect windowRect)
         {
@@ -98,7 +102,7 @@ namespace SearchHelper.Editor.Tools
             var searchedHash = string.Empty;
             if (!string.IsNullOrEmpty(searchedPath))
             {
-                searchedHash = Hash(ref md5, searchedPath);
+                searchedHash = SearchHelperService.GetFileHashMD5(ref md5, searchedPath);
                 if (string.IsNullOrEmpty(searchedHash))
                 {
                     Debug.Log($"Can't count Hash for {searchedPath}");
@@ -110,7 +114,7 @@ namespace SearchHelper.Editor.Tools
             {
                 try
                 {
-                    var hash = Hash(ref md5, path);
+                    var hash = SearchHelperService.GetFileHashMD5(ref md5, path);
                     if (dict.ContainsKey(hash))
                     {
                         dict[hash].Add(path);
@@ -136,13 +140,6 @@ namespace SearchHelper.Editor.Tools
 
             UpdateData(Contexts);
             return Contexts;
-        }
-
-        private static string Hash(ref MD5 md5, string path)
-        {
-            var hashBytes = md5.ComputeHash(File.ReadAllBytes(path));
-            var hash = BitConverter.ToString(hashBytes);
-            return hash;
         }
 
         protected override void AddContextMenu(GenericMenu menu, ObjectContext context)

@@ -99,6 +99,11 @@ namespace SearchHelper.Editor
         {
         }
 
+        public virtual void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
+            string[] movedFromAssetPaths)
+        {
+        }
+
         protected bool Sort(SortVariant sortVariant)
         {
             if (Data.IsNullOrEmpty())
@@ -136,6 +141,11 @@ namespace SearchHelper.Editor
             foreach (var context in contexts)
             {
                 context.ShouldBeShown = ShouldBeShown(context);
+                if (context.Dependencies.IsNullOrEmpty())
+                {
+                    continue;
+                }
+
                 foreach (var dependency in context.Dependencies)
                 {
                     dependency.ShouldBeShown = ShouldBeShown(dependency);

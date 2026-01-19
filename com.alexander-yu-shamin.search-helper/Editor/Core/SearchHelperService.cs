@@ -1,5 +1,11 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
+using Toolkit.Runtime.Extensions;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -9,6 +15,7 @@ namespace SearchHelper.Editor.Core
     public class SearchHelperService : AssetPostprocessor
     {
         private const string ObjectSearchFilter = "t:Object";
+        public static event Action<string[], string[], string[], string[]> OnAssetChanged;
 
         public static IEnumerable<string> FindAssetPaths(string root = null)
         {
@@ -147,10 +154,42 @@ namespace SearchHelper.Editor.Core
         private static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets,
             string[] movedAssets, string[] movedFromAssetPaths, bool didDomainReload)
         {
-            if (Application.isPlaying)
+            if (didDomainReload)
             {
                 return;
             }
+
+            if (!importedAssets.IsNullOrEmpty()
+                || !deletedAssets.IsNullOrEmpty()
+                || !movedAssets.IsNullOrEmpty()
+                || !movedFromAssetPaths.IsNullOrEmpty())
+            {
+                OnAssetChanged?.Invoke(importedAssets, deletedAssets, movedAssets, movedFromAssetPaths);
+            }
+        }
+
+        public static string GetFileHashMD5(ref MD5 md5, string path)
+        {
+            var hashBytes = md5.ComputeHash(File.ReadAllBytes(path));
+            var hash = BitConverter.ToString(hashBytes);
+            return hash;
+        }
+
+        public static string GetFileHashSHA256(string path, int skipLines)
+        {
+            using var sha = SHA256.Create();
+            using var reader = new StreamReader(path, Encoding.UTF8);
+
+            for (int i = 0; i < skipLines; i++)
+            {
+                reader.ReadLine();
+            }
+
+            var remaining = reader.ReadToEnd();
+            var bytes = Encoding.UTF8.GetBytes(remaining);
+            var hash = sha.ComputeHash(bytes);
+
+            return Convert.ToBase64String(hash);
         }
     }
 }

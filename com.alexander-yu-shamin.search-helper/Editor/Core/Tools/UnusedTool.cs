@@ -137,6 +137,7 @@ namespace SearchHelper.Editor.Tools
 
             AssetDatabase.StopAssetEditing();
             AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
         }
 
         private void CopyToClipboard()
