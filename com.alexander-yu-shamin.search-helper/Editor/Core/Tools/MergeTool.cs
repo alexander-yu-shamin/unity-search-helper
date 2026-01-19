@@ -61,7 +61,8 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            Contexts ??= new List<MergeObjectContext>();
+            BaseObject = null;
+            Contexts = new List<MergeObjectContext>();
 
             if (Contexts.Contains(context))
             {
