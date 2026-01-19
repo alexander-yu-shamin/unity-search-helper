@@ -12,4 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8bb34b281218a1941955a7af3c0df458, type: 3}
   m_Name: Location
   m_EditorClassIdentifier: 
-  Patterns: []
+  IgnoredNames: []
+  IgnoredPaths:
+  - ^Assets/DLC/locations/[^/]+/all_stars(/[^/]+)*/?$
+  - ^Assets/DLC/locations/[^/]+/collectibles(/[^/]+)*/?$
+  - ^Assets/DLC/locations/[^/]+/icons(/[^/]+)*/?$
+  - ^Assets/DLC/locations/[^/]+/passports(/[^/]+)*/?$
+  - ^Assets/DLC/locations/[^/]+/set/set_decoration\.prefab/?$
+  - ^Assets/DLC/locations/[^/]+/VanityItems(/[^/]+)*/?$
+  - ^Assets/DLC/locations/[^/]+/WorldTourMenu/Location_Collected\.prefab/?$
+  - ^Assets/DLC/locations/[^/]+/WorldTourMenu/Location_Locked\.prefab/?$
+  - ^Assets/DLC/locations/[^/]+/WorldTourMenu/Location_Unlocked\.prefab/?$
+  - ^Assets/DLC/locations/[^/]+/WorldTourMenu/[^/]+/statue_root_season_1.prefab/?$
+  - ^Assets/DLC/locations/[^/]+/WorldTourMenu/[^/]+/statue_root_season_2.prefab/?$
+  IgnoredTypes:
+  - UnityEditor.DefaultAsset
+  - UnityEngine.U2D.SpriteAtlas
