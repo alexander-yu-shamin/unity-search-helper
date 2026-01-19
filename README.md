@@ -32,7 +32,7 @@ The tool supports displaying unlimited items with comprehensive filtering and so
 2. **Settings**: *Note*: Not all tools have configurable settings.
 3. **Scan Rules**: 
    1. **Global Mode**: Scans the entire project for dependencies.
-   2. **Local Mode**: -> Limited to the specified folder only.
+   2. **Local Mode**: Limited to the specified folder only.
 4. **Ignore Rules**: Create `SearchHelperIgnoreRule` ScriptableObjects to exclude specific files from results.
 5. **Sorting Rules**: Customize how items are organized in the display.
 6. **Filter Rules**: Filter by: Name, Path, Asset Type.
