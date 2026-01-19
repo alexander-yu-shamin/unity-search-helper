@@ -1,8 +1,8 @@
 {
   "name": "com.alexander-yu-shamin.search-helper",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "displayName": "AYS: Search Helper",
-  "description": "Search tool for Unity",
+  "description": "Search helper tool for Unity",
   "__unity": "2019.1",
   "__unityRelease": "0b5",
   "__documentationUrl": "https://example.com/",
@@ -12,14 +12,12 @@
     "com.alexander-yu-shamin.toolkit": "0.0.2"
   },
   "__keywords": [
-    "keyword1",
-    "keyword2",
-    "keyword3"
+    "Search"
   ],
   "__author": {
-    "name": "Unity",
-    "email": "unity@example.com",
-    "url": "https://www.unity3d.com"
+    "name": "Alexander Shamin",
+    "email": "alexander.yu.shamin@gmail.com",
+    "url": ""
   },
   "samples": [
     {

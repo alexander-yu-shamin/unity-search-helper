@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.0.8] - 2026-1-19
+
 ### Added
 - some comments for better understanding
 - Global and Local mode for unused files
