@@ -10,6 +10,7 @@ namespace SearchHelper.Editor.Tools
 {
     public class DependenciesTool : ToolBase
     {
+        protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
         private List<ObjectContext> Contexts { get; set; }
