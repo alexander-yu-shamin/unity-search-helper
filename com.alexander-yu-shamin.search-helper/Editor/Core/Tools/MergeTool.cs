@@ -135,6 +135,7 @@ namespace SearchHelper.Editor.Tools
 
                 File.Delete(context.Path);
                 File.Delete(context.MetaPath);
+                context.IsMerged = true;
             }
 
             AssetDatabase.StopAssetEditing();
