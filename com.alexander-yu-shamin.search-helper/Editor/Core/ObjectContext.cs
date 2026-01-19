@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
-using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace SearchHelper.Editor
 {
@@ -52,6 +54,34 @@ namespace SearchHelper.Editor
                 return _guid;
             }
             set => _guid = value;
+        }
+
+        private string _size = null;
+        public string Size
+        {
+            get
+            {
+                if (_size != null)
+                {
+                    return _size;
+                }
+
+                if (!string.IsNullOrEmpty(Path))
+                {
+                    if (File.Exists(Path))
+                    {
+                        _size = FormatFileSize(new FileInfo(Path).Length);
+                    }
+                    else
+                    {
+                        _size = "NaN";
+                    }
+
+                    return _size;
+                }
+
+                return null;
+            }
         }
 
         public bool IsFolder { get; set; }
@@ -117,6 +147,48 @@ namespace SearchHelper.Editor
                 Path = path,
                 Dependencies = new List<ObjectContext>(),
             };
+        }
+
+        public static string FormatFileSize(long bytes)
+        {
+            if (bytes == 0)
+            {
+                return "0 B";
+            }
+
+            if (bytes == 1)
+            {
+                return "1 B";
+            }
+
+            var absBytes = Math.Abs(bytes);
+
+            if (absBytes < 1024)
+            {
+                return $"{bytes} B";
+            }
+
+            if (absBytes < 1024 * 1024)
+            {
+                return $"{(bytes / 1024.0):0.##} KB";
+            }
+
+            if (absBytes < 1024L * 1024 * 1024)
+            {
+                return $"{(bytes / (1024.0 * 1024)):0.##} MB";
+            }
+
+            if (absBytes < 1024L * 1024 * 1024 * 1024)
+            {
+                return $"{(bytes / (1024.0 * 1024 * 1024)):0.##} GB";
+            }
+
+            return $"{(bytes / (1024.0 * 1024 * 1024 * 1024)):0.##} TB";
+        }
+
+        public void UpdateSize()
+        {
+
         }
     }
 }

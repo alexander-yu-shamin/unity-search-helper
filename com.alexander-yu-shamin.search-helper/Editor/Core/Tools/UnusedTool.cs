@@ -16,6 +16,29 @@ namespace SearchHelper.Editor.Tools
         protected override bool IsShowFoldersSupported { get; set; } = false;
         protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
         protected override bool IsScopeRulesSupported { get; set; } = true;
+        protected override bool IsSizeShowingSupported { get; set; } = true;
+
+        protected override string EmptyObjectContextText
+        {
+            get
+            {
+                if (IsScopeRulesSupported)
+                {
+                    if (IsGlobalScope)
+                    {
+                        return "This object is not referenced anywhere in the project.";
+                    }
+                    else
+                    {
+                        return "This object is not referenced locally";
+                    }
+                }
+                else
+                {
+                    return "This object is not referenced anywhere in the project.";
+                }
+            }
+        } 
 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }

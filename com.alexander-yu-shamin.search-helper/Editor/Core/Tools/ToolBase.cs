@@ -37,6 +37,7 @@ namespace SearchHelper.Editor
         protected virtual bool ShouldMainObjectsBeSorted { get; set; } = false;
         protected virtual bool IsShowFoldersSupported { get; set; } = true;
         protected virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
+        protected virtual bool IsSizeShowingSupported { get; set; } = false;
         protected virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
         protected const float RowHeight = 20.0f;
@@ -330,8 +331,9 @@ namespace SearchHelper.Editor
             x += elementWidth + HorizontalIndent;
 
             var leftWidth = rect.width - x;
-            var neededWidthForDependency = GuidTextAreaWidth + 40.0f + 50.0f + 100.0f;
             var neededWidthForGuid = GuidTextAreaWidth + 40.0f;
+            var neededWidthForDependency = neededWidthForGuid + 50.0f + 100.0f;
+            var neededWidthForSize = neededWidthForDependency + 40.0f + 100.0f;
 
             if (leftWidth > neededWidthForGuid)
             {
@@ -351,9 +353,24 @@ namespace SearchHelper.Editor
                 EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight),
                     context.Dependencies?.Count.ToString());
 
-                elementWidth = 100.0f;
+                elementWidth = 90.0f;
                 x -= elementWidth;
                 EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Dependencies:");
+            }
+
+            if (IsSizeShowingSupported)
+            {
+                if (leftWidth > neededWidthForSize)
+                {
+                    elementWidth = 70.0f;
+                    x -= elementWidth + HorizontalIndent;
+                    EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight),
+                        context.Size ?? "");
+
+                    elementWidth = 40.0f;
+                    x -= elementWidth;
+                    EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Size:");
+                }
             }
 
             return HeaderHeightWithPadding;
