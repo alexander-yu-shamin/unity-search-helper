@@ -147,10 +147,7 @@ namespace SearchHelper.Editor.UI
         private void AssetChangedHandler(string[] importedAssets, string[] deletedAssets,
             string[] movedAssets, string[] movedFromAssetPaths)
         {
-            foreach (var tool in ToolMap)
-            {
-                tool.Value?.AssetChanged(importedAssets, deletedAssets, movedAssets, movedFromAssetPaths);
-            }
+            SelectTool(SelectedToolType)?.AssetChanged(importedAssets, deletedAssets, movedAssets, movedFromAssetPaths);
         }
     }
 }
