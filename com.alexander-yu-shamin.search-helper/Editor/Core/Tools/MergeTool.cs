@@ -88,6 +88,12 @@ namespace SearchHelper.Editor.Tools
             {
                 EGuiKit.Button("Add Selected Object as Base", () => { AddObjectToMergeAsBase(Selection.activeObject); });
                 EGuiKit.Button("Add Selected Object as Theirs", () => { AddObjectToMergeAsTheirs(Selection.activeObject);});
+                EGuiKit.Button(BaseObject != null && !Contexts.IsNullOrEmpty(), "Clear", () =>
+                {
+                    BaseObject = null;
+                    Contexts = null;
+                });
+
                 EGuiKit.FlexibleSpace();
                 EGuiKit.Button(BaseObject != null && !Contexts.IsNullOrEmpty(), "Merge", () =>
                 {
