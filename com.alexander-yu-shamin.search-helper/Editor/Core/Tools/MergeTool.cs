@@ -41,6 +41,8 @@ namespace SearchHelper.Editor.Tools
         private List<MergeObjectContext> Contexts { get; set; } = new List<MergeObjectContext>();
         protected override IEnumerable<ObjectContext> Data => Contexts;
 
+        private Vector2 ScrollPosition { get; set; }
+
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
         {
@@ -101,7 +103,7 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            EGuiKit.Vertical(() =>
+            ScrollPosition = EGuiKit.ScrollView(ScrollPosition, () =>
             {
                 foreach (var context in Contexts)
                 {
@@ -215,8 +217,21 @@ namespace SearchHelper.Editor.Tools
 
                 EGuiKit.Color(context.IsMerged ? Color.cyan : GUI.color, () =>
                 {
+                    EGuiKit.Button(EditorGUIUtility.IconContent(InspectorIconName), () =>
+                    {
+                        OpenProperty(context);
+                    }, GUILayout.Width(ContentHeight), GUILayout.Height(ContentHeight));
+
                     EditorGUILayout.LabelField("GUID:", GUILayout.Width(40));
                     EditorGUILayout.TextArea(context.IsMerged ? "MERGED" : context.Guid, GUILayout.Width(GuidTextAreaWidth));
+                    EGuiKit.Button(EditorGUIUtility.IconContent(FolderIconName), () =>
+                    {
+                        if (!string.IsNullOrEmpty(context.Path))
+                        {
+                            EditorUtility.RevealInFinder(context.Path);
+                        }
+                    }, GUILayout.Width(ContentHeight), GUILayout.Height(ContentHeight));
+
                     EditorGUILayout.LabelField("Path:", GUILayout.Width(40));
                     EditorGUILayout.TextArea(context.Path, GUILayout.ExpandWidth(true));
                 });

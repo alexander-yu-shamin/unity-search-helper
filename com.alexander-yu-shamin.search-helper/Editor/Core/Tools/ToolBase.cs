@@ -918,7 +918,7 @@ namespace SearchHelper.Editor
             }
         }
 
-        private void OpenProperty(ObjectContext context)
+        protected void OpenProperty(ObjectContext context)
         {
             if (context?.Object != null)
             {
