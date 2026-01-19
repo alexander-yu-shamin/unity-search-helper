@@ -87,6 +87,7 @@ namespace SearchHelper.Editor
 
         protected abstract IEnumerable<ObjectContext> Data { get; }
         public bool IsGlobalScope { get; set; } = true;
+        private GenericMenu SettingsMenu { get; set; }
 
         public abstract void Draw(Rect windowRect);
 
@@ -167,7 +168,7 @@ namespace SearchHelper.Editor
 
             ScrollViewPosition = EditorGUILayout.BeginScrollView(ScrollViewPosition, GUILayout.Height(windowRect.height - BottomIndent));
 
-            var totalHeight = CalculateDisplayedHeight(contexts);
+            var totalHeight = CalculateDisplayedHeight(contexts, drawDependencies);
             var fullRect = GUILayoutUtility.GetRect(0, totalHeight);
 
             var x = fullRect.x;
@@ -228,7 +229,7 @@ namespace SearchHelper.Editor
             return !beforeVisibleRect && !afterVisibleRect;
         }
 
-        private float CalculateDisplayedHeight(List<ObjectContext> contexts)
+        private float CalculateDisplayedHeight(List<ObjectContext> contexts, bool calculateDependencies)
         {
             return contexts.Sum(ctx => CalculateHeaderHeight(ctx) + CalculateDependenciesHeight(ctx));
         }
@@ -393,7 +394,7 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            return ContentHeight;
+            return ContentHeightWithPadding;
         }
 
         private float TryDrawEmptyContent(ref float x, ref float y, float width, ObjectContext mainContext)
@@ -528,17 +529,43 @@ namespace SearchHelper.Editor
         {
             EGuiKit.Horizontal(() =>
             {
-                if (IsShowFoldersSupported)
-                {
-                    IsFoldersShown = EditorGUILayout.ToggleLeft("Show Folders", IsFoldersShown, GUILayout.Width(100));
-                    EGuiKit.Space(HorizontalIndent);
-                }
-
+                DrawSettingsRules();
                 DrawScopeRules();
                 DrawIgnoringRules();
                 DrawSortingRules();
                 DrawFilterRules();
             });
+        }
+
+        private void DrawSettingsRules()
+        {
+            var content = new GUIContent($"Settings");
+
+            if (SettingsMenu == null)
+            {
+                SettingsMenu = new GenericMenu();
+                if (IsShowFoldersSupported)
+                {
+                    SettingsMenu.AddItem(new GUIContent("Show Folders"), IsFoldersShown, () =>
+                    {
+                        IsFoldersShown = !IsFoldersShown;
+                    });
+                }
+
+                AddSettingsContextMenu(SettingsMenu);
+            }
+
+            if (SettingsMenu.GetItemCount() > 0)
+            {
+                if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
+                {
+                    SettingsMenu.ShowAsContext();
+                }
+            }
+        }
+
+        protected virtual void AddSettingsContextMenu(GenericMenu menu)
+        {
         }
 
         private void DrawScopeRules()

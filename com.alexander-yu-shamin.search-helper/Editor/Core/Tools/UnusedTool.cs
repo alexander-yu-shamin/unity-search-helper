@@ -71,14 +71,6 @@ namespace SearchHelper.Editor.Tools
                 });
 
                 EGuiKit.FlexibleSpace();
-
-                var newValue = EditorGUILayout.ToggleLeft("Show All", ShowAll, GUILayout.Width(70));
-                if (ShowAll != newValue)
-                {
-                    ShowAll = newValue;
-                    Contexts = FindUnused(SelectedObject);
-                }
-
                 EGuiKit.Button(!Contexts.IsNullOrEmpty(), "Remove Items", RemovedUnusedItems);
                 EGuiKit.Button(SelectedObject != null && !Contexts.IsNullOrEmpty(), "Copy Items to Clipboard", CopyToClipboard);
 
@@ -92,6 +84,15 @@ namespace SearchHelper.Editor.Tools
         {
             SelectedObject = selectedObject;
             Contexts = FindUnused(SelectedObject);
+        }
+
+        protected override void AddSettingsContextMenu(GenericMenu menu)
+        {
+            menu.AddItem(new GUIContent("Show Used Files"), ShowAll, () =>
+            {
+                ShowAll = !ShowAll;
+                Contexts = FindUnused(SelectedObject);
+            });
         }
 
         private List<ObjectContext> FindUnused(Object obj)
