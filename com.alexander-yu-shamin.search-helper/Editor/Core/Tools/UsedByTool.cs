@@ -61,7 +61,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             UsedObject = obj;
-            var searchedCtx = SearchHelperService.FindUsedBy(obj);
+            var searchedCtx = SearchHelperService.FindUsedBy(obj, true);
 
             if (searchedCtx.IsFolder)
             {

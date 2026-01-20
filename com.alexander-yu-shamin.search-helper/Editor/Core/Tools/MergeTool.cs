@@ -134,7 +134,7 @@ namespace SearchHelper.Editor.Tools
 
         private static void Merge(ObjectContext baseObject, ObjectContext theirsObject)
         {
-            var dependencies = SearchHelperService.FindUsedBy(theirsObject.Object);
+            var dependencies = SearchHelperService.FindUsedBy(theirsObject.Object, true);
             foreach (var dependency in dependencies.Dependencies)
             {
                 var dependencyObject = new ObjectContext(dependency);
