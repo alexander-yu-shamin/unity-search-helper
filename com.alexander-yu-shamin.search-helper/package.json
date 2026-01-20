@@ -9,7 +9,7 @@
   "__changelogUrl": "https://example.com/changelog.html",
   "__licensesUrl": "https://example.com/licensing.html",
   "dependencies": {
-    "com.alexander-yu-shamin.toolkit": "0.0.2"
+    "com.alexander-yu-shamin.toolkit": "https://github.com/alexander-yu-shamin/unity-toolkit.git?path=/com.alexander-yu-shamin.toolkit"
   },
   "__keywords": [
     "Search"
