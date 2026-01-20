@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using SearchHelper.Editor.Core;
 using Toolkit.Editor.Helpers.IMGUI;
-using Toolkit.Runtime.Extensions;
 using UnityEditor;
 using UnityEngine;
 
@@ -27,11 +26,7 @@ namespace SearchHelper.Editor.Tools
                     UsedObject = null;
                 }
 
-                EGuiKit.Button("Find", () =>
-                {
-                    FindDependencies(SelectedObject);
-                });
-
+                EGuiKit.Button("Find", Run);
                 EGuiKit.FlexibleSpace();
                 DrawHeaderControls();
             });
@@ -48,7 +43,12 @@ namespace SearchHelper.Editor.Tools
             }
 
             SelectedObject = selectedObject;
-            FindDependencies(SelectedObject);
+            Run();
+        }
+
+        public override void Run()
+        {
+            Contexts = FindDependencies(SelectedObject);
         }
 
         private List<ObjectContext> FindDependencies(Object obj)
@@ -59,9 +59,9 @@ namespace SearchHelper.Editor.Tools
             }
 
             UsedObject = obj;
-            Contexts = FolderOrFile(obj).Select(SearchHelperService.FindDependencies).ToList();
-            UpdateData(Contexts);
-            return Contexts;
+            var contexts = FolderOrFile(obj).Select(SearchHelperService.FindDependencies).ToList();
+            UpdateData(contexts);
+            return contexts;
         }
     }
 }

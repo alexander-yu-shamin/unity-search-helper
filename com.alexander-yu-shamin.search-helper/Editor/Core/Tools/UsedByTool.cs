@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using SearchHelper.Editor.Core;
 using Toolkit.Editor.Helpers.IMGUI;
-using Toolkit.Runtime.Extensions;
 using UnityEditor;
 using UnityEngine;
 
@@ -29,11 +28,7 @@ namespace SearchHelper.Editor.Tools
                     UsedObject = null;
                 }
 
-                EGuiKit.Button("Find", () =>
-                {
-                    FindUsedBy(SelectedObject);
-                });
-
+                EGuiKit.Button("Find", Run);
                 EGuiKit.FlexibleSpace();
                 DrawHeaderControls();
             });
@@ -50,7 +45,12 @@ namespace SearchHelper.Editor.Tools
             }
 
             SelectedObject = selectedObject;
-            FindUsedBy(SelectedObject);
+            Run();
+        }
+
+        public override void Run()
+        {
+            Contexts = FindUsedBy(SelectedObject);
         }
 
         private List<ObjectContext> FindUsedBy(Object obj)
@@ -63,9 +63,14 @@ namespace SearchHelper.Editor.Tools
             UsedObject = obj;
             var searchedCtx = SearchHelperService.FindUsedBy(obj);
 
-            Contexts = new List<ObjectContext>() { searchedCtx };
-            UpdateData(Contexts);
-            return Contexts;
+            if (searchedCtx.IsFolder)
+            {
+                IsFoldersShown = true;
+            }
+
+            var contexts = new List<ObjectContext>() { searchedCtx };
+            UpdateData(contexts);
+            return contexts;
         }
     }
 }

@@ -2,10 +2,23 @@
 
 ## [Unreleased]
 
+## [0.0.9] - 2026-1-20
+
+### Added
+- Settings Menu Button
+  - File size can be shown for every tool
+
+### Fixed
+- To avoid redundant processing, the data is refreshed in place rather than requiring a separate/tool re-run.
+
+### Changed
+- For better scalability, make your UI reactive to state changes rather than directly coupled to data mutations. This pattern is a lifesaver in large projects.- UI update not a data, but data state
+- Unused Tool can show used elements (simular to Used By)
+
 ## [0.0.8] - 2026-1-19
 
 ### Added
-- some comments for better understanding
+- Some comments for better understanding
 - Global and Local mode for unused files
 - Natural sorting order
 - The "Report" button to the Unused tools

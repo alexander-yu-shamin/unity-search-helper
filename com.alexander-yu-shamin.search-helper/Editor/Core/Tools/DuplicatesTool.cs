@@ -14,7 +14,7 @@ namespace SearchHelper.Editor.Tools
     public class DuplicatesTool : ToolBase
     {
         protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
-        protected override bool IsShowFoldersSupported { get; set; } = false;
+        protected override bool IsShowingFoldersSupported { get; set; } = false;
         protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
         protected override bool IsSizeShowingSupported { get; set; } = true;
 
@@ -28,7 +28,7 @@ namespace SearchHelper.Editor.Tools
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
         {
-            Contexts = FindDuplicates(SelectedObject);
+            Run();
         }
 
         public override void Draw(Rect windowRect)
@@ -42,7 +42,7 @@ namespace SearchHelper.Editor.Tools
                     UsedObject = null;
                 }
 
-                EGuiKit.Button("Find", () => { Contexts = FindDuplicates(SelectedObject); });
+                EGuiKit.Button("Find", Run);
 
                 EGuiKit.Space();
                 EGuiKit.Color(Color.gray, () =>
@@ -64,6 +64,11 @@ namespace SearchHelper.Editor.Tools
         public override void Run(Object selectedObject)
         {
             SelectedObject = selectedObject;
+            Run();
+        }
+
+        public override void Run()
+        {
             Contexts = FindDuplicates(SelectedObject);
         }
 
@@ -131,7 +136,7 @@ namespace SearchHelper.Editor.Tools
                 }
             }
 
-            Contexts = 
+            var contexts = 
                 dict.Where(kv => (string.IsNullOrEmpty(searchedHash) || kv.Key == searchedHash) && kv.Value.Count > 1).Select(kv =>
                 {
                     var ctx = ObjectContext.FromPath(kv.Value.First());
@@ -139,8 +144,8 @@ namespace SearchHelper.Editor.Tools
                     return ctx;
                 }).ToList();
 
-            UpdateData(Contexts);
-            return Contexts;
+            UpdateData(contexts);
+            return contexts;
         }
 
         protected override void AddContextMenu(GenericMenu menu, ObjectContext context)

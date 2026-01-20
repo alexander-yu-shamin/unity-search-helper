@@ -60,6 +60,11 @@ namespace SearchHelper.Editor.Tools
             }
 
             SelectedObject = UsedObject = selectedObject;
+            Run();
+        }
+
+        public override void Run()
+        {
             CurrentUsedObjectGuid = string.Empty;
             CurrentUsedObjectGuid = SearchHelperService.GetObjectGuid(UsedObject);
         }

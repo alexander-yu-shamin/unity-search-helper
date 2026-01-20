@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using SearchHelper.Editor.Core;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
@@ -13,7 +12,6 @@ namespace SearchHelper.Editor.Tools
     public class UnusedTool : ToolBase
     {
         protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
-        protected override bool IsShowFoldersSupported { get; set; } = false;
         protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
         protected override bool IsScopeRulesSupported { get; set; } = true;
         protected override bool IsSizeShowingSupported { get; set; } = true;
@@ -42,7 +40,8 @@ namespace SearchHelper.Editor.Tools
 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
-        private bool ShowAll { get; set; } = false;
+        private bool ShowUsedItems { get; set; } = false;
+        private bool ShowUnusedItems { get; set; } = true;
 
         private List<ObjectContext> Contexts { get; set; }
 
@@ -59,10 +58,7 @@ namespace SearchHelper.Editor.Tools
                     UsedObject = null;
                 }
 
-                EGuiKit.Button("Find", () =>
-                {
-                    Contexts = FindUnused(SelectedObject);
-                });
+                EGuiKit.Button("Find", Run);
 
                 EGuiKit.Space();
                 EGuiKit.Color(Color.gray, () =>
@@ -83,15 +79,26 @@ namespace SearchHelper.Editor.Tools
         public override void Run(Object selectedObject)
         {
             SelectedObject = selectedObject;
+            Run();
+        }
+
+        public override void Run()
+        {
             Contexts = FindUnused(SelectedObject);
         }
 
         protected override void AddSettingsContextMenu(GenericMenu menu)
         {
-            menu.AddItem(new GUIContent("Show Used Files"), ShowAll, () =>
+            menu.AddItem(new GUIContent("Show Unused Items"), ShowUnusedItems, () =>
             {
-                ShowAll = !ShowAll;
-                Contexts = FindUnused(SelectedObject);
+                ShowUnusedItems = !ShowUnusedItems;
+                UpdateData(Contexts);
+            });
+
+            menu.AddItem(new GUIContent("Show Used Items"), ShowUsedItems, () =>
+            {
+                ShowUsedItems = !ShowUsedItems;
+                UpdateData(Contexts);
             });
         }
 
@@ -131,9 +138,37 @@ namespace SearchHelper.Editor.Tools
                 element.Dependencies = element.Dependencies.Where(dependency => dependency.Guid != element.Guid).ToList();
             }
 
-            Contexts = ShowAll ? map.Values.OrderBy(ctx => ctx.Dependencies.Count).ToList() : map.Values.Where(ctx => ctx.Dependencies.Count == 0).ToList();
-            UpdateData(Contexts);
-            return Contexts;
+            var contexts = map.Values.ToList();
+            UpdateData(contexts);
+            return contexts;
+        }
+
+        protected override bool ShouldBeShown(ObjectContext objectContext, ObjectContext parentContext = null)
+        {
+            var isTopLevel = parentContext == null;
+
+            if (!isTopLevel)
+            {
+                if (!ShowUsedItems)
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                var hasDependencies = objectContext.Dependencies.Count != 0;
+                if (hasDependencies && !ShowUsedItems)
+                {
+                    return false;
+                }
+
+                if (!hasDependencies && !ShowUnusedItems)
+                {
+                    return false;
+                }
+            }
+
+            return base.ShouldBeShown(objectContext, parentContext);
         }
 
         private void RemovedUnusedItems()

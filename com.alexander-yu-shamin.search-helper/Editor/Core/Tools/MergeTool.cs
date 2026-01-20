@@ -34,7 +34,7 @@ namespace SearchHelper.Editor.Tools
             }
         }
 
-        protected override bool IsShowFoldersSupported { get; set; } = false;
+        protected override bool IsShowingFoldersSupported { get; set; } = false;
         protected override bool IsIgnoredFilesSupported { get; set; } = false;
 
         private MergeObjectContext BaseObject { get; set; }
@@ -267,6 +267,10 @@ namespace SearchHelper.Editor.Tools
             {
                 AddObjectToMergeAsBase(selectedObject);
             }
+        }
+
+        public override void Run()
+        {
         }
 
         private void AddObjectToMergeAsBase(Object selectedObject)

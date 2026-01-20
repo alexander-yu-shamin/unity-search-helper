@@ -35,9 +35,10 @@ namespace SearchHelper.Editor
         protected virtual bool IsIgnoredFilesSupported { get; set; } = true;
         protected virtual bool IsSortingSupported { get; set; } = true;
         protected virtual bool ShouldMainObjectsBeSorted { get; set; } = false;
-        protected virtual bool IsShowFoldersSupported { get; set; } = true;
+        protected virtual bool IsShowingFoldersSupported { get; set; } = true;
         protected virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
         protected virtual bool IsSizeShowingSupported { get; set; } = false;
+        protected virtual bool IsSettingsButtonEnabled { get; set; } = true;
         protected virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
         protected const float RowHeight = 20.0f;
@@ -77,21 +78,22 @@ namespace SearchHelper.Editor
         protected SortVariant CurrentSortVariant { get; set; } = SortVariant.None;
         protected FilterVariant CurrentFilterVariant { get; set; } = FilterVariant.Path;
         private string FilterString { get; set; }
-        private bool IsFoldersShown { get; set; } = false;
+        protected bool IsFoldersShown { get; set; } = false;
 
         private DataDescription<SearchHelperIgnoreRule> ChosenPattern { get; set; }
         private List<DataDescription<SearchHelperIgnoreRule>> Patterns { get; set; }
         private List<Regex> RegexIgnoredPaths { get; set; }
         private List<Regex> RegexIgnoredNames { get; set; }
         private List<Regex> RegexIgnoredTypes { get; set; }
+        protected bool ShouldShowSettingsButton => IsSettingsButtonEnabled && IsShowingFoldersSupported;
 
         protected abstract IEnumerable<ObjectContext> Data { get; }
         public bool IsGlobalScope { get; set; } = true;
-        private GenericMenu SettingsMenu { get; set; }
 
         public abstract void Draw(Rect windowRect);
 
         public abstract void Run(Object selectedObject);
+        public abstract void Run();
 
         public virtual void GetDataFromAnotherTool(IEnumerable<ObjectContext> contexts)
         {
@@ -120,12 +122,22 @@ namespace SearchHelper.Editor
 
             if (ShouldMainObjectsBeSorted)
             {
-                Sort(Data, sortVariant);
+                if (Data is List<ObjectContext> list)
+                {
+                    SortInPlace(list, sortVariant);
+                }
             }
 
             foreach (var context in Data.Where(context => !context.Dependencies.IsNullOrEmpty()))
             {
-                context.Dependencies = Sort(context.Dependencies, sortVariant).ToList();
+                if (context.Dependencies is List<ObjectContext> list)
+                {
+                    SortInPlace(list, sortVariant);
+                }
+                else
+                {
+                    context.Dependencies = OrderBy(context.Dependencies, sortVariant).ToList();
+                }
             }
 
             return true;
@@ -150,7 +162,7 @@ namespace SearchHelper.Editor
 
                 foreach (var dependency in context.Dependencies)
                 {
-                    dependency.ShouldBeShown = ShouldBeShown(dependency);
+                    dependency.ShouldBeShown = ShouldBeShown(dependency, context);
                 }
             }
 
@@ -259,12 +271,7 @@ namespace SearchHelper.Editor
 
         private float CalculateHeaderHeight(ObjectContext context)
         {
-            if (context.IsFolder && !IsFoldersShown)
-            {
-                return 0.0f;
-            }
-
-            if (IsIgnoredFilesSupported && !context.ShouldBeShown)
+            if (!context.ShouldBeShown)
             {
                 return 0.0f;
             }
@@ -279,12 +286,7 @@ namespace SearchHelper.Editor
 
         private float TryDrawObjectHeader(ref float x, ref float y, float width, ObjectContext context)
         {
-            if (context.IsFolder && !IsFoldersShown)
-            {
-                return 0.0f;
-            }
-
-            if (IsIgnoredFilesSupported && !context.ShouldBeShown)
+            if (!context.ShouldBeShown)
             {
                 return 0.0f;
             }
@@ -539,28 +541,38 @@ namespace SearchHelper.Editor
 
         private void DrawSettingsRules()
         {
+            if (!ShouldShowSettingsButton)
+            {
+                return;
+            }
+
             var content = new GUIContent($"Settings");
 
-            if (SettingsMenu == null)
+            if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
-                SettingsMenu = new GenericMenu();
-                if (IsShowFoldersSupported)
+                var menu = new GenericMenu();
+                if (IsShowingFoldersSupported)
                 {
-                    SettingsMenu.AddItem(new GUIContent("Show Folders"), IsFoldersShown, () =>
+                    menu.AddItem(new GUIContent("Show Folders"), IsFoldersShown, () =>
                     {
                         IsFoldersShown = !IsFoldersShown;
+                        UpdateData();
                     });
                 }
 
-                AddSettingsContextMenu(SettingsMenu);
-            }
-
-            if (SettingsMenu.GetItemCount() > 0)
-            {
-                if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
+                menu.AddItem(new GUIContent("Sort Main Objects"), ShouldMainObjectsBeSorted, () =>
                 {
-                    SettingsMenu.ShowAsContext();
-                }
+                    ShouldMainObjectsBeSorted = !ShouldMainObjectsBeSorted;
+                });
+
+                menu.AddItem(new GUIContent("Show File Size"), IsSizeShowingSupported, () =>
+                {
+                    IsSizeShowingSupported = !IsSizeShowingSupported;
+                });
+
+                AddSettingsContextMenu(menu);
+
+                menu.ShowAsContext();
             }
         }
 
@@ -578,6 +590,7 @@ namespace SearchHelper.Editor
             EGuiKit.Button(IsGlobalScope ? "Global" : "Local", () =>
             {
                 IsGlobalScope = !IsGlobalScope;
+                Run();
             });
         }
 
@@ -665,11 +678,11 @@ namespace SearchHelper.Editor
             }
         }
 
-        private bool ShouldBeShown(ObjectContext objectContext)
+        protected virtual bool ShouldBeShown(ObjectContext objectContext, ObjectContext parentContext = null)
         {
-            if (string.IsNullOrEmpty(objectContext.Path))
+            if (objectContext.IsFolder && !IsFoldersShown)
             {
-                return true;
+                return false;
             }
 
             if (!string.IsNullOrEmpty(FilterString))
@@ -719,19 +732,38 @@ namespace SearchHelper.Editor
             return true;
         }
 
-        protected IEnumerable<ObjectContext> Sort(IEnumerable<ObjectContext> objectContexts, SortVariant sortVariant)
+        protected IEnumerable<ObjectContext> OrderBy(IEnumerable<ObjectContext> objectContexts, SortVariant sortVariant)
         {
             switch (sortVariant)
             {
                 case SortVariant.ByName:
-                    return objectContexts.OrderBy(el => el.Object.name);
+                    return objectContexts.OrderBy(el => el.Object?.name);
                 case SortVariant.ByPath:
                     return objectContexts.OrderBy(el => el.Path);
                 case SortVariant.Natural:
-                    return objectContexts.OrderBy(el => el.Object.name, Comparer<string>.Create(EditorUtility.NaturalCompare));
+                    return objectContexts.OrderBy(el => el.Object?.name, Comparer<string>.Create(EditorUtility.NaturalCompare));
                 case SortVariant.None:
                 default:
                     return objectContexts;
+            }
+        }
+
+        protected void SortInPlace(List<ObjectContext> list, SortVariant sortVariant)
+        {
+            switch (sortVariant)
+            {
+                case SortVariant.ByName:
+                    list.Sort((a, b) => string.Compare(a.Object?.name, b.Object?.name, StringComparison.Ordinal));
+                    break;
+                case SortVariant.ByPath:
+                    list.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.Ordinal));
+                    break;
+                case SortVariant.Natural:
+                    list.Sort((a, b) => EditorUtility.NaturalCompare(a.Object?.name, b.Object?.name));
+                    break;
+                case SortVariant.None:
+                default:
+                    break;
             }
         }
 

@@ -14,7 +14,7 @@ A lightweight multi-tool for asset management:
 
 Package Manager -> Install package from git URL:
 - `git@github.com:alexander-yu-shamin/unity-toolkit.git?path=/com.alexander-yu-shamin.toolkit`
-- `git@github.com:alexander-yu-shamin/unity-search-helper.git?path/com.alexander-yu-shamin.search-helper`
+- `git@github.com:alexander-yu-shamin/unity-search-helper.git?path=/com.alexander-yu-shamin.search-helper`
 
 ## Entrypoints
 
@@ -27,10 +27,9 @@ Package Manager -> Install package from git URL:
 
 The tool supports displaying unlimited items with comprehensive filtering and sorting functionality.
 
-
 1. **Available Tools**: Collection of specialized utilities for different tasks.
 2. **Settings**: *Note*: Not all tools have configurable settings.
-3. **Scan Rules**: 
+3. **Scan Rules**:
    1. **Global Mode**: Scans the entire project for dependencies.
    2. **Local Mode**: Limited to the specified folder only.
 4. **Ignore Rules**: Create `SearchHelperIgnoreRule` ScriptableObjects to exclude specific files from results.
@@ -40,11 +39,10 @@ The tool supports displaying unlimited items with comprehensive filtering and so
 8. **Object Context Menus**: Each object button features a specialized context menu with additional options.
 9. **File Information**: Size information where applicable.
 
-
 ### Ignore Rules
 ![search-helper-ignore-rule](images/search-helper-ignore-rule.png)
 
-You can create custom rule files to exclude specific files from search results. The system uses regex (regular expression) capabilities for matching, allowing you to filter by: 
+You can create custom rule files to exclude specific files from search results. The system uses regex (regular expression) capabilities for matching, allowing you to filter by:
 - **File path**
 - **File name**
 - **Asset type**
@@ -62,37 +60,40 @@ The tool doesn't check for direct script references (aka by filename from a scri
 ### Used By Tool
 ![search-helper-used-by-tool](images/search-helper-used-by-tool.png)
 
-The `AssetDatabase.GetDependencies` method is used to a dependency map and tracking object references.
+The `AssetDatabase.GetDependencies` method is used to build a dependency map and track object references.
 The tool doesn't check for direct script references (aka by filename from a script).
+
+**Please note**: Folders are included in the scan as they can be referenced assets in some workflows. To check dependencies for a folder's contents, use the [**Unused Tool**](README.md#Unused%20Tool).
 
 ### Unused Tool
 ![search-helper-unused-tool](images/search-helper-unused-tool.png)
 
 Similar to 'Used By', but scans all files within a folder instead of searching for dependencies on the folder itself.
 
-The tool operates in two modes: Local and Global ("Scan Rules")
+The tool operates in two modes: Local and Global ('Scan Rules')
 - **Global Mode**: Scans the entire project for dependencies
 - **Local Mode**: Analyzes dependencies only within the specified folder
 
 A common task is to safeguard critical files (for instance, "important") from accidental deletion. This can be automated by setting up a combination of Scan Rules and Ignore Rules, effectively streamlining the cleanup of unused files.
 
+**Important**: The tool operates on principles similar to the [**Used By Tool**](README.md#Used%20By%20Tool). Its Global Scan mode can analyze a folder's contents to show what is referenced. Toggle "Show Used Items" in Settings to invert the display.
+
 ### Duplicates Tool
 ![search-helper-duplicates](images/search-helper-duplicates-tool.png)
 
-The tool identifies duplicates by comparing file hashes (MD5) in a folder (defaults to "Assets"). 
-The results can be transfered to "Merge Tool" by the button "Open in Merge Tool" or the context menu "Open in Merge Tool".
+The tool identifies duplicates by comparing file hashes (MD5) in a folder (defaults to "Assets").
+The results can be transferred to "Merge Tool" by the button "Open in Merge Tool" or the context menu "Open in Merge Tool".
 
 ### Merge Tool
 
 For meta-files, it compares hashes (SHA256) while ignoring the first two lines, with results color-coded in red and green for easy distinction.
 
-***Please note***: This tool is currently under development.The tool is under development now.
+**Please note**: This tool is currently under development.
 
 ![search-helper-merge-tool](images/search-helper-merge-tool.png)
-
 
 ### Find By GUID Tool
 
 The tool can locate objects by their GUID or display an object's GUID.
 
-***Please note***: This tool is currently under development.The tool is under development now.
+**Please note**: This tool is currently under development.

@@ -116,6 +116,7 @@ namespace SearchHelper.Editor
             {
                 Object = obj,
                 Path = path,
+                IsFolder = AssetDatabase.IsValidFolder(path),
                 Dependencies = new List<ObjectContext>(),
             };
         }
@@ -145,6 +146,7 @@ namespace SearchHelper.Editor
             return new ObjectContext()
             {
                 Path = path,
+                IsFolder = AssetDatabase.IsValidFolder(path),
                 Dependencies = new List<ObjectContext>(),
             };
         }
