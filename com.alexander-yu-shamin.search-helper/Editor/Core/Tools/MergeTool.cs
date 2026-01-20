@@ -13,32 +13,12 @@ namespace SearchHelper.Editor.Tools
 {
     public class MergeTool : ToolBase
     {
-        private enum ObjectState
-        {
-            None,
-            BaseObject,
-            SameAsBaseObject,
-            NotTheSameAsBaseObject
-        }
-
-        private class MergeObjectContext : ObjectContext
-        {
-            public bool IsSelected { get; set; } = true;
-            public bool IsBaseObject { get; set; } = false;
-            public bool IsMerged { get; set; } = false;
-            public ObjectState State { get; set; } = ObjectState.None;
-            public string MetaPath => Path + ".meta";
-
-            public MergeObjectContext(ObjectContext context) : base(context)
-            {
-            }
-        }
-
         protected override bool IsShowingFoldersSupported { get; set; } = false;
         protected override bool IsIgnoredFilesSupported { get; set; } = false;
+        protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
 
-        private MergeObjectContext BaseObject { get; set; }
-        private List<MergeObjectContext> Contexts { get; set; } = new List<MergeObjectContext>();
+        private ObjectContext BaseObject { get; set; }
+        private List<ObjectContext> Contexts { get; set; } = new List<ObjectContext>();
         protected override IEnumerable<ObjectContext> Data => Contexts;
 
         private Vector2 ScrollPosition { get; set; }
@@ -62,7 +42,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             BaseObject = null;
-            Contexts = new List<MergeObjectContext>();
+            Contexts = new List<ObjectContext>();
 
             if (Contexts.Contains(context))
             {
@@ -95,7 +75,7 @@ namespace SearchHelper.Editor.Tools
                 });
 
                 EGuiKit.FlexibleSpace();
-                EGuiKit.Button(BaseObject != null && !Contexts.IsNullOrEmpty(), "Merge", () =>
+                EGuiKit.Button(BaseObject != null && BaseObject.ShouldBeShown && !Contexts.IsNullOrEmpty(), "Merge", () =>
                 {
                     Merge(BaseObject, Contexts);
                 });
@@ -119,7 +99,7 @@ namespace SearchHelper.Editor.Tools
             });
         }
 
-        private void Merge(MergeObjectContext baseObject, List<MergeObjectContext> contexts)
+        private void Merge(ObjectContext baseObject, List<ObjectContext> contexts)
         {
             if (contexts.IsNullOrEmpty())
             {
@@ -133,7 +113,7 @@ namespace SearchHelper.Editor.Tools
 
             AssetDatabase.StartAssetEditing();
 
-            foreach (var context in contexts.Where(context => !context.IsBaseObject && context.IsSelected))
+            foreach (var context in contexts.Where(context => !context.IsBaseObject && context.IsSelected && context.ShouldBeShown))
             {
                 if (context == null)
                 {
@@ -152,12 +132,12 @@ namespace SearchHelper.Editor.Tools
             AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
         }
 
-        private static void Merge(MergeObjectContext baseObject, MergeObjectContext theirsObject)
+        private static void Merge(ObjectContext baseObject, ObjectContext theirsObject)
         {
             var dependencies = SearchHelperService.FindUsedBy(theirsObject.Object);
             foreach (var dependency in dependencies.Dependencies)
             {
-                var dependencyObject = new MergeObjectContext(dependency);
+                var dependencyObject = new ObjectContext(dependency);
 
                 if (!string.IsNullOrEmpty(dependencyObject.Path))
                 {
@@ -181,9 +161,14 @@ namespace SearchHelper.Editor.Tools
             }
         }
 
-        private void DrawElement(MergeObjectContext context)
+        private void DrawElement(ObjectContext context)
         {
             if (context == null)
+            {
+                return;
+            }
+
+            if (!context.ShouldBeShown)
             {
                 return;
             }
@@ -245,7 +230,7 @@ namespace SearchHelper.Editor.Tools
             }, GUI.skin.box);
         }
 
-        private Color GetColor(MergeObjectContext context)
+        private Color GetColor(ObjectContext context)
         {
             switch (context.State)
             {
@@ -280,10 +265,10 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            Contexts ??= new List<MergeObjectContext>();
+            Contexts ??= new List<ObjectContext>();
 
-            var newBaseObject = ToMergeObjectContext(selectedObject);
-            var validationError = ValidateMergeObjectContext(newBaseObject);
+            var newBaseObject = ObjectContext.ToObjectContext(selectedObject);
+            var validationError = ValidateObjectContext(newBaseObject);
 
             switch (validationError)
             {
@@ -336,10 +321,10 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            Contexts ??= new List<MergeObjectContext>();
+            Contexts ??= new List<ObjectContext>();
 
-            var mergeObject = ToMergeObjectContext(selectedObject);
-            var validationError = ValidateMergeObjectContext(mergeObject);
+            var mergeObject = ObjectContext.ToObjectContext(selectedObject);
+            var validationError = ValidateObjectContext(mergeObject);
 
             switch (validationError)
             {
@@ -372,7 +357,7 @@ namespace SearchHelper.Editor.Tools
             UpdateData(Contexts);
         }
 
-        private void CompareWithBaseObject(MergeObjectContext context)
+        private void CompareWithBaseObject(ObjectContext context)
         {
             if (BaseObject == null || context == null)
             {
@@ -396,7 +381,7 @@ namespace SearchHelper.Editor.Tools
             context.State = areMetasEqual ? ObjectState.SameAsBaseObject : ObjectState.NotTheSameAsBaseObject;
         }
 
-        private void CompareWithBaseObject(List<MergeObjectContext> contexts)
+        private void CompareWithBaseObject(List<ObjectContext> contexts)
         {
             if (contexts.IsNullOrEmpty())
             {
@@ -419,6 +404,18 @@ namespace SearchHelper.Editor.Tools
 
             foreach (var context in contexts)
             {
+                if (!context.Object)
+                {
+                    context.State = ObjectState.None;
+                    continue;
+                }
+
+                if (context.IsMerged)
+                {
+                    continue;
+                    context.State = ObjectState.None;
+                }
+
                 if (!File.Exists(context.MetaPath))
                 {
                     context.State = ObjectState.None;
@@ -449,7 +446,7 @@ namespace SearchHelper.Editor.Tools
             InContexts,
         }
 
-        private ValidationError ValidateMergeObjectContext(MergeObjectContext context)
+        private ValidationError ValidateObjectContext(ObjectContext context)
         {
             if (context == null)
             {
@@ -479,11 +476,6 @@ namespace SearchHelper.Editor.Tools
             }
 
             return ValidationError.NoError;
-        }
-
-        private MergeObjectContext ToMergeObjectContext(Object obj)
-        {
-            return new MergeObjectContext(ObjectContext.ToObjectContext(obj));
         }
     }
 }

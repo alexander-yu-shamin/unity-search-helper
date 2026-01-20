@@ -7,6 +7,14 @@ using Object = UnityEngine.Object;
 
 namespace SearchHelper.Editor
 {
+    public enum ObjectState
+    {
+        None,
+        BaseObject,
+        SameAsBaseObject,
+        NotTheSameAsBaseObject
+    }
+
     public class ObjectContext
     {
         private Object _object;
@@ -39,6 +47,8 @@ namespace SearchHelper.Editor
             }
             set => _path = value;
         }
+
+        public string MetaPath => Path + ".meta";
 
         private string _guid;
 
@@ -85,6 +95,10 @@ namespace SearchHelper.Editor
         }
 
         public bool IsFolder { get; set; }
+        public bool IsSelected { get; set; } = true;
+        public bool IsBaseObject { get; set; } = false;
+        public bool IsMerged { get; set; } = false;
+        public ObjectState State { get; set; } = ObjectState.None;
 
         public List<ObjectContext> Dependencies;
 

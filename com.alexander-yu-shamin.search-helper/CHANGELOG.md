@@ -1,6 +1,11 @@
 # Changelog
 
 ## [Unreleased]
+## [0.1.2] - 2026-1-20
+
+### Fixed
+- fixed sorting and filtering in merge tool
+- filtering ignores case 
 
 ## [0.1.1] - 2026-1-20
 

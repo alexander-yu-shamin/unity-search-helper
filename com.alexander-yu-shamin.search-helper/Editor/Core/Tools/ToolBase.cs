@@ -690,20 +690,20 @@ namespace SearchHelper.Editor
                 switch (CurrentFilterVariant)
                 {
                     case FilterVariant.Name:
-                        if (!objectContext.Object.name.Contains(FilterString))
+                        if (!objectContext.Object.name.Contains(FilterString, StringComparison.CurrentCultureIgnoreCase))
                         {
                             return false;
                         }
 
                         break;
                     case FilterVariant.Path:
-                        if (!objectContext.Path.Contains(FilterString))
+                        if (!objectContext.Path.Contains(FilterString, StringComparison.InvariantCultureIgnoreCase))
                         {
                             return false;
                         }
                         break;
                     case FilterVariant.Type:
-                        if (!objectContext.Object.GetType().FullName.Contains(FilterString))
+                        if (!objectContext.Object.GetType().FullName.Contains(FilterString, StringComparison.InvariantCultureIgnoreCase))
                         {
                             return false;
                         }
