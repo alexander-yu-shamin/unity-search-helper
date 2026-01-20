@@ -412,8 +412,8 @@ namespace SearchHelper.Editor.Tools
 
                 if (context.IsMerged)
                 {
-                    continue;
                     context.State = ObjectState.None;
+                    continue;
                 }
 
                 if (!File.Exists(context.MetaPath))

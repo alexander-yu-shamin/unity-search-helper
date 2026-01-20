@@ -1,7 +1,11 @@
 # Changelog
 
 ## [Unreleased]
-## [0.1.2] - 2026-1-20
+
+## [0.1.3] - 2026-1-20
+
+### Fixed
+- fix: remove unreachable code 
 
 ### Fixed
 - fixed sorting and filtering in merge tool
