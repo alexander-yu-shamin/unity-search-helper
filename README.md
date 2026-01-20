@@ -1,4 +1,20 @@
+<div align="center">
+
+[![LinkedIn Badge](https://img.shields.io/badge/-_-white?style=social&logo=Linkedin&link=https://www.linkedin.com/in/alexander-yu-shamin/)](https://www.linkedin.com/in/alexander-yu-shamin)
+&nbsp;
+[![Github Badge](https://img.shields.io/badge/-_-white?style=social&logo=GitHub&link=https://github.com/alexander-yu-shamin/)](https://github.com/alexander-yu-shamin/)
+&nbsp;
+[![Gmail Badge](https://img.shields.io/badge/-_-white?style=social&logo=Gmail&link=mailto:alexander.yu.shamin@gmail.com)](mailto:alexander.yu.shamin@gmail.com)
+&nbsp;
+[![Telegram Badge](https://img.shields.io/badge/-_-white?style=social&logo=Telegram&link=https://t.me/alexander_yu_shamin)](https://t.me/alexander_yu_shamin)
+
+</div>
+
+<div align="center">
+
 # Search Helper
+
+</div>
 
 ![search-helper](com.alexander-yu-shamin.search-helper/Documentation~/images/search-helper.gif)
 
@@ -12,9 +28,23 @@ A lightweight multi-tool for asset management:
 
 ## Install
 
-Package Manager -> Install package from git URL:
-- `git@github.com:alexander-yu-shamin/unity-toolkit.git?path=/com.alexander-yu-shamin.toolkit`
-- `git@github.com:alexander-yu-shamin/unity-search-helper.git?path=/com.alexander-yu-shamin.search-helper`
+This package depends on several other packages. You must install them in the correct order for everything to work.
+
+Package Manager -> `+` -> Install package from git URL:
+- ```
+  https://github.com/alexander-yu-shamin/unity-toolkit.git?path=/com.alexander-yu-shamin.toolkit
+  ```
+- ```
+  https://github.com/alexander-yu-shamin/unity-search-helper.git?path=/com.alexander-yu-shamin.search-helper
+  ```
+
+or SSH:
+- ```
+  git@github.com:alexander-yu-shamin/unity-toolkit.git?path=/com.alexander-yu-shamin.toolkit
+  ```
+- ```
+  git@github.com:alexander-yu-shamin/unity-search-helper.git?path=/com.alexander-yu-shamin.search-helper
+  ```
 
 ## Entrypoints
 
