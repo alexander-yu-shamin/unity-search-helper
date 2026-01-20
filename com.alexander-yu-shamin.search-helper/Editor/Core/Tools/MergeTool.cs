@@ -190,7 +190,7 @@ namespace SearchHelper.Editor.Tools
 
             EGuiKit.Horizontal(() =>
             {
-                context.IsSelected = EditorGUILayout.ToggleLeft("Use for merge", context.IsExpanded, GUILayout.Width(100));
+                context.IsSelected = EditorGUILayout.ToggleLeft("Use for merge", context.IsSelected, GUILayout.Width(100));
                 EGuiKit.Button("Remove", () =>
                 {
                     Contexts.RemoveAll(match => match.Path == context.Path);

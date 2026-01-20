@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-1-20
+
+### Fixed
+- "select" checkbox doesn't work
+
+
+## [0.1.0] - 2026-1-20
+
+## Added 
+- Documentation
+
+
 ## [0.0.9] - 2026-1-20
 
 ### Added
