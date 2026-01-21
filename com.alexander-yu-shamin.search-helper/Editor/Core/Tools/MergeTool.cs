@@ -194,7 +194,7 @@ namespace SearchHelper.Editor.Tools
                 EGuiKit.Button("Remove", () =>
                 {
                     Contexts.RemoveAll(match => match.Path == context.Path);
-                }, GUILayout.Width(100));
+                }, GUILayout.Width(75));
 
                 EGuiKit.Button(context.IsBaseObject ? "Base" : "Theirs", () =>
                 {
@@ -215,7 +215,26 @@ namespace SearchHelper.Editor.Tools
                     }
 
                     CompareWithBaseObject(Contexts);
-                }, GUILayout.Width(100));
+                }, GUILayout.Width(75));
+
+                var content = new GUIContent($"Diff");
+                if (EditorGUILayout.DropdownButton(content, FocusType.Passive, GUI.skin.button, GUILayout.Width(75)))
+                {
+                    var menu = new GenericMenu();
+                    menu.AddItem(new GUIContent("Asset"), false,
+                        () =>
+                        {
+                            EditorUtility.InvokeDiffTool("Base", BaseObject.Path, "Theirs", context.Path, null, null);
+                        });
+
+                    menu.AddItem(new GUIContent("Meta"), false,
+                        () =>
+                        {
+                            EditorUtility.InvokeDiffTool("Base", BaseObject.MetaPath, "Theirs", context.MetaPath, null, null);
+                        });
+
+                    menu.ShowAsContext();
+                }
 
                 EGuiKit.Color(GetColor(context), () =>
                 {

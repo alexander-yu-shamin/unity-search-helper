@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-1-21
+
+### Added 
+- cache system
+- diff for merge tool
+
 ## [0.1.3] - 2026-1-20
 
 ### Fixed
