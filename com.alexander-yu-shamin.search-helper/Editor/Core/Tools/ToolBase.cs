@@ -21,7 +21,8 @@ namespace SearchHelper.Editor
             None = 0,
             ByName,
             ByPath,
-            Natural
+            Natural,
+            ByCount
         }
 
         protected enum FilterVariant
@@ -748,6 +749,8 @@ namespace SearchHelper.Editor
                     return objectContexts.OrderBy(el => el.Path);
                 case SortVariant.Natural:
                     return objectContexts.OrderBy(el => el.Object?.name, Comparer<string>.Create(EditorUtility.NaturalCompare));
+                case SortVariant.ByCount:
+                    return objectContexts.OrderByDescending(el => el.Dependencies.Count);
                 case SortVariant.None:
                 default:
                     return objectContexts;
@@ -766,6 +769,9 @@ namespace SearchHelper.Editor
                     break;
                 case SortVariant.Natural:
                     list.Sort((a, b) => EditorUtility.NaturalCompare(a.Object?.name, b.Object?.name));
+                    break;
+                case SortVariant.ByCount:
+                    list.Sort((a, b) => b.Dependencies.Count.CompareTo(a.Dependencies.Count));
                     break;
                 case SortVariant.None:
                 default:

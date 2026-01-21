@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added 
+- sorting descending by dependency count
+
 ## [0.1.4] - 2026-1-21
 
 ### Added 
