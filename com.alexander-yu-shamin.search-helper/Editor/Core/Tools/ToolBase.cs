@@ -39,6 +39,7 @@ namespace SearchHelper.Editor
         protected virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
         protected virtual bool IsSizeShowingSupported { get; set; } = false;
         protected virtual bool IsSettingsButtonEnabled { get; set; } = true;
+        protected virtual bool IsCacheUsed { get; set; } = true;
         protected virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
         protected const float RowHeight = 20.0f;
@@ -568,6 +569,11 @@ namespace SearchHelper.Editor
                 menu.AddItem(new GUIContent("Show File Size"), IsSizeShowingSupported, () =>
                 {
                     IsSizeShowingSupported = !IsSizeShowingSupported;
+                });
+
+                menu.AddItem(new GUIContent("Use Cache"), IsCacheUsed, () =>
+                {
+                    IsCacheUsed = !IsCacheUsed;
                 });
 
                 AddSettingsContextMenu(menu);

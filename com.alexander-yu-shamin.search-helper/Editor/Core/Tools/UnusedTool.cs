@@ -114,28 +114,13 @@ namespace SearchHelper.Editor.Tools
             var map = FolderOrFile(UsedObject).Select(ObjectContext.ToObjectContext).ToDictionary(key => key.Path);
 
             var root = IsGlobalScope ? null : FolderPathFromObject(obj);
-
-            var paths = SearchHelperService.FindAssetPaths(root);
-            if (!paths.Any())
+            var dependencyMap = SearchHelperService.BuildDependencyMap(root, IsCacheUsed);
+            foreach (var (path, context) in map)
             {
-                return null;
-            }
-
-            foreach (var path in paths)
-            {
-                var dependencies = AssetDatabase.GetDependencies(path);
-                foreach (var dependency in dependencies)
+                if (dependencyMap.TryGetValue(path, out var dependencies))
                 {
-                    if (map.ContainsKey(dependency))
-                    {
-                        map[dependency].Dependencies.Add(ObjectContext.FromPath(path));
-                    }
+                    context.Dependencies = dependencies.Where(dependency => dependency.Guid != context.Guid).ToList();
                 }
-            }
-
-            foreach (var element in map.Values)
-            {
-                element.Dependencies = element.Dependencies.Where(dependency => dependency.Guid != element.Guid).ToList();
             }
 
             var contexts = map.Values.ToList();

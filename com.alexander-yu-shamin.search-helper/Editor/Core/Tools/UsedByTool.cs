@@ -10,6 +10,7 @@ namespace SearchHelper.Editor.Tools
     public class UsedByTool : ToolBase
     {
         protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
+        protected override bool IsCacheUsed { get; set; } = false;
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
 
@@ -61,7 +62,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             UsedObject = obj;
-            var searchedCtx = SearchHelperService.FindUsedBy(obj, true);
+            var searchedCtx = SearchHelperService.FindUsedBy(obj, IsCacheUsed);
 
             if (searchedCtx.IsFolder)
             {

@@ -17,9 +17,9 @@ namespace SearchHelper.Editor.Core
         private const string ObjectSearchFilter = "t:Object";
         public static event Action<string[], string[], string[], string[]> OnAssetChanged;
 #if SEARCH_HELPER_ENABLE_CACHING
-        // path and list dependencies
         private static Dictionary<string, List<ObjectContext>> DependencyMap { get; set; } = new Dictionary<string, List<ObjectContext>>();
-        private static bool HasCalledFindAllAssets { get; set; } = false;
+        private static bool HasOnlyNames { get; set; } = false;
+        private static bool HasFullDependencyMap { get; set; } = false;
 #endif
 
         public static IEnumerable<string> FindAssetPaths(string root = null)
@@ -29,9 +29,9 @@ namespace SearchHelper.Editor.Core
 #if SEARCH_HELPER_ENABLE_STOPWATCH
             var stopwatch = StartStopwatch();
 #endif
-            if (root == null && DependencyMap != null && HasCalledFindAllAssets)
+            if (root == null && DependencyMap != null && HasOnlyNames)
             {
-                return DependencyMap.Keys;
+                return DependencyMap.Keys.ToList();
             }
             
 #if SEARCH_HELPER_ENABLE_STOPWATCH
@@ -55,7 +55,7 @@ namespace SearchHelper.Editor.Core
 #endif
             if (root == null && !assets.IsNullOrEmpty())
             {
-                HasCalledFindAllAssets = true;
+                HasOnlyNames = true;
                 DependencyMap = assets.ToDictionary(k => k, v => null as List<ObjectContext>);
             }
 
@@ -87,7 +87,7 @@ namespace SearchHelper.Editor.Core
             return AssetDatabase.FindAssets(searchFilter, GetSearchDirs(root));
         }
 
-        public static ObjectContext FindUsedBy(Object obj, bool useCache = false)
+        public static ObjectContext FindUsedBy(Object obj, bool useCache = true)
         {
             if (obj == null)
             {
@@ -99,45 +99,34 @@ namespace SearchHelper.Editor.Core
             var searchedCtx = ObjectContext.ToObjectContext(obj);
 
 #if SEARCH_HELPER_ENABLE_CACHING
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            var stopwatch = StartStopwatch();
-#endif
             if (useCache && (DependencyMap?.ContainsKey(searchedCtx.Path) ?? false))
             {
+#if SEARCH_HELPER_ENABLE_STOPWATCH
+                var stopwatchCaching = StartStopwatch();
+#endif
                 var dependencies = DependencyMap[searchedCtx.Path];
                 if (dependencies != null)
                 {
                     searchedCtx.Dependencies = dependencies;
 #if SEARCH_HELPER_ENABLE_STOPWATCH
-                    StopStopwatch("FindUsedBy::ToObjectContext", stopwatch);
+                    StopStopwatch("FindUsedBy::GetFromCache", stopwatchCaching);
 #endif
                     return searchedCtx;
                 }
+#if SEARCH_HELPER_ENABLE_STOPWATCH
+                StopStopwatch("FindUsedBy::GetFromCache", stopwatchCaching);
+#endif
             }
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            StopStopwatch("FindUsedBy::ToObjectContext", stopwatch);
-#endif
-#endif
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            stopwatch = StartStopwatch();
 #endif
             var paths = SearchHelperService.FindAssetPaths();
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            StopStopwatch("FindUsedBy::FindAssetPaths", stopwatch);
-#endif
             if (!paths.Any())
             {
                 return null;
             }
 
 #if SEARCH_HELPER_ENABLE_STOPWATCH
-            stopwatch = StartStopwatch();
+            var stopwatch = StartStopwatch();
 #endif
-
-#if SEARCH_HELPER_ENABLE_CACHING
-            CacheMainObject(searchedCtx.Path, new List<ObjectContext>());
-#endif
-
             foreach (var path in paths)
             {
                 if (path == searchedCtx.Path)
@@ -146,14 +135,9 @@ namespace SearchHelper.Editor.Core
                 }
 
                 var dependencies = AssetDatabase.GetDependencies(path);
-
                 if (dependencies.ToHashSet().Contains(searchedCtx.Path))
                 {
-                    var dependencyObject = ObjectContext.FromPath(path);
-#if SEARCH_HELPER_ENABLE_CACHING
-                    CacheDependencyObject(dependencyObject, searchedCtx.Path);
-#endif
-                    searchedCtx.Dependencies.Add(dependencyObject);
+                    searchedCtx.Dependencies.Add(ObjectContext.FromPath(path));
                 }
             }
 
@@ -161,6 +145,18 @@ namespace SearchHelper.Editor.Core
             StopStopwatch("FindUsedBy::GetDependencies", stopwatch);
 #endif
 
+#if SEARCH_HELPER_ENABLE_CACHING
+
+#if SEARCH_HELPER_ENABLE_STOPWATCH
+            stopwatch = StartStopwatch();
+#endif
+
+            CacheMainObject(searchedCtx.Path, searchedCtx.Dependencies);
+
+#if SEARCH_HELPER_ENABLE_STOPWATCH
+            StopStopwatch("FindUsedBy::Caching", stopwatch);
+#endif
+#endif
             return searchedCtx;
         }
 
@@ -194,6 +190,78 @@ namespace SearchHelper.Editor.Core
             };
 
             return objectContext;
+        }
+
+        public static Dictionary<string, List<ObjectContext>> BuildDependencyMap(string root = null, bool useCache = true)
+        {
+            AssetDatabase.SaveAssets();
+
+#if SEARCH_HELPER_ENABLE_CACHING
+            if (useCache && DependencyMap != null && HasFullDependencyMap)
+            {
+#if SEARCH_HELPER_ENABLE_STOPWATCH
+                var stopwatchCaching = StartStopwatch();
+#endif
+                var DependencyMapCopy = DependencyMap.ToDictionary(k => k.Key, v => v.Value);
+#if SEARCH_HELPER_ENABLE_STOPWATCH
+                StopStopwatch("BuildDependencyMap", stopwatchCaching);
+#endif
+                return DependencyMapCopy;
+            }
+#endif
+
+
+#if SEARCH_HELPER_ENABLE_STOPWATCH
+            var stopwatch = StartStopwatch();
+#endif
+            var result = new Dictionary<string, List<ObjectContext>>();
+            var paths = SearchHelperService.FindAssetPaths(root);
+            foreach (var path in paths)
+            {
+                var dependencies = AssetDatabase.GetDependencies(path);
+                foreach (var dependency in dependencies)
+                {
+                    var context = ObjectContext.FromPath(path);
+#if SEARCH_HELPER_ENABLE_CACHING
+                    CacheDependencyObject(context, dependency);
+#endif
+                    if (result.ContainsKey(dependency))
+                    {
+                        result[dependency].Add(context);
+                    }
+                    else
+                    {
+                        result.Add(dependency, new List<ObjectContext>() { context });
+                    }
+                }
+            }
+
+#if SEARCH_HELPER_ENABLE_CACHING
+            if (root == null)
+            {
+                DependencyMap = result;
+                HasFullDependencyMap = paths?.Count() == DependencyMap?.Count;
+            }
+            else
+            {
+                if (DependencyMap == null)
+                {
+                    DependencyMap = result;
+                }
+                else
+                {
+                    foreach(var (path, contexts) in result)
+                    {
+                        CacheMainObject(path, contexts);
+                    }
+                }
+            }
+#endif
+
+#if SEARCH_HELPER_ENABLE_STOPWATCH
+            StopStopwatch("BuildDependencyMap::BuildMap", stopwatch);
+#endif
+            return result;
         }
 
         public static Object FindObjectByGuid(string guid)
@@ -285,17 +353,16 @@ namespace SearchHelper.Editor.Core
 #if SEARCH_HELPER_ENABLE_CACHING
         private static void ClearDependencyMap()
         {
-            UnityEngine.Debug.Log($"ClearDependencyMap");
-            HasCalledFindAllAssets = false;
+            HasOnlyNames = false;
+            HasFullDependencyMap = false;
             DependencyMap = new Dictionary<string, List<ObjectContext>>();
-
         }
 
         private static void CacheMainObject(string main, List<ObjectContext> dependencies = null)
         {
             if (DependencyMap.ContainsKey(main))
             {
-                DependencyMap[main] ??= dependencies;
+                DependencyMap[main] = dependencies;
             }
             else
             {
@@ -307,7 +374,14 @@ namespace SearchHelper.Editor.Core
         private static void CacheDependencyObject(ObjectContext dependency, string main)
         {
             DependencyMap.TryAdd(main, new List<ObjectContext>());
-            DependencyMap[main].Add(dependency); 
+            if (DependencyMap[main] == null)
+            {
+                DependencyMap[main] = new List<ObjectContext>() { dependency };
+            }
+            else
+            {
+                DependencyMap[main].Add(dependency);
+            }
         }
 #endif
 

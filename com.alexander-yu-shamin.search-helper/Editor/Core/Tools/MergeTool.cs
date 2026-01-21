@@ -26,6 +26,13 @@ namespace SearchHelper.Editor.Tools
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
         {
+            foreach (var context in Contexts)
+            {
+                if (context.Object != null)
+                {
+                    context.IsMerged = false;
+                }
+            }
             CompareWithBaseObject(Contexts);
         }
 
@@ -77,7 +84,7 @@ namespace SearchHelper.Editor.Tools
                 EGuiKit.FlexibleSpace();
                 EGuiKit.Button(BaseObject != null && BaseObject.ShouldBeShown && !Contexts.IsNullOrEmpty(), "Merge", () =>
                 {
-                    Merge(BaseObject, Contexts);
+                    Merge(BaseObject, Contexts, IsCacheUsed);
                 });
 
                 DrawHeaderControls();
@@ -99,7 +106,7 @@ namespace SearchHelper.Editor.Tools
             });
         }
 
-        private void Merge(ObjectContext baseObject, List<ObjectContext> contexts)
+        private void Merge(ObjectContext baseObject, List<ObjectContext> contexts, bool isCacheUsed)
         {
             if (contexts.IsNullOrEmpty())
             {
@@ -113,14 +120,23 @@ namespace SearchHelper.Editor.Tools
 
             AssetDatabase.StartAssetEditing();
 
-            foreach (var context in contexts.Where(context => !context.IsBaseObject && context.IsSelected && context.ShouldBeShown))
+            var dependencyMap = SearchHelperService.BuildDependencyMap(useCache: isCacheUsed);
+
+            foreach (var context in contexts.Where(context => context is { IsBaseObject: false, IsSelected: true, ShouldBeShown: true }))
             {
-                if (context == null)
+                List<ObjectContext> dependencies = null;
+                if (!dependencyMap.TryGetValue(context.Path, out dependencies))
                 {
+                    dependencies = SearchHelperService.FindUsedBy(context.Object, isCacheUsed)?.Dependencies;
+                }
+
+                if (dependencies == null)
+                {
+                    UnityEngine.Debug.LogError($"Can't find dependencies for {context.Path}");
                     continue;
                 }
 
-                Merge(baseObject, context);
+                Merge(baseObject, context, dependencies);
 
                 File.Delete(context.Path);
                 File.Delete(context.MetaPath);
@@ -132,10 +148,9 @@ namespace SearchHelper.Editor.Tools
             AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
         }
 
-        private static void Merge(ObjectContext baseObject, ObjectContext theirsObject)
+        private static void Merge(ObjectContext baseObject, ObjectContext theirsObject, List<ObjectContext> dependencies)
         {
-            var dependencies = SearchHelperService.FindUsedBy(theirsObject.Object, true);
-            foreach (var dependency in dependencies.Dependencies)
+            foreach (var dependency in dependencies)
             {
                 var dependencyObject = new ObjectContext(dependency);
 
