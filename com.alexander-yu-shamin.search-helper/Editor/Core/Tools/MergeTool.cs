@@ -555,6 +555,11 @@ namespace SearchHelper.Editor.Tools
                 return ("Merged", Color.cyan);
             }
 
+            if (context.State == ObjectState.NotTheSameAsBaseObject)
+            {
+                return ("Meta mismatch", Color.red);
+            }
+
             return null;
         }
 

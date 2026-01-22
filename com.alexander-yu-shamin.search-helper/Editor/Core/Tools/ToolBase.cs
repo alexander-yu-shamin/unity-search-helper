@@ -76,7 +76,7 @@ namespace SearchHelper.Editor
         protected const float ScrollBarWidth = 16.0f;
         protected const float NoScrollBarWidth = 4.0f;
         protected const float GuidTextAreaWidth = 275.0f;
-        protected const float StateTextAreaWidth = 275.0f;
+        protected const float StateTextAreaWidth = 150.0f;
         protected const float ExtraHeightToPreventBlinking = ContentHeightWithPadding * 5;
         protected const float BottomIndent = ContentHeightWithPadding * 3;
         protected const float SelectedObjectWidth = HeaderHeight + 250.0f + HorizontalIndent / 2;
@@ -394,7 +394,7 @@ namespace SearchHelper.Editor
                 EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "GUID:");
             }
 
-            var neededWidthForDependency = neededWidthForGuid + 50.0f + 100.0f;
+            var neededWidthForDependency = neededWidthForGuid + 50.0f + 90.0f + HorizontalIndent;
             if (leftWidth > neededWidthForDependency)
             {
                 elementWidth = 50.0f;
@@ -406,15 +406,15 @@ namespace SearchHelper.Editor
                 EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Dependencies:");
             }
 
-            var neededWidthForSize = neededWidthForDependency + 40.0f + 100.0f;
+            var neededWidthForSize = neededWidthForDependency + HorizontalIndent;
             if (IsSizeShowingSupported)
             {
+                neededWidthForSize = neededWidthForDependency + 70 + 40.0f + HorizontalIndent;
                 if (leftWidth > neededWidthForSize)
                 {
                     elementWidth = 70.0f;
                     x -= elementWidth + HorizontalIndent;
-                    EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight),
-                        context.Size ?? "");
+                    EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Size ?? "");
 
                     elementWidth = 40.0f;
                     x -= elementWidth;
@@ -422,7 +422,7 @@ namespace SearchHelper.Editor
                 }
             }
 
-            var neededWidthForState = neededWidthForSize + 40.0f + 100.0f;
+            var neededWidthForState = neededWidthForSize + StateTextAreaWidth + HorizontalIndent;
             if (leftWidth > neededWidthForState)
             {
                 if (model?.DrawState ?? true)
