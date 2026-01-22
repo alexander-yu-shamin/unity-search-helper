@@ -1,4 +1,5 @@
 using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -18,10 +19,11 @@ namespace SearchHelper.Editor.Tools
         protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
 
         private ObjectContext BaseObject { get; set; }
-        private List<ObjectContext> Contexts { get; set; } = new List<ObjectContext>();
-        protected override IEnumerable<ObjectContext> Data => Contexts;
+        private List<ObjectContext> Contexts { get; set; } = new();
+        private Model DrawModel { get; set; }
+        private bool ShowDependents { get; set; } = false;
 
-        private Vector2 ScrollPosition { get; set; }
+        protected override IEnumerable<ObjectContext> Data => Contexts;
 
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
@@ -33,6 +35,7 @@ namespace SearchHelper.Editor.Tools
                     context.IsMerged = false;
                 }
             }
+
             CompareWithBaseObject(Contexts);
         }
 
@@ -75,11 +78,14 @@ namespace SearchHelper.Editor.Tools
             {
                 EGuiKit.Button("Add Selected Object as Base", () => { AddObjectToMergeAsBase(Selection.activeObject); });
                 EGuiKit.Button("Add Selected Object as Theirs", () => { AddObjectToMergeAsTheirs(Selection.activeObject);});
-                EGuiKit.Button(BaseObject != null && !Contexts.IsNullOrEmpty(), "Clear", () =>
+
+                EGuiKit.Button(BaseObject != null || !Contexts.IsNullOrEmpty(), "Clear", () =>
                 {
                     BaseObject = null;
                     Contexts = null;
                 });
+
+                DrawSelectButton();
 
                 EGuiKit.FlexibleSpace();
                 EGuiKit.Button(BaseObject != null && BaseObject.ShouldBeShown && !Contexts.IsNullOrEmpty(), "Merge", () =>
@@ -97,13 +103,76 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            ScrollPosition = EGuiKit.ScrollView(ScrollPosition, () =>
+            DrawModel ??= new Model()
             {
-                foreach (var context in Contexts)
-                {
-                    DrawElement(context);
-                }
+                DrawDependencies = ShowDependents,
+                DrawObjectWithEmptyDependencies = true,
+                DrawMergeButtons = true,
+                DrawState = true,
+                DrawEmptyDependency = ShowDependents,
+
+                GetState = GetObjectState,
+                GetObjectFieldColor = GetObjectFieldColor,
+                OnSelectedButtonPressed = SelectedButtonPressedHandler,
+                OnRemoveButtonPressed = RemoveButtonPressedHandler,
+                OnComparandButtonPressed = ComparandButtonPressedHandler,
+                OnDiffButtonPressed = DiffButtonPressedHandler
+            };
+
+            DrawModel.DrawDependencies = ShowDependents;
+            DrawModel.DrawEmptyDependency = ShowDependents;
+
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
+        }
+
+        public override void Run(Object selectedObject)
+        {
+            if (selectedObject != null)
+            {
+                AddObjectToMergeAsBase(selectedObject);
+            }
+        }
+
+        public override void Run()
+        {
+        }
+
+        protected override void AddSettingsContextMenu(GenericMenu menu)
+        {
+            base.AddSettingsContextMenu(menu);
+            menu.AddItem(new GUIContent("Show Dependents"), ShowDependents, () =>
+            {
+                ShowDependents = !ShowDependents;
+                UpdateDependents();
             });
+        }
+
+        private void DrawSelectButton()
+        {
+            var content = new GUIContent($"Selection");
+            if (EditorGUILayout.DropdownButton(content, FocusType.Passive, GUI.skin.button, GUILayout.Width(75)))
+            {
+                var menu = new GenericMenu();
+                menu.AddItem(new GUIContent("Select All"), false,
+                    () =>
+                    {
+                        Contexts.ForEach(context => context.IsSelected = context.ShouldBeShown);
+                    });
+
+                menu.AddItem(new GUIContent("Unselect All"), false,
+                    () =>
+                    {
+                        Contexts.ForEach(context => context.IsSelected = false);
+                    });
+
+                menu.AddItem(new GUIContent("Select Similar"), false,
+                    () =>
+                    {
+                        Contexts.ForEach(context => context.IsSelected = context.State == ObjectState.SameAsBaseObject && context.ShouldBeShown);
+                    });
+
+                menu.ShowAsContext();
+            }
         }
 
         private void Merge(ObjectContext baseObject, List<ObjectContext> contexts, bool isCacheUsed)
@@ -176,96 +245,42 @@ namespace SearchHelper.Editor.Tools
             }
         }
 
-        private void DrawElement(ObjectContext context)
+        private void InvokeDiffTool(string leftTitle, string leftFile, string rightTitle, string rightFile)
         {
-            if (context == null)
+            if (string.IsNullOrEmpty(leftFile))
             {
+                Debug.LogError($"LeftFile is null");
                 return;
             }
 
-            if (!context.ShouldBeShown)
+            if (string.IsNullOrEmpty(leftFile))
             {
+                Debug.LogError($"RightFile is null");
                 return;
             }
 
-            EGuiKit.Horizontal(() =>
+            if (!File.Exists(leftFile))
             {
-                context.IsSelected = EditorGUILayout.ToggleLeft("Use for merge", context.IsSelected, GUILayout.Width(100));
-                EGuiKit.Button("Remove", () =>
-                {
-                    Contexts.RemoveAll(match => match.Path == context.Path);
-                }, GUILayout.Width(75));
+                Debug.LogError($"Can not find Left File");
+                return;
+            }
 
-                EGuiKit.Button(context.IsBaseObject ? "Base" : "Theirs", () =>
-                {
-                    if (context.IsBaseObject)
-                    {
-                        context.IsBaseObject = false;
-                        BaseObject = null;
-                    }
-                    else
-                    {
-                        Contexts.ForEach(context =>
-                        {
-                            context.IsBaseObject = false;
-                            context.State = ObjectState.None;
-                        });
-                        context.IsBaseObject = true;
-                        BaseObject = context;
-                    }
+            if (!File.Exists(rightFile))
+            {
+                Debug.LogError($"Can not find Right File");
+                return;
+            }
 
-                    CompareWithBaseObject(Contexts);
-                }, GUILayout.Width(75));
-
-                var content = new GUIContent($"Diff");
-                if (EditorGUILayout.DropdownButton(content, FocusType.Passive, GUI.skin.button, GUILayout.Width(75)))
-                {
-                    var menu = new GenericMenu();
-                    menu.AddItem(new GUIContent("Asset"), false,
-                        () =>
-                        {
-                            EditorUtility.InvokeDiffTool("Base", BaseObject.Path, "Theirs", context.Path, null, null);
-                        });
-
-                    menu.AddItem(new GUIContent("Meta"), false,
-                        () =>
-                        {
-                            EditorUtility.InvokeDiffTool("Base", BaseObject.MetaPath, "Theirs", context.MetaPath, null, null);
-                        });
-
-                    menu.ShowAsContext();
-                }
-
-                EGuiKit.Color(GetColor(context), () =>
-                {
-                    EditorGUILayout.ObjectField(context.Object, typeof(Object), true, GUILayout.Width(SelectedObjectWidth));
-                });
-
-                EGuiKit.Color(context.IsMerged ? Color.cyan : GUI.color, () =>
-                {
-                    EGuiKit.Button(EditorGUIUtility.IconContent(InspectorIconName), () =>
-                    {
-                        OpenProperty(context);
-                    }, GUILayout.Width(ContentHeight), GUILayout.Height(ContentHeight));
-
-                    EditorGUILayout.LabelField("GUID:", GUILayout.Width(40));
-                    EditorGUILayout.TextArea(context.IsMerged ? "MERGED" : context.Guid, GUILayout.Width(GuidTextAreaWidth));
-                    EGuiKit.Button(EditorGUIUtility.IconContent(FolderIconName), () =>
-                    {
-                        if (!string.IsNullOrEmpty(context.Path))
-                        {
-                            EditorUtility.RevealInFinder(context.Path);
-                        }
-                    }, GUILayout.Width(ContentHeight), GUILayout.Height(ContentHeight));
-
-                    EditorGUILayout.LabelField("Path:", GUILayout.Width(40));
-                    EditorGUILayout.TextArea(context.Path, GUILayout.ExpandWidth(true));
-                });
-            }, GUI.skin.box);
+            EditorUtility.InvokeDiffTool(leftTitle, leftFile, rightTitle, rightFile, null, null);
         }
 
-        private Color GetColor(ObjectContext context)
+        private Color GetObjectFieldColor(ObjectContext context)
         {
+            if (context.IsMerged)
+            {
+                return Color.cyan;
+            }
+
             switch (context.State)
             {
                 case ObjectState.BaseObject:
@@ -278,18 +293,6 @@ namespace SearchHelper.Editor.Tools
                 default:
                     return GUI.color;
             }
-        }
-
-        public override void Run(Object selectedObject)
-        {
-            if (selectedObject != null)
-            {
-                AddObjectToMergeAsBase(selectedObject);
-            }
-        }
-
-        public override void Run()
-        {
         }
 
         private void AddObjectToMergeAsBase(Object selectedObject)
@@ -345,6 +348,8 @@ namespace SearchHelper.Editor.Tools
             BaseObject = newBaseObject;
             BaseObject.State = ObjectState.BaseObject;
             BaseObject.IsBaseObject = true;
+            UpdateDependent(BaseObject);
+
             CompareWithBaseObject(Contexts);
         }
 
@@ -388,6 +393,7 @@ namespace SearchHelper.Editor.Tools
 
             Contexts.Add(mergeObject);
             CompareWithBaseObject(mergeObject);
+            UpdateDependent(mergeObject);
             UpdateData(Contexts);
         }
 
@@ -510,6 +516,87 @@ namespace SearchHelper.Editor.Tools
             }
 
             return ValidationError.NoError;
+        }
+
+        private void UpdateDependents()
+        {
+            foreach (var context in Contexts)
+            {
+                UpdateDependent(context);
+            }
+        }
+
+        private void UpdateDependent(ObjectContext context)
+        {
+            if (!ShowDependents)
+            {
+                return;
+            }
+
+            if (context == null)
+            {
+                return;
+            }
+
+            if (context.Object == null)
+            {
+                return;
+            }
+
+            var usedBy = SearchHelperService.FindUsedBy(context.Object);
+            context.Dependencies = usedBy.Dependencies;
+        }
+
+        private (string, Color)? GetObjectState(ObjectContext context)
+        {
+            if (context.IsMerged)
+            {
+                return ("Merged", Color.cyan);
+            }
+
+            return null;
+        }
+
+        private void DiffButtonPressedHandler(ObjectContext context)
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("Asset"), false, () => { InvokeDiffTool(BaseObject.Path, BaseObject.Path, context.Path, context.Path); });
+            menu.AddItem(new GUIContent("Meta"), false, () => { InvokeDiffTool(BaseObject.MetaPath, BaseObject.MetaPath, context.MetaPath, context.MetaPath); });
+            menu.ShowAsContext();
+        }
+
+        private void ComparandButtonPressedHandler(ObjectContext context)
+        {
+            if (context.IsBaseObject)
+            {
+                context.IsBaseObject = false;
+                BaseObject = null;
+            }
+            else
+            {
+                Contexts.ForEach(context =>
+                {
+                    context.IsBaseObject = false;
+                    context.State = ObjectState.None;
+                });
+                context.IsBaseObject = true;
+                BaseObject = context;
+            }
+
+            CompareWithBaseObject(Contexts);
+        }
+
+        private void RemoveButtonPressedHandler(ObjectContext context)
+        {
+            Contexts.RemoveAll(match => match.Path == context.Path);
+        }
+
+        private void SelectedButtonPressedHandler(ObjectContext context)
+        {
+            if (!context.IsBaseObject)
+            {
+                context.IsSelected = !context.IsSelected;
+            }
         }
     }
 }

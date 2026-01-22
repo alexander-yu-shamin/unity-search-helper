@@ -11,7 +11,6 @@ namespace SearchHelper.Editor.Tools
 {
     public class UnusedTool : ToolBase
     {
-        protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
         protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
         protected override bool IsScopeRulesSupported { get; set; } = true;
         protected override bool IsSizeShowingSupported { get; set; } = true;
@@ -44,6 +43,7 @@ namespace SearchHelper.Editor.Tools
         private bool ShowUnusedItems { get; set; } = true;
 
         private List<ObjectContext> Contexts { get; set; }
+        private Model DrawModel { get; set; }
 
         protected override IEnumerable<ObjectContext> Data => Contexts;
 
@@ -73,7 +73,12 @@ namespace SearchHelper.Editor.Tools
                 DrawHeaderControls();
             });
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
+            DrawModel ??= new Model()
+            {
+                DrawObjectWithEmptyDependencies = true
+            };
+
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
         }
 
         public override void Run(Object selectedObject)

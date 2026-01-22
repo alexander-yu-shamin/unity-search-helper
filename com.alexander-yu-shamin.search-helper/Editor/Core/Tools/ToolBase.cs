@@ -32,12 +32,27 @@ namespace SearchHelper.Editor
             Type
         }
 
+        protected class Model
+        {
+            public bool DrawDependencies { get; set; } = true;
+            public bool DrawObjectWithEmptyDependencies { get; set; } = true;
+            public bool DrawMergeButtons { get; set; }
+            public bool DrawEmptyDependency { get; set; } = true;
+            public bool DrawState { get; set; } = true;
+
+            public Func<ObjectContext, (string, Color)?> GetState { get; set; } 
+            public Func<ObjectContext, Color> GetObjectFieldColor { get; set; }
+            public Action<ObjectContext> OnSelectedButtonPressed { get; set; }
+            public Action<ObjectContext> OnRemoveButtonPressed { get; set; }
+            public Action<ObjectContext> OnComparandButtonPressed { get; set; }
+            public Action<ObjectContext> OnDiffButtonPressed { get; set; }
+        }
+
         protected virtual bool IsScopeRulesSupported { get; set; } = false;
         protected virtual bool IsIgnoredFilesSupported { get; set; } = true;
         protected virtual bool IsSortingSupported { get; set; } = true;
         protected virtual bool ShouldMainObjectsBeSorted { get; set; } = false;
         protected virtual bool IsShowingFoldersSupported { get; set; } = true;
-        protected virtual bool DrawObjectWithEmptyDependencies { get; set; } = false;
         protected virtual bool IsSizeShowingSupported { get; set; } = false;
         protected virtual bool IsSettingsButtonEnabled { get; set; } = true;
         protected virtual bool IsCacheUsed { get; set; } = true;
@@ -59,6 +74,7 @@ namespace SearchHelper.Editor
         protected const float ScrollBarWidth = 16.0f;
         protected const float NoScrollBarWidth = 4.0f;
         protected const float GuidTextAreaWidth = 275.0f;
+        protected const float StateTextAreaWidth = 275.0f;
         protected const float ExtraHeightToPreventBlinking = ContentHeightWithPadding * 5;
         protected const float BottomIndent = ContentHeightWithPadding * 3;
         protected const float SelectedObjectWidth = HeaderHeight + 250.0f + HorizontalIndent / 2;
@@ -87,7 +103,6 @@ namespace SearchHelper.Editor
         private List<Regex> RegexIgnoredPaths { get; set; }
         private List<Regex> RegexIgnoredNames { get; set; }
         private List<Regex> RegexIgnoredTypes { get; set; }
-        protected bool ShouldShowSettingsButton => IsSettingsButtonEnabled && IsShowingFoldersSupported;
 
         protected abstract IEnumerable<ObjectContext> Data { get; }
         public bool IsGlobalScope { get; set; } = true;
@@ -171,7 +186,7 @@ namespace SearchHelper.Editor
             Sort(CurrentSortVariant);
         }
 
-        protected void DrawVirtualScroll(Rect windowRect, List<ObjectContext> contexts, bool drawDependencies = true)
+        protected void DrawVirtualScroll(Rect windowRect, List<ObjectContext> contexts, Model model = null)
         {
             if (contexts.IsNullOrEmpty())
             {
@@ -182,7 +197,7 @@ namespace SearchHelper.Editor
 
             ScrollViewPosition = EditorGUILayout.BeginScrollView(ScrollViewPosition, GUILayout.Height(windowRect.height - BottomIndent));
 
-            var totalHeight = CalculateDisplayedHeight(contexts, drawDependencies);
+            var totalHeight = CalculateDisplayedHeight(contexts, model);
             var fullRect = GUILayoutUtility.GetRect(0, totalHeight);
 
             var x = fullRect.x;
@@ -198,13 +213,13 @@ namespace SearchHelper.Editor
             foreach (var ctx in contexts)
             {
                 if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect, 
-                        () => TryDrawObjectHeader(ref x, ref y, displayRect.width, ctx),
-                        () => CalculateHeaderHeight(ctx)))
+                        () => TryDrawObjectHeader(ref x, ref y, displayRect.width, ctx, model),
+                        () => CalculateHeaderHeight(ctx, model)))
                 {
                     break;
                 }
 
-                if (!drawDependencies)
+                if ((!model?.DrawDependencies) ?? false)
                 {
                     continue;
                 }
@@ -212,8 +227,8 @@ namespace SearchHelper.Editor
                 if (ctx.Dependencies.IsNullOrEmpty())
                 {
                     if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect, 
-                            () => TryDrawEmptyContent(ref x, ref y, displayRect.width, ctx),
-                            () => CalculateEmptyHeight(ctx)))
+                            () => TryDrawEmptyContent(ref x, ref y, displayRect.width, ctx, model),
+                            () => CalculateEmptyHeight(ctx, model)))
                     {
                         break;
                     }
@@ -243,9 +258,9 @@ namespace SearchHelper.Editor
             return !beforeVisibleRect && !afterVisibleRect;
         }
 
-        private float CalculateDisplayedHeight(List<ObjectContext> contexts, bool calculateDependencies)
+        private float CalculateDisplayedHeight(List<ObjectContext> contexts, Model model)
         {
-            return contexts.Sum(ctx => CalculateHeaderHeight(ctx) + CalculateDependenciesHeight(ctx));
+            return contexts.Sum(ctx => CalculateHeaderHeight(ctx, model) + CalculateDependenciesHeight(ctx, model));
         }
 
         private bool TryDraw(ref float currentY, Vector2 scrollViewPosition, ref float drawnHeight, Rect windowRect, Func<float> tryDraw, Func<float> calculateHeight)
@@ -259,11 +274,11 @@ namespace SearchHelper.Editor
             return !afterVisibleRect;
         }
 
-        private float CalculateDependenciesHeight(ObjectContext context)
+        private float CalculateDependenciesHeight(ObjectContext context, Model model)
         {
             if (context.Dependencies.IsNullOrEmpty())
             {
-                return CalculateEmptyHeight(context);
+                return CalculateEmptyHeight(context, model);
             }
             else
             {
@@ -271,14 +286,14 @@ namespace SearchHelper.Editor
             }
         }
 
-        private float CalculateHeaderHeight(ObjectContext context)
+        private float CalculateHeaderHeight(ObjectContext context, Model model)
         {
             if (!context.ShouldBeShown)
             {
                 return 0.0f;
             }
 
-            if (!DrawObjectWithEmptyDependencies && !context.Dependencies.Any(dependency => dependency.ShouldBeShown))
+            if (((!model?.DrawObjectWithEmptyDependencies) ?? false) && !context.Dependencies.Any(dependency => dependency.ShouldBeShown))
             {
                 return 0.0f;
             }
@@ -286,24 +301,24 @@ namespace SearchHelper.Editor
             return HeaderHeightWithPadding;
         }
 
-        private float TryDrawObjectHeader(ref float x, ref float y, float width, ObjectContext context)
+        private float TryDrawObjectHeader(ref float x, ref float y, float width, ObjectContext context, Model model)
         {
             if (!context.ShouldBeShown)
             {
                 return 0.0f;
             }
 
-            if (!DrawObjectWithEmptyDependencies && !context.Dependencies.Any(dependency => dependency.ShouldBeShown))
+            if (((!model?.DrawObjectWithEmptyDependencies) ?? false) && !context.Dependencies.Any(dependency => dependency.ShouldBeShown))
             {
                 return 0.0f;
             }
 
-            var result = DrawObjectHeader(new Rect(x, y, width, HeaderHeightWithPadding), context);
+            var result = DrawObjectHeader(new Rect(x, y, width, HeaderHeightWithPadding), context, model);
             y += result;
             return result;
         }
 
-        private float DrawObjectHeader(Rect rect, ObjectContext context)
+        private float DrawObjectHeader(Rect rect, ObjectContext context, Model model)
         {
             var x = rect.x + FirstElementIndent;
             var y = rect.y;
@@ -312,10 +327,45 @@ namespace SearchHelper.Editor
 
             EditorGUI.DrawRect(new Rect(rect.x, y, rect.width, HeaderHeight + HeaderPadding), BoxColor);
             y += HeaderPadding / 2;
+            var elementWidth = 0.0f;
 
-            var elementWidth = HeaderHeight;
-            if (GUI.Button(new Rect(x, y - 1, elementWidth, HeaderHeight),
-                    EditorGUIUtility.IconContent(FolderIconName)))
+            if (model?.DrawMergeButtons ?? false)
+            {
+                elementWidth = 75.0f;
+                var toggleRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
+                var selected = EditorGUI.ToggleLeft(toggleRect, "Selected", context.IsSelected);
+                if (selected != context.IsSelected)
+                {
+                    model?.OnSelectedButtonPressed?.Invoke(context);
+                }
+
+                x += elementWidth + HorizontalIndent / 2;
+                elementWidth = 75.0f;
+                var removeRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
+                if (GUI.Button(removeRect, "Remove"))
+                {
+                    model?.OnRemoveButtonPressed?.Invoke(context);
+                }
+
+                x += elementWidth + HorizontalIndent / 2;
+                var comporandRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
+                if (GUI.Button(comporandRect, context.IsBaseObject ? "Base" : "Theirs"))
+                {
+                    model?.OnComparandButtonPressed?.Invoke(context);
+                }
+
+                x += elementWidth + HorizontalIndent / 2;
+                var diffRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
+                if (GUI.Button(diffRect, "Diff"))
+                {
+                    model?.OnDiffButtonPressed?.Invoke(context);
+                }
+
+                x += elementWidth + HorizontalIndent / 2;
+            }
+
+            elementWidth = HeaderHeight;
+            if (GUI.Button(new Rect(x, y - 1, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(FolderIconName)))
             {
                 OpenInDefaultFileBrowser(context);
             }
@@ -323,7 +373,12 @@ namespace SearchHelper.Editor
             x += elementWidth + HorizontalIndent / 2;
             elementWidth = 250.0f;
             var objectFieldRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
-            EditorGUI.ObjectField(objectFieldRect, context.Object, typeof(Object), context.Object);
+            var objectColor = model?.GetObjectFieldColor != null ? model.GetObjectFieldColor(context) : GUI.color;
+
+            EGuiKit.Color(objectColor, () =>
+            {
+                EditorGUI.ObjectField(objectFieldRect, context.Object, typeof(Object), context.Object);
+            });
 
             DrawContextMenu(context, objectFieldRect);
 
@@ -337,8 +392,6 @@ namespace SearchHelper.Editor
 
             var leftWidth = rect.width - x;
             var neededWidthForGuid = GuidTextAreaWidth + 40.0f;
-            var neededWidthForDependency = neededWidthForGuid + 50.0f + 100.0f;
-            var neededWidthForSize = neededWidthForDependency + 40.0f + 100.0f;
 
             if (leftWidth > neededWidthForGuid)
             {
@@ -351,18 +404,19 @@ namespace SearchHelper.Editor
                 EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "GUID:");
             }
 
+            var neededWidthForDependency = neededWidthForGuid + 50.0f + 100.0f;
             if (leftWidth > neededWidthForDependency)
             {
                 elementWidth = 50.0f;
                 x -= elementWidth + HorizontalIndent;
-                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight),
-                    context.Dependencies?.Count.ToString());
+                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Dependencies?.Count.ToString());
 
                 elementWidth = 90.0f;
                 x -= elementWidth;
                 EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Dependencies:");
             }
 
+            var neededWidthForSize = neededWidthForDependency + 40.0f + 100.0f;
             if (IsSizeShowingSupported)
             {
                 if (leftWidth > neededWidthForSize)
@@ -378,10 +432,30 @@ namespace SearchHelper.Editor
                 }
             }
 
+            var neededWidthForState = neededWidthForSize + 40.0f + 100.0f;
+            if (leftWidth > neededWidthForState)
+            {
+                if (model?.DrawState ?? true)
+                {
+                    var message = model?.GetState != null ? model.GetState(context) : null;
+                    if (message.HasValue)
+                    {
+                        elementWidth = StateTextAreaWidth;
+                        x -= elementWidth + HorizontalIndent;
+
+                        EGuiKit.Color(message.Value.Item2,
+                            () =>
+                            {
+                                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), message.Value.Item1);
+                            });
+                    }
+                }
+            }
+
             return HeaderHeightWithPadding;
         }
 
-        private float CalculateEmptyHeight(ObjectContext mainContext)
+        private float CalculateEmptyHeight(ObjectContext mainContext, Model model)
         {
             if (mainContext.IsFolder)
             {
@@ -394,6 +468,11 @@ namespace SearchHelper.Editor
             }
 
             if (IsIgnoredFilesSupported && !mainContext.ShouldBeShown)
+            {
+                return 0.0f;
+            }
+
+            if (!model?.DrawEmptyDependency ?? false)
             {
                 return 0.0f;
             }
@@ -401,7 +480,7 @@ namespace SearchHelper.Editor
             return ContentHeightWithPadding;
         }
 
-        private float TryDrawEmptyContent(ref float x, ref float y, float width, ObjectContext mainContext)
+        private float TryDrawEmptyContent(ref float x, ref float y, float width, ObjectContext mainContext, Model model)
         {
             if (mainContext.IsFolder)
             {
@@ -414,6 +493,11 @@ namespace SearchHelper.Editor
             }
 
             if (IsIgnoredFilesSupported && !mainContext.ShouldBeShown)
+            {
+                return 0.0f;
+            }
+
+            if (!model?.DrawEmptyDependency ?? false)
             {
                 return 0.0f;
             }
@@ -483,15 +567,15 @@ namespace SearchHelper.Editor
             {
                 FindInHierarchyWindow(context);
             }
-            x += elementWidth + HorizontalIndent / 2;
 
+            x += elementWidth + HorizontalIndent / 2;
             elementWidth = ContentHeight;
             if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight), EditorGUIUtility.IconContent(InspectorIconName)))
             {
                 OpenProperty(context);
             }
-            x += elementWidth + HorizontalIndent / 2;
 
+            x += elementWidth + HorizontalIndent / 2;
             elementWidth = 40.0f;
             EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "GUID:");
             x += elementWidth;
@@ -508,8 +592,8 @@ namespace SearchHelper.Editor
                     EditorUtility.RevealInFinder(context.Path);
                 }
             }
-            x += elementWidth + HorizontalIndent / 2;
 
+            x += elementWidth + HorizontalIndent / 2;
             elementWidth = 40.0f;
             EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "Path:");
             x += elementWidth;
@@ -543,7 +627,7 @@ namespace SearchHelper.Editor
 
         private void DrawSettingsRules()
         {
-            if (!ShouldShowSettingsButton)
+            if (!IsSettingsButtonEnabled)
             {
                 return;
             }
@@ -575,6 +659,22 @@ namespace SearchHelper.Editor
                 menu.AddItem(new GUIContent("Use Cache"), IsCacheUsed, () =>
                 {
                     IsCacheUsed = !IsCacheUsed;
+                });
+
+                menu.AddItem(new GUIContent("Visibility/Show Dependencies"), false, () =>
+                {
+                    foreach (var context in Data)
+                    {
+                        context.IsExpanded = true;
+                    }
+                });
+
+                menu.AddItem(new GUIContent("Visibility/Hide Dependencies"), false, () =>
+                {
+                    foreach (var context in Data)
+                    {
+                        context.IsExpanded = false;
+                    }
                 });
 
                 AddSettingsContextMenu(menu);

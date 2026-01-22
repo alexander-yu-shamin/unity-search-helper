@@ -15,7 +15,7 @@ namespace SearchHelper.Editor.Tools
         private string CurrentUsedObjectGuid { get; set; }
         private List<ObjectContext> Contexts { get; set; }
         protected override IEnumerable<ObjectContext> Data => Contexts;
-        protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
+        private Model DrawModel { get; set; }
 
         public override void Draw(Rect windowRect)
         {
@@ -100,7 +100,12 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, false));
+            DrawModel ??= new Model()
+            {
+                DrawObjectWithEmptyDependencies = true
+            };
+
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
         }
     }
 }

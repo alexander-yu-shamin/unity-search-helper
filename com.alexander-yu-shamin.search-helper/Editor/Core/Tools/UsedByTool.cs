@@ -9,7 +9,6 @@ namespace SearchHelper.Editor.Tools
 {
     public class UsedByTool : ToolBase
     {
-        protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
         protected override bool IsCacheUsed { get; set; } = false;
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
@@ -17,7 +16,7 @@ namespace SearchHelper.Editor.Tools
         private List<ObjectContext> Contexts { get; set; }
         protected override IEnumerable<ObjectContext> Data => Contexts;
         protected override string EmptyObjectContextText { get; set; } = "This object is not referenced anywhere in the project.";
-
+        private Model DrawModel { get; set; }
         public override void Draw(Rect windowRect)
         {
             EGuiKit.Horizontal(() =>
@@ -34,7 +33,12 @@ namespace SearchHelper.Editor.Tools
                 DrawHeaderControls();
             });
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
+            DrawModel ??= new Model()
+            {
+                DrawObjectWithEmptyDependencies = true
+            };
+
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
         }
 
         public override void Run(Object selectedObject)

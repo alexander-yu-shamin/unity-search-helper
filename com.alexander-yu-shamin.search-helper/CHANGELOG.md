@@ -4,6 +4,7 @@
 
 ### Added 
 - sorting descending by dependency count
+- add selection control for merge tool
 
 ## [0.1.4] - 2026-1-21
 

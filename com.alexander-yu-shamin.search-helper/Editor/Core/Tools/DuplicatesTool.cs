@@ -13,7 +13,6 @@ namespace SearchHelper.Editor.Tools
 {
     public class DuplicatesTool : ToolBase
     {
-        protected override bool DrawObjectWithEmptyDependencies { get; set; } = true;
         protected override bool IsShowingFoldersSupported { get; set; } = false;
         protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
         protected override bool IsSizeShowingSupported { get; set; } = true;
@@ -22,6 +21,7 @@ namespace SearchHelper.Editor.Tools
         private Object UsedObject { get; set; }
 
         private List<ObjectContext> Contexts { get; set; }
+        private Model DrawModel { get; set; }
 
         protected override IEnumerable<ObjectContext> Data => Contexts;
 
@@ -58,7 +58,12 @@ namespace SearchHelper.Editor.Tools
                 DrawHeaderControls();
             });
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
+            DrawModel ??= new Model()
+            {
+                DrawObjectWithEmptyDependencies = true
+            };
+
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
         }
 
         public override void Run(Object selectedObject)
