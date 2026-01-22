@@ -221,6 +221,11 @@ namespace SearchHelper.Editor.Core
                 var dependencies = AssetDatabase.GetDependencies(path);
                 foreach (var dependency in dependencies)
                 {
+                    if (path == dependency)
+                    {
+                        continue;
+                    }
+
                     var context = ObjectContext.FromPath(path);
 #if SEARCH_HELPER_ENABLE_CACHING
                     CacheDependencyObject(context, dependency);

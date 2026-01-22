@@ -124,7 +124,7 @@ namespace SearchHelper.Editor.Tools
             {
                 if (dependencyMap.TryGetValue(path, out var dependencies))
                 {
-                    context.Dependencies = dependencies.Where(dependency => dependency.Guid != context.Guid).ToList();
+                    context.Dependencies = dependencies.ToList();
                 }
             }
 

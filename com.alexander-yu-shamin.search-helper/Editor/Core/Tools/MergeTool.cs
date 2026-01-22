@@ -544,7 +544,7 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            var usedBy = SearchHelperService.FindUsedBy(context.Object);
+            var usedBy = SearchHelperService.FindUsedBy(context.Object, IsCacheUsed);
             context.Dependencies = usedBy.Dependencies;
         }
 
