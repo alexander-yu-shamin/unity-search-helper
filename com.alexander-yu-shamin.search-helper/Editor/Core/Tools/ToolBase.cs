@@ -39,6 +39,7 @@ namespace SearchHelper.Editor
             public bool DrawMergeButtons { get; set; }
             public bool DrawEmptyDependency { get; set; } = true;
             public bool DrawState { get; set; } = true;
+            public bool DrawEmptyFolder { get; set; } = true;
 
             public Func<ObjectContext, (string, Color)?> GetState { get; set; } 
             public Func<ObjectContext, Color> GetObjectFieldColor { get; set; }
@@ -277,14 +278,7 @@ namespace SearchHelper.Editor
 
         private float CalculateDependenciesHeight(ObjectContext context, Model model)
         {
-            if (context.Dependencies.IsNullOrEmpty())
-            {
-                return CalculateEmptyHeight(context, model);
-            }
-            else
-            {
-                return context.Dependencies.Sum(dependency => CalculateDependencyHeight(dependency, context));
-            }
+            return context.Dependencies.IsNullOrEmpty() ? CalculateEmptyHeight(context, model) : context.Dependencies.Sum(dependency => CalculateDependencyHeight(dependency, context));
         }
 
         private float CalculateHeaderHeight(ObjectContext context, Model model)
@@ -304,12 +298,7 @@ namespace SearchHelper.Editor
 
         private float TryDrawObjectHeader(ref float x, ref float y, float width, ObjectContext context, Model model)
         {
-            if (!context.ShouldBeShown)
-            {
-                return 0.0f;
-            }
-
-            if (((!model?.DrawObjectWithEmptyDependencies) ?? false) && !context.Dependencies.Any(dependency => dependency.ShouldBeShown))
+            if (CalculateHeaderHeight(context, model) == 0.0f)
             {
                 return 0.0f;
             }
@@ -460,7 +449,10 @@ namespace SearchHelper.Editor
         {
             if (mainContext.IsFolder)
             {
-                return 0.0f;
+                if (!model?.DrawEmptyFolder ?? true)
+                {
+                    return 0.0f;
+                }
             }
 
             if (!mainContext.IsExpanded)
@@ -483,22 +475,7 @@ namespace SearchHelper.Editor
 
         private float TryDrawEmptyContent(ref float x, ref float y, float width, ObjectContext mainContext, Model model)
         {
-            if (mainContext.IsFolder)
-            {
-                return 0.0f;
-            }
-
-            if (!mainContext.IsExpanded)
-            {
-                return 0.0f;
-            }
-
-            if (IsIgnoredFilesSupported && !mainContext.ShouldBeShown)
-            {
-                return 0.0f;
-            }
-
-            if (!IsEmptyDependencyShown || (!model?.DrawEmptyDependency ?? false))
+            if (CalculateEmptyHeight(mainContext, model) == 0.0f)
             {
                 return 0.0f;
             }
@@ -535,12 +512,7 @@ namespace SearchHelper.Editor
 
         private float TryDrawContent(ref float x, ref float y, float width, ObjectContext context, ObjectContext mainContext)
         {
-            if (!mainContext.IsExpanded)
-            {
-                return 0.0f;
-            }
-
-            if (!context.ShouldBeShown)
+            if (CalculateDependencyHeight(context, mainContext) == 0.0f)
             {
                 return 0.0f;
             }
