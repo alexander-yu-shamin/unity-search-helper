@@ -55,6 +55,7 @@ namespace SearchHelper.Editor
         protected virtual bool IsShowingFoldersSupported { get; set; } = true;
         protected virtual bool IsSizeShowingSupported { get; set; } = false;
         protected virtual bool IsSettingsButtonEnabled { get; set; } = true;
+        protected virtual bool IsEmptyDependencyShown { get; set; } = true;
         protected virtual bool IsCacheUsed { get; set; } = true;
         protected virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
@@ -472,7 +473,7 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            if (!model?.DrawEmptyDependency ?? false)
+            if (!IsEmptyDependencyShown || (!model?.DrawEmptyDependency ?? false))
             {
                 return 0.0f;
             }
@@ -497,7 +498,7 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            if (!model?.DrawEmptyDependency ?? false)
+            if (!IsEmptyDependencyShown || (!model?.DrawEmptyDependency ?? false))
             {
                 return 0.0f;
             }
@@ -675,6 +676,11 @@ namespace SearchHelper.Editor
                     {
                         context.IsExpanded = false;
                     }
+                });
+
+                menu.AddItem(new GUIContent("Visibility/Show Empty Dependencies"), IsEmptyDependencyShown, () =>
+                {
+                    IsEmptyDependencyShown = !IsEmptyDependencyShown;
                 });
 
                 AddSettingsContextMenu(menu);

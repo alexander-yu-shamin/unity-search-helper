@@ -17,6 +17,7 @@ namespace SearchHelper.Editor.Tools
         protected override bool IsShowingFoldersSupported { get; set; } = false;
         protected override bool IsIgnoredFilesSupported { get; set; } = false;
         protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
+        protected override string EmptyObjectContextText { get; set; } = "This object is not referenced anywhere in the project.";
 
         private ObjectContext BaseObject { get; set; }
         private List<ObjectContext> Contexts { get; set; } = new();
