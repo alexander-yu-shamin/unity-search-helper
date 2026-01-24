@@ -1,9 +1,9 @@
 using System;
-using System.CodeDom;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using SearchHelper.Editor.Core;
+using Toolkit.Editor.Helpers.Diagnostics;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
@@ -24,11 +24,15 @@ namespace SearchHelper.Editor.Tools
         private Model DrawModel { get; set; }
         private bool ShowDependents { get; set; } = false;
 
+        private readonly HashSet<string> _defaultLines = new() { "assetBundleName", "assetBundleVariant", "SpriteID", "userData" };
+        private HashSet<string> IgnoredLines { get; set; } = new HashSet<string>();
+
         protected override IEnumerable<ObjectContext> Data => Contexts;
 
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
         {
+            using var measure = Profiler.Measure("AssetChanged");
             foreach (var context in Contexts)
             {
                 if (context.Object != null)
@@ -146,6 +150,44 @@ namespace SearchHelper.Editor.Tools
                 ShowDependents = !ShowDependents;
                 UpdateDependents();
             });
+
+            var hashset = new HashSet<string>();
+            hashset.UnionWith(_defaultLines);
+            hashset.UnionWith(IgnoredLines);
+
+            foreach (var ignoredLine in hashset)
+            {
+                AddItem(ignoredLine);
+            }
+
+            menu.AddItem(new GUIContent($"Ignore Line in Diff/Add your line"), false, () =>
+            {
+                InputDialog.Show("Add Ignore Line", "", result =>
+                {
+                    if (!string.IsNullOrEmpty(result))
+                    {
+                        IgnoredLines.Add(result);
+                    }
+                });
+            });
+
+
+            void AddItem(string s)
+            {
+                menu.AddItem(new GUIContent($"Ignore Line in Diff/{s}"), IgnoredLines.Contains(s), () =>
+                {
+                    if (IgnoredLines.Contains(s))
+                    {
+                        IgnoredLines.Remove(s);
+                    }
+                    else
+                    {
+                        IgnoredLines.Add(s);
+                    }
+
+                    CompareWithBaseObject(Contexts);
+                });
+            }
         }
 
         private void DrawSelectButton()
@@ -178,6 +220,7 @@ namespace SearchHelper.Editor.Tools
 
         private void Merge(ObjectContext baseObject, List<ObjectContext> contexts, bool isCacheUsed)
         {
+            using var measure = Profiler.Measure("Merge");
             if (contexts.IsNullOrEmpty())
             {
                 return;
@@ -200,16 +243,23 @@ namespace SearchHelper.Editor.Tools
                     dependencies = SearchHelperService.FindUsedBy(context.Object, isCacheUsed)?.Dependencies;
                 }
 
-                if (dependencies == null)
+                if(dependencies == null)
                 {
-                    UnityEngine.Debug.LogError($"Can't find dependencies for {context.Path}");
+                    Debug.LogError($"Can't find dependencies for {context.Path}");
                     continue;
                 }
 
                 Merge(baseObject, context, dependencies);
 
-                File.Delete(context.Path);
-                File.Delete(context.MetaPath);
+                using (Profiler.Measure($"Merge::Delete {context.Path}"))
+                {
+                    File.Delete(context.Path);
+                }
+
+                using (Profiler.Measure($"Merge::Delete {context.MetaPath}"))
+                {
+                    File.Delete(context.MetaPath);
+                }
                 context.IsMerged = true;
             }
 
@@ -220,27 +270,34 @@ namespace SearchHelper.Editor.Tools
 
         private static void Merge(ObjectContext baseObject, ObjectContext theirsObject, List<ObjectContext> dependencies)
         {
+            using var measure = Profiler.Measure("MergeElement");
             foreach (var dependency in dependencies)
             {
                 var dependencyObject = new ObjectContext(dependency);
 
                 if (!string.IsNullOrEmpty(dependencyObject.Path))
                 {
-                    if (File.Exists(dependencyObject.Path))
+                    using (Profiler.Measure($"MergeElement::Merge {dependencyObject.Path}"))
                     {
-                        var text = File.ReadAllText(dependencyObject.Path);
-                        var replaced = text.Replace(theirsObject.Guid, baseObject.Guid);
-                        File.WriteAllText(dependencyObject.Path, replaced);
+                        if (File.Exists(dependencyObject.Path))
+                        {
+                            var text = File.ReadAllText(dependencyObject.Path);
+                            var replaced = text.Replace(theirsObject.Guid, baseObject.Guid);
+                            File.WriteAllText(dependencyObject.Path, replaced);
+                        }
                     }
                 }
 
                 if (!string.IsNullOrEmpty(dependencyObject.MetaPath))
                 {
-                    if (File.Exists(dependencyObject.MetaPath))
+                    using (Profiler.Measure($"MergeElement::Merge{dependencyObject.MetaPath}"))
                     {
-                        var text = File.ReadAllText(dependencyObject.MetaPath);
-                        var replaced = text.Replace(theirsObject.Guid, baseObject.Guid);
-                        File.WriteAllText(dependencyObject.MetaPath, replaced);
+                        if (File.Exists(dependencyObject.MetaPath))
+                        {
+                            var text = File.ReadAllText(dependencyObject.MetaPath);
+                            var replaced = text.Replace(theirsObject.Guid, baseObject.Guid);
+                            File.WriteAllText(dependencyObject.MetaPath, replaced);
+                        }
                     }
                 }
             }
@@ -418,7 +475,7 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            var areMetasEqual = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2) == SearchHelperService.GetFileHashSHA256(context.MetaPath, 2);
+            var areMetasEqual = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2, IgnoredLines) == SearchHelperService.GetFileHashSHA256(context.MetaPath, 2, IgnoredLines);
             context.State = areMetasEqual ? ObjectState.SameAsBaseObject : ObjectState.NotTheSameAsBaseObject;
         }
 
@@ -441,7 +498,7 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            var baseObjectMetaHash = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2);
+            var baseObjectMetaHash = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2, IgnoredLines);
 
             foreach (var context in contexts)
             {
@@ -470,7 +527,7 @@ namespace SearchHelper.Editor.Tools
                 }
                 else
                 {
-                    var hash = SearchHelperService.GetFileHashSHA256(context.MetaPath, 2);
+                    var hash = SearchHelperService.GetFileHashSHA256(context.MetaPath, 2, IgnoredLines);
                     context.State = hash == baseObjectMetaHash
                         ? ObjectState.SameAsBaseObject
                         : ObjectState.NotTheSameAsBaseObject;
@@ -529,6 +586,7 @@ namespace SearchHelper.Editor.Tools
 
         private void UpdateDependent(ObjectContext context)
         {
+            using var measure = Profiler.Measure("UpdateDependent");
             if (!ShowDependents)
             {
                 return;
@@ -599,9 +657,56 @@ namespace SearchHelper.Editor.Tools
 
         private void SelectedButtonPressedHandler(ObjectContext context)
         {
-            if (!context.IsBaseObject)
+            if (context.IsBaseObject)
+            {
+                context.IsSelected = true;
+            }
+            else
             {
                 context.IsSelected = !context.IsSelected;
+            }
+        }
+
+        public class InputDialog : EditorWindow
+        {
+            private static string _inputText = "";
+            private static Action<string> _onConfirm;
+
+            public static void Show(string title, string initialValue, Action<string> callback)
+            {
+                _inputText = initialValue;
+                _onConfirm = callback;
+
+                var window = CreateInstance<InputDialog>();
+                window.titleContent = new GUIContent(title);
+                var size = new Vector2(400, 60);
+                window.minSize = size;
+                window.maxSize = size;
+                window.position = new Rect(Screen.width / 2, Screen.height / 2, size.x, size.y);
+
+                window.ShowModalUtility();
+            }
+
+            void OnGUI()
+            {
+                GUILayout.Label("Input:", EditorStyles.boldLabel);
+                _inputText = EditorGUILayout.TextField(_inputText);
+
+                GUILayout.FlexibleSpace();
+
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("OK", GUILayout.Width(100)))
+                {
+                    _onConfirm?.Invoke(_inputText);
+                    Close();
+                }
+
+                if (GUILayout.Button("Cancel", GUILayout.Width(100)))
+                {
+                    Close();
+                }
+
+                EditorGUILayout.EndHorizontal();
             }
         }
     }

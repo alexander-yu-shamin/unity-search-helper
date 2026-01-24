@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using Toolkit.Editor.Helpers.Diagnostics;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
 using Object = UnityEngine.Object;
@@ -24,44 +25,25 @@ namespace SearchHelper.Editor.Core
 
         public static IEnumerable<string> FindAssetPaths(string root = null)
         {
+            using var measure = Profiler.Measure($"FindAssetPaths {root}");
             AssetDatabase.SaveAssets();
 #if SEARCH_HELPER_ENABLE_CACHING
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            var stopwatch = StartStopwatch();
-#endif
             if (root == null && DependencyMap != null && HasOnlyNames)
             {
                 return DependencyMap.Keys.ToList();
             }
-            
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            StopStopwatch("FindAssetsPath::GetFromCache", stopwatch);
-#endif
-#endif
-
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            stopwatch = StartStopwatch();
 #endif
             var assets = FindAssets(ObjectSearchFilter, root).Select(AssetDatabase.GUIDToAssetPath)
                                                              .Where(path => !string.IsNullOrEmpty(path));
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            StopStopwatch("FindAssetsPath::FindAssets", stopwatch);
-#endif
-
 #if SEARCH_HELPER_ENABLE_CACHING
-
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            stopwatch = StartStopwatch();
-#endif
             if (root == null && !assets.IsNullOrEmpty())
             {
-                HasOnlyNames = true;
-                DependencyMap = assets.ToDictionary(k => k, v => null as List<ObjectContext>);
+                using (Profiler.Measure($"FindAssetPaths:: Caching {root}"))
+                {
+                    HasOnlyNames = true;
+                    DependencyMap = assets.ToDictionary(k => k, v => null as List<ObjectContext>);
+                }
             }
-
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            StopStopwatch("FindAssetsPath::Caching", stopwatch);
-#endif
 #endif
             return assets;
         }
@@ -69,21 +51,15 @@ namespace SearchHelper.Editor.Core
         public static IEnumerable<Object> FindAssetObjects(string root = null)
         {
             AssetDatabase.SaveAssets();
-
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            var stopwatch = StartStopwatch();
-#endif
             var assetObjects = FindAssets(ObjectSearchFilter, root).Select(AssetDatabase.GUIDToAssetPath)
                                                                    .Select(AssetDatabase.LoadMainAssetAtPath)
                                                                    .Where(asset => asset != null);
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            StopStopwatch("FindAssetObjects", stopwatch);
-#endif
             return assetObjects;
         }
 
         public static IEnumerable<string> FindAssets(string searchFilter, string root = null)
         {
+            using var measure = Profiler.Measure($"FindAssets {searchFilter} {root}");
             return AssetDatabase.FindAssets(searchFilter, GetSearchDirs(root));
         }
 
@@ -94,6 +70,8 @@ namespace SearchHelper.Editor.Core
                 return null;
             }
 
+            using var measure = Profiler.Measure($"FindUsedBy {obj.name}");
+
             AssetDatabase.SaveAssets();
 
             var searchedCtx = ObjectContext.ToObjectContext(obj);
@@ -101,21 +79,15 @@ namespace SearchHelper.Editor.Core
 #if SEARCH_HELPER_ENABLE_CACHING
             if (useCache && (DependencyMap?.ContainsKey(searchedCtx.Path) ?? false))
             {
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-                var stopwatchCaching = StartStopwatch();
-#endif
-                var dependencies = DependencyMap[searchedCtx.Path];
-                if (dependencies != null)
+                using (Profiler.Measure($"FindUsedBy:: Caching {searchedCtx.Path}"))
                 {
-                    searchedCtx.Dependencies = dependencies;
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-                    StopStopwatch("FindUsedBy::GetFromCache", stopwatchCaching);
-#endif
-                    return searchedCtx;
+                    var dependencies = DependencyMap[searchedCtx.Path];
+                    if (dependencies != null)
+                    {
+                        searchedCtx.Dependencies = dependencies;
+                        return searchedCtx;
+                    }
                 }
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-                StopStopwatch("FindUsedBy::GetFromCache", stopwatchCaching);
-#endif
             }
 #endif
             var paths = SearchHelperService.FindAssetPaths();
@@ -124,38 +96,25 @@ namespace SearchHelper.Editor.Core
                 return null;
             }
 
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            var stopwatch = StartStopwatch();
-#endif
-            foreach (var path in paths)
+            using (Profiler.Measure($"FindUsedBy:: GetDependencies {searchedCtx.Path}"))
             {
-                if (path == searchedCtx.Path)
+                foreach (var path in paths)
                 {
-                    continue;
-                }
+                    if (path == searchedCtx.Path)
+                    {
+                        continue;
+                    }
 
-                var dependencies = AssetDatabase.GetDependencies(path);
-                if (dependencies.ToHashSet().Contains(searchedCtx.Path))
-                {
-                    searchedCtx.Dependencies.Add(ObjectContext.FromPath(path));
+                    var dependencies = AssetDatabase.GetDependencies(path);
+                    if (dependencies.ToHashSet().Contains(searchedCtx.Path))
+                    {
+                        searchedCtx.Dependencies.Add(ObjectContext.FromPath(path));
+                    }
                 }
             }
 
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            StopStopwatch("FindUsedBy::GetDependencies", stopwatch);
-#endif
-
 #if SEARCH_HELPER_ENABLE_CACHING
-
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            stopwatch = StartStopwatch();
-#endif
-
-            CacheMainObject(searchedCtx.Path, searchedCtx.Dependencies);
-
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            StopStopwatch("FindUsedBy::Caching", stopwatch);
-#endif
+            UpdateCachedDependencies(searchedCtx.Path, searchedCtx.Dependencies);
 #endif
             return searchedCtx;
         }
@@ -166,6 +125,8 @@ namespace SearchHelper.Editor.Core
             {
                 return null;
             }
+
+            using var measure = Profiler.Measure($"FindDependencies {obj.name}");
 
             AssetDatabase.SaveAssets();
 
@@ -195,25 +156,16 @@ namespace SearchHelper.Editor.Core
         public static Dictionary<string, List<ObjectContext>> BuildDependencyMap(string root = null, bool useCache = true)
         {
             AssetDatabase.SaveAssets();
+            using var measure = Profiler.Measure($"BuildDependencyMap {root ?? "global"}");
 
 #if SEARCH_HELPER_ENABLE_CACHING
             if (useCache && DependencyMap != null && HasFullDependencyMap)
             {
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-                var stopwatchCaching = StartStopwatch();
-#endif
                 var DependencyMapCopy = DependencyMap.ToDictionary(k => k.Key, v => v.Value);
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-                StopStopwatch("BuildDependencyMap", stopwatchCaching);
-#endif
                 return DependencyMapCopy;
             }
 #endif
 
-
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            var stopwatch = StartStopwatch();
-#endif
             var result = new Dictionary<string, List<ObjectContext>>();
             var paths = SearchHelperService.FindAssetPaths(root);
             foreach (var path in paths)
@@ -223,6 +175,11 @@ namespace SearchHelper.Editor.Core
                 {
                     if (path == dependency)
                     {
+                        if(!result.ContainsKey(path))
+                        {
+                            result.Add(path, new List<ObjectContext>());
+                        }
+                        EnsureMainKeyExists(path);
                         continue;
                     }
 
@@ -255,17 +212,14 @@ namespace SearchHelper.Editor.Core
                 }
                 else
                 {
-                    foreach(var (path, contexts) in result)
+                    foreach (var (path, contexts) in result)
                     {
-                        CacheMainObject(path, contexts);
+                        UpdateCachedDependencies(path, contexts);
                     }
                 }
             }
 #endif
 
-#if SEARCH_HELPER_ENABLE_STOPWATCH
-            StopStopwatch("BuildDependencyMap::BuildMap", stopwatch);
-#endif
             return result;
         }
 
@@ -338,21 +292,45 @@ namespace SearchHelper.Editor.Core
             return hash;
         }
 
-        public static string GetFileHashSHA256(string path, int skipLines)
+        public static string GetFileHashSHA256(string path, int skipLines, HashSet<string> ignored = null)
         {
             using var sha = SHA256.Create();
             using var reader = new StreamReader(path, Encoding.UTF8);
 
-            for (int i = 0; i < skipLines; i++)
+            for (var i = 0; i < skipLines && !reader.EndOfStream; i++)
             {
                 reader.ReadLine();
             }
 
-            var remaining = reader.ReadToEnd();
-            var bytes = Encoding.UTF8.GetBytes(remaining);
-            var hash = sha.ComputeHash(bytes);
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                if (ignored != null)
+                {
+                    var skip = false;
+                    foreach (var ignore in ignored)
+                    {
+                        if (line.Contains(ignore))
+                        {
+                            skip = true;
+                            break;
+                        }
+                    }
 
-            return Convert.ToBase64String(hash);
+                    if (skip)
+                        continue;
+                }
+
+                var bytes = Encoding.UTF8.GetBytes(line);
+                sha.TransformBlock(bytes, 0, bytes.Length, null, 0);
+
+                // сохраняем структуру файла
+                sha.TransformBlock(Encoding.UTF8.GetBytes("\n"), 0, 1, null, 0);
+            }
+
+            sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+
+            return Convert.ToBase64String(sha.Hash);
         }
 
 #if SEARCH_HELPER_ENABLE_CACHING
@@ -363,15 +341,17 @@ namespace SearchHelper.Editor.Core
             DependencyMap = new Dictionary<string, List<ObjectContext>>();
         }
 
-        private static void CacheMainObject(string main, List<ObjectContext> dependencies = null)
+        private static void UpdateCachedDependencies(string main, List<ObjectContext> dependencies = null)
         {
-            if (DependencyMap.ContainsKey(main))
+            DependencyMap[main] = dependencies;
+        }
+
+        [Conditional("SEARCH_HELPER_ENABLE_CACHING")]
+        private static void EnsureMainKeyExists(string main)
+        {
+            if (!DependencyMap.ContainsKey(main))
             {
-                DependencyMap[main] = dependencies;
-            }
-            else
-            {
-                DependencyMap[main] = dependencies;
+                DependencyMap[main] = new List<ObjectContext>();
             }
         }
 
@@ -389,16 +369,5 @@ namespace SearchHelper.Editor.Core
             }
         }
 #endif
-
-        private static Stopwatch StartStopwatch()
-        {
-            return Stopwatch.StartNew();
-        }
-
-        private static void StopStopwatch(string message, Stopwatch stopwatch)
-        {
-            stopwatch.Stop();
-            UnityEngine.Debug.Log($"{message}: {stopwatch.ElapsedMilliseconds} ms");
-        }
     }
 }
