@@ -14,6 +14,14 @@ namespace SearchHelper.Editor
         SameAsBaseObject,
         NotTheSameAsBaseObject
     }
+    
+    public enum ObjectContextTarget
+    {
+        Path,
+        Name,
+        Type,
+    }
+
 
     public class ObjectContext
     {
@@ -200,6 +208,17 @@ namespace SearchHelper.Editor
             }
 
             return $"{(bytes / (1024.0 * 1024 * 1024 * 1024)):0.##} TB";
+        }
+
+        public string GetTarget(ObjectContextTarget target)
+        {
+            return target switch
+            {
+                ObjectContextTarget.Path => Path,
+                ObjectContextTarget.Name => Object != null ? Object.name : string.Empty,
+                ObjectContextTarget.Type => Object != null ? Object.GetType().Name : string.Empty,
+                _                        => throw new ArgumentOutOfRangeException(nameof(target), target, null)
+            };
         }
 
         public void UpdateSize()

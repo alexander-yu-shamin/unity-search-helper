@@ -12,7 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8bb34b281218a1941955a7af3c0df458, type: 3}
   m_Name: Builtin
   m_EditorClassIdentifier: 
-  IgnoredNames: []
-  IgnoredPaths:
-  - Resources/unity_builtin_extra
-  - Library/unity default resources
+  FilterRules: []

@@ -1,11 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using SearchHelper.Editor.Core;
-using SearchHelper.Editor.Data;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
@@ -23,13 +20,6 @@ namespace SearchHelper.Editor
             ByPath,
             Natural,
             ByCount
-        }
-
-        protected enum FilterVariant
-        {
-            Path,
-            Name,
-            Type
         }
 
         protected class Model
@@ -50,7 +40,7 @@ namespace SearchHelper.Editor
         }
 
         protected virtual bool IsScopeRulesSupported { get; set; } = false;
-        protected virtual bool IsIgnoredFilesSupported { get; set; } = true;
+        protected virtual bool IsFilteringSupported { get; set; } = true;
         protected virtual bool IsSortingSupported { get; set; } = true;
         protected virtual bool ShouldMainObjectsBeSorted { get; set; } = false;
         protected virtual bool IsShowingFoldersSupported { get; set; } = true;
@@ -96,18 +86,18 @@ namespace SearchHelper.Editor
 
         private Vector2 ScrollViewPosition { get; set; }
         protected SortVariant CurrentSortVariant { get; set; } = SortVariant.None;
-        protected FilterVariant CurrentFilterVariant { get; set; } = FilterVariant.Path;
-        private string FilterString { get; set; }
         protected bool IsFoldersShown { get; set; } = false;
 
-        private DataDescription<SearchHelperIgnoreRule> ChosenPattern { get; set; }
-        private List<DataDescription<SearchHelperIgnoreRule>> Patterns { get; set; }
-        private List<Regex> RegexIgnoredPaths { get; set; }
-        private List<Regex> RegexIgnoredNames { get; set; }
-        private List<Regex> RegexIgnoredTypes { get; set; }
+        private SearchHelperFilterManager FilterManager { get; set; }
 
         protected abstract IEnumerable<ObjectContext> Data { get; }
         public bool IsGlobalScope { get; set; } = true;
+
+
+        public virtual void Init()
+        {
+            FilterManager ??= new SearchHelperFilterManager(OnFilterChanged);
+        }
 
         public abstract void Draw(Rect windowRect);
 
@@ -186,6 +176,11 @@ namespace SearchHelper.Editor
             }
 
             Sort(CurrentSortVariant);
+        }
+
+        private void OnFilterChanged()
+        {
+            UpdateData();
         }
 
         protected void DrawVirtualScroll(Rect windowRect, List<ObjectContext> contexts, Model model = null)
@@ -460,7 +455,7 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            if (IsIgnoredFilesSupported && !mainContext.ShouldBeShown)
+            if (IsFilteringSupported && !mainContext.ShouldBeShown)
             {
                 return 0.0f;
             }
@@ -681,29 +676,56 @@ namespace SearchHelper.Editor
 
         private void DrawFilterRules()
         {
-            var content = new GUIContent($"{CurrentFilterVariant} contains:");
+            var target = FilterManager.CurrentFilterByStringTarget;
+            var mode = FilterManager.CurrentFilterByStringMode;
+            var filter = FilterManager.CurrentFilterString;
+
+            var content = new GUIContent($"{target}");
             if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
                 var menu = new GenericMenu();
-                foreach (FilterVariant variant in Enum.GetValues(typeof(FilterVariant)))
+                foreach (ObjectContextTarget possibleTarget in Enum.GetValues(typeof(ObjectContextTarget)))
                 {
-                    menu.AddItem(new GUIContent(variant.ToString()), CurrentFilterVariant == variant, () =>
+                    menu.AddItem(new GUIContent(possibleTarget.ToString()), target == possibleTarget, () =>
                     {
-                        UpdateFilterVariant(variant);
+                        FilterManager.SelectFilterByString(possibleTarget, mode, filter);
                     });
                 }
 
                 menu.ShowAsContext();
             }
 
-            var newFilterString = EditorGUILayout.TextArea(FilterString, GUILayout.Width(250));
-            if (FilterString != newFilterString)
+            content = new GUIContent($"{ToString(mode)}:");
+            if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
-                FilterString = newFilterString;
-                UpdateData();
+                var menu = new GenericMenu();
+                foreach (FilterRuleMode possibleMode in Enum.GetValues(typeof(FilterRuleMode)))
+                {
+                    menu.AddItem(new GUIContent(ToString(possibleMode)), mode == possibleMode, () =>
+                    {
+                        FilterManager.SelectFilterByString(target, possibleMode, filter);
+                    });
+                }
+
+                menu.ShowAsContext();
             }
 
+            FilterManager.SelectFilterByString(target, mode, EditorGUILayout.TextArea(filter, GUILayout.Width(250)));
+
             EGuiKit.Space(HorizontalIndent);
+
+            string ToString(FilterRuleMode mode)
+            {
+                switch (mode)
+                {
+                    case FilterRuleMode.Include:
+                        return "contains";
+
+                    default:
+                    case FilterRuleMode.Exclude:
+                        return "!contains";
+                }
+            }
         }
 
         private void DrawSortingRules()
@@ -727,36 +749,36 @@ namespace SearchHelper.Editor
 
         private void DrawIgnoringRules()
         {
-            if (!IsIgnoredFilesSupported)
+            if (!IsFilteringSupported)
             {
                 return;
             }
 
-            UpdatePatternsIfNeeded();
+            var currentFilterName = FilterManager?.CurrentFilterRule?.Name;
+            var content = new GUIContent(currentFilterName ?? "No Ignore Rule");
 
-            var content = new GUIContent(ChosenPattern?.Name ?? "No Ignore Rule");
             if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
+
                 var menu = new GenericMenu();
-                if (Patterns != null)
+                foreach(var rule in FilterManager.FilterRules)
                 {
-                    foreach (var pattern in Patterns)
+                    menu.AddItem(new GUIContent(rule.Name), currentFilterName == rule.Name, () =>
                     {
-                        menu.AddItem(new GUIContent(pattern.Name), ChosenPattern?.Name == pattern.Name, () =>
-                        {
-                            UpdatePattern(pattern);
-                        });
-                    }
+                        FilterManager?.SelectFilterRule(rule);
+                        UpdateData();
+                    });
                 }
 
                 menu.AddItem(new GUIContent("Load more from disk"), false, () =>
                 {
-                    UpdatePatternsIfNeeded(true);
+                    FilterManager?.UpdateFilterRules();
+                    UpdateData();
                 });
-
                 menu.AddItem(new GUIContent("Remove Pattern"), false, () =>
                 {
-                    UpdatePattern(null);
+                    FilterManager?.UnselectFilterRule();
+                    UpdateData();
                 });
 
                 menu.ShowAsContext();
@@ -770,45 +792,9 @@ namespace SearchHelper.Editor
                 return false;
             }
 
-            if (!string.IsNullOrEmpty(FilterString))
+            if (IsFilteringSupported && FilterManager != null) 
             {
-                switch (CurrentFilterVariant)
-                {
-                    case FilterVariant.Name:
-                        if (!objectContext.Object.name.Contains(FilterString, StringComparison.CurrentCultureIgnoreCase))
-                        {
-                            return false;
-                        }
-
-                        break;
-                    case FilterVariant.Path:
-                        if (!objectContext.Path.Contains(FilterString, StringComparison.InvariantCultureIgnoreCase))
-                        {
-                            return false;
-                        }
-                        break;
-                    case FilterVariant.Type:
-                        if (!objectContext.Object.GetType().FullName.Contains(FilterString, StringComparison.InvariantCultureIgnoreCase))
-                        {
-                            return false;
-                        }
-                        break;
-                }
-            }
-
-            if (IsIgnoredFilesSupported)
-            {
-                if (RegexIgnoredPaths?.Any(regex => regex.IsMatch(objectContext.Path)) ?? false)
-                {
-                    return false;
-                }
-
-                if (RegexIgnoredNames?.Any(regex => regex.IsMatch(objectContext.Object.name)) ?? false)
-                {
-                    return false;
-                }
-
-                if (RegexIgnoredTypes?.Any(regex => regex.IsMatch(objectContext.Object.GetType().FullName)) ?? false)
+                if (!FilterManager.IsAllowed(objectContext, parentContext))
                 {
                     return false;
                 }
@@ -877,92 +863,6 @@ namespace SearchHelper.Editor
             }
 
             return AssetDatabase.IsValidFolder(path) ? path : null;
-        }
-
-        private void UpdateFilterVariant(FilterVariant newFilterVariant)
-        {
-            CurrentFilterVariant = newFilterVariant;
-            UpdateData();
-        }
-
-        private void UpdatePattern(DataDescription<SearchHelperIgnoreRule> newPattern)
-        {
-            if (newPattern == null)
-            {
-                RegexIgnoredPaths = null;
-                RegexIgnoredNames = null;
-                RegexIgnoredTypes = null;
-                if (ChosenPattern != null)
-                {
-                    ChosenPattern.Data.OnDataChanged -= OnPatterChanged;
-                    ChosenPattern = null;
-                }
-            }
-            else
-            {
-                if (ChosenPattern != null)
-                {
-                    ChosenPattern.Data.OnDataChanged -= OnPatterChanged;
-                }
-
-                ChosenPattern = newPattern;
-                ChosenPattern.Data.OnDataChanged += OnPatterChanged;
-
-                RegexIgnoredPaths = new List<Regex>(ChosenPattern.Data.IgnoredPaths.Count);
-                foreach (var ignoredPath in ChosenPattern.Data.IgnoredPaths)
-                {
-                    if (!string.IsNullOrEmpty(ignoredPath))
-                    {
-                        RegexIgnoredPaths.Add(new Regex(ignoredPath, RegexOptions.Compiled));
-                    }
-                }
-
-                RegexIgnoredNames = new List<Regex>(ChosenPattern.Data.IgnoredNames.Count);
-                foreach (var ignoredName in ChosenPattern.Data.IgnoredNames)
-                {
-                    if (!string.IsNullOrEmpty(ignoredName))
-                    {
-                        RegexIgnoredNames.Add(new Regex(ignoredName, RegexOptions.Compiled));
-                    }
-                }
-
-                RegexIgnoredTypes = new List<Regex>(ChosenPattern.Data.IgnoredTypes.Count);
-                foreach (var ignoredType in ChosenPattern.Data.IgnoredTypes)
-                {
-                    if (!string.IsNullOrEmpty(ignoredType))
-                    {
-                        RegexIgnoredTypes.Add(new Regex(ignoredType, RegexOptions.Compiled));
-                    }
-                }
-            }
-
-            UpdateData();
-        }
-
-        private void OnPatterChanged()
-        {
-            UpdatePattern(ChosenPattern);
-        }
-
-        private void UpdatePatternsIfNeeded(bool force = false)
-        {
-            var shouldBeUpdated = Patterns == null;
-
-            if (shouldBeUpdated || force)
-            {
-                Patterns = SearchHelperDataSource.GetAllUnusedPatterns();
-
-                foreach (var pattern in Patterns)
-                {
-                    if (pattern.Path.StartsWith("Packages"))
-                    {
-                        pattern.Name = "Default: " + Path.GetFileName(Path.GetDirectoryName(pattern.Path)) + "/" + Path.GetFileNameWithoutExtension(pattern.Path);
-                        continue;
-                    }
-
-                    pattern.Name = Path.GetFileName(Path.GetDirectoryName(pattern.Path)) + "/" + Path.GetFileNameWithoutExtension(pattern.Path);
-                }
-            }
         }
 
         private void ShowContextMenu(ObjectContext context)

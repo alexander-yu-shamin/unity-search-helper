@@ -109,6 +109,12 @@ namespace SearchHelper.Editor.UI
 
         private void OnEnable()
         {
+            Debug.Log("Init");
+            foreach (var (toolType, tool) in ToolMap)
+            {
+                tool.Init();
+            }
+
             SearchHelperService.OnAssetChanged += AssetChangedHandler;
         }
 
