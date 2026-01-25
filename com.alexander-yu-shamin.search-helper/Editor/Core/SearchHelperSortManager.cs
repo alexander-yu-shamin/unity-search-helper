@@ -4,7 +4,6 @@ using System.Linq;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
 
-
 namespace SearchHelper.Editor.Core
 {
     public enum SortVariant
@@ -79,7 +78,8 @@ namespace SearchHelper.Editor.Core
                 case SortVariant.ByPath:
                     return objectContexts.OrderBy(el => el.Path);
                 case SortVariant.Natural:
-                    return objectContexts.OrderBy(el => el.Object?.name, Comparer<string>.Create(EditorUtility.NaturalCompare));
+                    return objectContexts.OrderBy(el => el.Object?.name,
+                        Comparer<string>.Create(EditorUtility.NaturalCompare));
                 case SortVariant.ByCount:
                     return objectContexts.OrderByDescending(el => el.Dependencies.Count);
                 case SortVariant.NoSorting:
@@ -109,8 +109,5 @@ namespace SearchHelper.Editor.Core
                     break;
             }
         }
-
-
-        
     }
 }

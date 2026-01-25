@@ -31,6 +31,7 @@ namespace SearchHelper.Editor
         }
 
         #region Settings
+
         protected virtual bool IsScopeRulesSupported { get; set; } = false;
         protected virtual bool IsFilterRuleSupported { get; set; } = true;
         protected virtual bool IsFilterStringSupported { get; set; } = true;
@@ -43,6 +44,7 @@ namespace SearchHelper.Editor
         protected virtual bool IsEmptyDependencyShown { get; set; } = true;
         protected virtual bool IsCacheUsed { get; set; } = true;
         protected virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
+
         #endregion
 
         protected const float RowHeight = 20.0f;
@@ -112,9 +114,6 @@ namespace SearchHelper.Editor
 
         #region Data
 
-        
-
-
         protected void UpdateData(IEnumerable<ObjectContext> contexts = null)
         {
             contexts ??= Data;
@@ -140,6 +139,7 @@ namespace SearchHelper.Editor
 
             SortManager?.Sort(contexts);
         }
+
         protected virtual bool ShouldBeShown(ObjectContext objectContext, ObjectContext parentContext = null)
         {
             if (objectContext.IsFolder && !IsFoldersShown)
@@ -162,6 +162,7 @@ namespace SearchHelper.Editor
         {
             UpdateData();
         }
+
         #endregion
 
         #region DrawFunctions
@@ -781,13 +782,13 @@ namespace SearchHelper.Editor
 
             menu.AddItem(new GUIContent("Copy/Path"), false, () => { CopyToClipboard(context.Path); });
             menu.AddItem(new GUIContent("Copy/GUID"), false, () => { CopyToClipboard(context.Guid); });
-            menu.AddItem(new GUIContent("Copy/Type"), false,
-                () => { CopyToClipboard(context.Object.GetType().Name); });
+            menu.AddItem(new GUIContent("Copy/Type"), false, () => { CopyToClipboard(context.Object.GetType().Name); });
 
             if (!context.Dependencies.IsNullOrEmpty())
             {
                 menu.AddItem(new GUIContent("Select All in Project"), false, () => { SelectAll(context); });
-                menu.AddItem(new GUIContent("Select Dependencies in Project"), false, () => { SelectDependencies(context); });
+                menu.AddItem(new GUIContent("Select Dependencies in Project"), false,
+                    () => { SelectDependencies(context); });
                 menu.AddItem(new GUIContent("Copy/Dependency Paths"), false,
                     () =>
                     {

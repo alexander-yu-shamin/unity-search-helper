@@ -29,7 +29,8 @@ namespace SearchHelper.Editor.Core
 
         public override string ToString()
         {
-            return $"Mode: {Mode}; Target: {Target}; Patterns: {string.Join(" | ", Patterns.IsNullOrEmpty() ? string.Empty : Patterns)}";
+            return
+                $"Mode: {Mode}; Target: {Target}; Patterns: {string.Join(" | ", Patterns.IsNullOrEmpty() ? string.Empty : Patterns)}";
         }
     }
 
@@ -37,7 +38,7 @@ namespace SearchHelper.Editor.Core
     {
         public FilterRuleMode Mode { get; }
         public ObjectContextTarget Target { get; }
-        public Regex Regex { get;}
+        public Regex Regex { get; }
 
         public bool IsMatch(ObjectContext context)
         {
@@ -63,9 +64,11 @@ namespace SearchHelper.Editor.Core
     public class SearchHelperFilterManager
     {
         #region FilterRule
+
         public ResourceData<SearchHelperFilterRules> CurrentFilterRule { get; private set; }
         public List<ResourceData<SearchHelperFilterRules>> FilterRules { get; private set; } = new();
         protected List<CompiledFilterRule> CompiledFilterRules { get; set; }
+
         #endregion
 
         #region FilterString
@@ -73,6 +76,7 @@ namespace SearchHelper.Editor.Core
         public ObjectContextTarget CurrentFilterByStringTarget { get; private set; } = ObjectContextTarget.Path;
         public FilterRuleMode CurrentFilterByStringMode { get; private set; } = FilterRuleMode.Include;
         public string CurrentFilterString { get; private set; }
+
         #endregion
 
         protected Action OnFilterChanged { get; set; }
@@ -160,6 +164,7 @@ namespace SearchHelper.Editor.Core
         #endregion
 
         #region FilterRule
+
         public void SelectFilterRule(ResourceData<SearchHelperFilterRules> resource)
         {
             if (resource == null || resource.Data == null || resource.Data.FilterRules.IsNullOrEmpty())
@@ -241,6 +246,7 @@ namespace SearchHelper.Editor.Core
                             + Path.GetFileNameWithoutExtension(rule.Path);
             }
         }
+
         #endregion
     }
 }
