@@ -15,7 +15,7 @@ namespace SearchHelper.Editor.Tools
     public class MergeTool : ToolBase
     {
         protected override bool IsShowingFoldersSupported { get; set; } = false;
-        protected override bool IsFilteringSupported { get; set; } = false;
+        protected override bool IsFilterRuleSupported { get; set; } = false;
         protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
         protected override string EmptyObjectContextText { get; set; } = "This object is not referenced anywhere in the project.";
 

@@ -35,9 +35,9 @@ namespace SearchHelper.Editor.Core
 
     public class CompiledFilterRule
     {
-        public FilterRuleMode Mode { get; set; }
-        public ObjectContextTarget Target { get; set; }
-        public Regex Regex { get; set; }
+        public FilterRuleMode Mode { get; }
+        public ObjectContextTarget Target { get; }
+        public Regex Regex { get;}
 
         public bool IsMatch(ObjectContext context)
         {
@@ -125,54 +125,6 @@ namespace SearchHelper.Editor.Core
             }
 
             return included;
-
-
-
-            //var hasIncludeRules = CurrentFilterByStringMode == FilterRuleMode.Include;
-            //var included = !hasIncludeRules;
-            //if (!string.IsNullOrEmpty(CurrentFilterString))
-            //{
-            //    if (context.GetTarget(CurrentFilterByStringTarget)
-            //               .Contains(CurrentFilterString, StringComparison.InvariantCultureIgnoreCase))
-            //    {
-            //        if (CurrentFilterByStringMode == FilterRuleMode.Include)
-            //        {
-            //            included = true;
-            //        }
-            //        else
-            //        {
-            //            return false;
-            //        }
-            //    }
-            //}
-
-            //if (CompiledFilterRules.IsNullOrEmpty())
-            //{
-            //    return true;
-            //}
-
-            //hasIncludeRules |= CompiledFilterRules.Any(r => r.Mode == FilterRuleMode.Include);
-            //included |= !hasIncludeRules;
-            //for (var index = 0; index < CompiledFilterRules.Count; index++)
-            //{
-            //    var rule = CompiledFilterRules[index];
-            //    if (!rule.IsMatch(context))
-            //    {
-            //        continue;
-            //    }
-
-            //    if (rule.Mode == FilterRuleMode.Exclude)
-            //    {
-            //        return false;
-            //    }
-
-            //    if (rule.Mode == FilterRuleMode.Include)
-            //    {
-            //        included = true;
-            //    }
-            //}
-
-            //return included;
         }
 
         #region FilterString
@@ -249,6 +201,14 @@ namespace SearchHelper.Editor.Core
         public void UpdateFilterRules()
         {
             FilterRules = LoadRulesFromDisk();
+        }
+
+        public void UpdateFilterRulesIfEmpty()
+        {
+            if (FilterRules.IsNullOrEmpty())
+            {
+                UpdateFilterRules();
+            }
         }
 
         private List<ResourceData<SearchHelperFilterRules>> LoadRulesFromDisk()

@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using SearchHelper.Editor.Core;
 using SearchHelper.Editor.Tools;
 using UnityEditor;
@@ -109,8 +107,7 @@ namespace SearchHelper.Editor.UI
 
         private void OnEnable()
         {
-            Debug.Log("Init");
-            foreach (var (toolType, tool) in ToolMap)
+            foreach (var (_, tool) in ToolMap)
             {
                 tool.Init();
             }
@@ -127,6 +124,7 @@ namespace SearchHelper.Editor.UI
         {
             OpenWindow()?.SelectTool(toolType).GetDataFromAnotherTool(context);
         }
+
         public static void TransferToTool(ToolType toolType, IEnumerable<ObjectContext> contexts)
         {
             OpenWindow()?.SelectTool(toolType).GetDataFromAnotherTool(contexts);
