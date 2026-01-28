@@ -15,36 +15,68 @@ namespace SearchHelper.Editor.Core
         Natural
     }
 
+    public enum SortOrder
+    {
+        Ascending,
+        Descending
+    }
+
     public class SearchHelperSortManager
     {
         public SortVariant CurrentSortVariant { get; private set; } = SortVariant.NoSorting;
-        public bool ShouldMainObjectsBeSorted { get; private set; }
-        public HashSet<SortVariant> PossibleSortVariants { get; private set; }
+        public SortOrder CurrentSortOrder { get; private set; } = SortOrder.Descending;
+
+        private bool _shouldBeMainObjectBeSorted = true;
+
+        public bool ShouldMainObjectsBeSorted
+        {
+            get => _shouldBeMainObjectBeSorted;
+            set
+            {
+                _shouldBeMainObjectBeSorted = value;
+                UpdateData();
+            }
+        }
+
+        public SortVariant[] PossibleSortVariants { get; private set; } = new[]
+        {
+            SortVariant.NoSorting,
+            SortVariant.ByName,
+            SortVariant.ByPath,
+            SortVariant.ByCount,
+            SortVariant.Natural
+        };
+
+        public SortOrder[] PossibleSortOrders { get; private set; } = new[]
+        {
+            SortOrder.Descending,
+            SortOrder.Ascending
+        };
+        
         private Action OnFilterChanged { get; set; }
 
         public SearchHelperSortManager(Action onFilterChanged)
         {
-            PossibleSortVariants = new HashSet<SortVariant>(Enum.GetValues(typeof(SortVariant)).Cast<SortVariant>());
             OnFilterChanged = onFilterChanged;
         }
 
         public bool Sort(IEnumerable<ObjectContext> data)
         {
-            if (data.IsNullOrEmpty())
-            {
-                return false;
-            }
-
             if (CurrentSortVariant == SortVariant.NoSorting)
             {
                 return true;
+            }
+
+            if (data.IsNullOrEmpty())
+            {
+                return false;
             }
 
             if (ShouldMainObjectsBeSorted)
             {
                 if (data is List<ObjectContext> list)
                 {
-                    SortInPlace(list, CurrentSortVariant);
+                    SortInPlace(list, CurrentSortVariant, CurrentSortOrder);
                 }
             }
 
@@ -52,11 +84,7 @@ namespace SearchHelper.Editor.Core
             {
                 if (context.Dependencies is List<ObjectContext> list)
                 {
-                    SortInPlace(list, CurrentSortVariant);
-                }
-                else
-                {
-                    context.Dependencies = OrderBy(context.Dependencies, CurrentSortVariant).ToList();
+                    SortInPlace(list, CurrentSortVariant, CurrentSortOrder);
                 }
             }
 
@@ -65,49 +93,76 @@ namespace SearchHelper.Editor.Core
 
         public void Select(SortVariant sortVariant)
         {
+            if (CurrentSortVariant == sortVariant)
+            {
+                return;
+            }
+
             CurrentSortVariant = sortVariant;
+            UpdateData();
+        }
+
+        public void Select(SortOrder sortOrder)
+        {
+            if (CurrentSortOrder == sortOrder)
+            {
+                return;
+            }
+
+            CurrentSortOrder = sortOrder;
+            UpdateData();
+        }
+
+        private void UpdateData()
+        {
             OnFilterChanged?.Invoke();
         }
 
-        private IEnumerable<ObjectContext> OrderBy(IEnumerable<ObjectContext> objectContexts, SortVariant sortVariant)
+        private void SortInPlace(List<ObjectContext> list, SortVariant sortVariant, SortOrder sortOrder)
         {
-            switch (sortVariant)
+            if (sortVariant == SortVariant.NoSorting)
             {
-                case SortVariant.ByName:
-                    return objectContexts.OrderBy(el => el.Object?.name);
-                case SortVariant.ByPath:
-                    return objectContexts.OrderBy(el => el.Path);
-                case SortVariant.Natural:
-                    return objectContexts.OrderBy(el => el.Object?.name,
-                        Comparer<string>.Create(EditorUtility.NaturalCompare));
-                case SortVariant.ByCount:
-                    return objectContexts.OrderByDescending(el => el.Dependencies.Count);
-                case SortVariant.NoSorting:
-                default:
-                    return objectContexts;
+                return;
             }
+
+            var target = ToTarget(sortVariant);
+
+            Comparison<ObjectContext> comparison = sortVariant switch
+            {
+                SortVariant.ByName or SortVariant.ByPath => (a, b) =>
+                    string.CompareOrdinal(a.GetTarget(target), b.GetTarget(target)),
+
+                SortVariant.ByCount => (a, b) => a.Dependencies.Count.CompareTo(b.Dependencies.Count),
+
+                SortVariant.Natural => (a, b) => EditorUtility.NaturalCompare(a.GetTarget(target), b.GetTarget(target)),
+
+                _ => null
+            };
+
+            if (comparison == null)
+            {
+                return;
+            }
+
+            if (sortOrder == SortOrder.Descending)
+            {
+                var baseComparison = comparison;
+                comparison = (a, b) => baseComparison(b, a);
+            }
+
+            list.Sort(comparison);
         }
 
-        private void SortInPlace(List<ObjectContext> list, SortVariant sortVariant)
+        private ObjectContextTarget ToTarget(SortVariant sortVariant)
         {
-            switch (sortVariant)
+            return sortVariant switch
             {
-                case SortVariant.ByName:
-                    list.Sort((a, b) => string.Compare(a.Object?.name, b.Object?.name, StringComparison.Ordinal));
-                    break;
-                case SortVariant.ByPath:
-                    list.Sort((a, b) => string.Compare(a.Path, b.Path, StringComparison.Ordinal));
-                    break;
-                case SortVariant.Natural:
-                    list.Sort((a, b) => EditorUtility.NaturalCompare(a.Object?.name, b.Object?.name));
-                    break;
-                case SortVariant.ByCount:
-                    list.Sort((a, b) => b.Dependencies.Count.CompareTo(a.Dependencies.Count));
-                    break;
-                case SortVariant.NoSorting:
-                default:
-                    break;
-            }
+                SortVariant.ByName                           => ObjectContextTarget.Name,
+                SortVariant.ByPath                           => ObjectContextTarget.Path,
+                SortVariant.Natural                          => ObjectContextTarget.Path,
+                SortVariant.NoSorting or SortVariant.ByCount => ObjectContextTarget.NoTarget,
+                _                                            => ObjectContextTarget.NoTarget
+            };
         }
     }
 }

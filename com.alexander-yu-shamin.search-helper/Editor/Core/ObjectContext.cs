@@ -17,11 +17,11 @@ namespace SearchHelper.Editor
     
     public enum ObjectContextTarget
     {
+        NoTarget,
         Path,
         Name,
         Type,
     }
-
 
     public class ObjectContext
     {
@@ -217,13 +217,9 @@ namespace SearchHelper.Editor
                 ObjectContextTarget.Path => Path,
                 ObjectContextTarget.Name => Object != null ? Object.name : string.Empty,
                 ObjectContextTarget.Type => Object != null ? Object.GetType().Name : string.Empty,
+                ObjectContextTarget.NoTarget => string.Empty,
                 _                        => throw new ArgumentOutOfRangeException(nameof(target), target, null)
             };
-        }
-
-        public void UpdateSize()
-        {
-
         }
     }
 }

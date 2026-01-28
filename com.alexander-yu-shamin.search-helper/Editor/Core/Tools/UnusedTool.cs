@@ -11,7 +11,6 @@ namespace SearchHelper.Editor.Tools
 {
     public class UnusedTool : ToolBase
     {
-        protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
         protected override bool IsScopeRulesSupported { get; set; } = true;
         protected override bool IsSizeShowingSupported { get; set; } = true;
 
@@ -133,33 +132,33 @@ namespace SearchHelper.Editor.Tools
             return contexts;
         }
 
-        protected override bool ShouldBeShown(ObjectContext objectContext, ObjectContext parentContext = null)
-        {
-            var isTopLevel = parentContext == null;
+        //protected override bool ShouldBeShown(ObjectContext objectContext, ObjectContext parentContext = null)
+        //{
+        //    var isTopLevel = parentContext == null;
 
-            if (!isTopLevel)
-            {
-                if (!ShowUsedItems)
-                {
-                    return false;
-                }
-            }
-            else
-            {
-                var hasDependencies = objectContext.Dependencies.Count != 0;
-                if (hasDependencies && !ShowUsedItems)
-                {
-                    return false;
-                }
+        //    if (!isTopLevel)
+        //    {
+        //        if (!ShowUsedItems)
+        //        {
+        //            return false;
+        //        }
+        //    }
+        //    else
+        //    {
+        //        var hasDependencies = objectContext.Dependencies.Count != 0;
+        //        if (hasDependencies && !ShowUsedItems)
+        //        {
+        //            return false;
+        //        }
 
-                if (!hasDependencies && !ShowUnusedItems)
-                {
-                    return false;
-                }
-            }
+        //        if (!hasDependencies && !ShowUnusedItems)
+        //        {
+        //            return false;
+        //        }
+        //    }
 
-            return base.ShouldBeShown(objectContext, parentContext);
-        }
+        //    return base.ShouldBeShown(objectContext, parentContext);
+        //}
 
         private void RemovedUnusedItems()
         {

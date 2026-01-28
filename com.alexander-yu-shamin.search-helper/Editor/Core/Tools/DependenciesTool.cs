@@ -31,9 +31,9 @@ namespace SearchHelper.Editor.Tools
                 DrawHeaderControls();
             });
 
-            DrawModel ??= new Model()
+            DrawModel = new Model()
             {
-                DrawObjectWithEmptyDependencies = true
+                DrawObjectWithEmptyDependencies = IsEmptyDependencyShown
             };
 
             EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));

@@ -14,7 +14,6 @@ namespace SearchHelper.Editor.Tools
     public class DuplicatesTool : ToolBase
     {
         protected override bool IsShowingFoldersSupported { get; set; } = false;
-        protected override bool ShouldMainObjectsBeSorted { get; set; } = true;
         protected override bool IsSizeShowingSupported { get; set; } = true;
 
         private Object SelectedObject { get; set; }

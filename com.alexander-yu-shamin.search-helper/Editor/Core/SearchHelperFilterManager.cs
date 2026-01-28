@@ -77,6 +77,18 @@ namespace SearchHelper.Editor.Core
         public FilterRuleMode CurrentFilterByStringMode { get; private set; } = FilterRuleMode.Include;
         public string CurrentFilterString { get; private set; }
 
+        public ObjectContextTarget[] PossibleObjectContextTargets { get; private set; } = new[]
+        {
+            ObjectContextTarget.Path,
+            ObjectContextTarget.Name,
+            ObjectContextTarget.Type,
+        };
+
+        public FilterRuleMode[] PossibleFilterRuleModes { get; private set; } = new[]
+        {
+            FilterRuleMode.Include,
+            FilterRuleMode.Exclude,
+        };
         #endregion
 
         protected Action OnFilterChanged { get; set; }
@@ -88,32 +100,45 @@ namespace SearchHelper.Editor.Core
 
         public bool IsAllowed(ObjectContext context, ObjectContext parent = null)
         {
-            var hasIncludeRules =
-                (CurrentFilterByStringMode == FilterRuleMode.Include && !string.IsNullOrEmpty(CurrentFilterString))
-                || (CompiledFilterRules?.Any(r => r.Mode == FilterRuleMode.Include) ?? false);
+            if (!IsAllowedByFilterRules(context, parent))
+            {
+                return false;
+            }
 
-            var included = !hasIncludeRules;
+            return IsAllowedByFilterString(context, parent);
+        }
 
+        private bool IsAllowedByFilterString(ObjectContext context, ObjectContext parent)
+        {
             if (!string.IsNullOrEmpty(CurrentFilterString))
             {
                 var value = context.GetTarget(CurrentFilterByStringTarget);
 
-                if (value != null && value.Contains(CurrentFilterString, StringComparison.InvariantCultureIgnoreCase))
-                {
-                    if (CurrentFilterByStringMode == FilterRuleMode.Exclude)
-                    {
-                        return false;
-                    }
+                var matches = value != null
+                              && value.Contains(CurrentFilterString, StringComparison.InvariantCultureIgnoreCase);
 
-                    included = true;
+                if (CurrentFilterByStringMode == FilterRuleMode.Include)
+                {
+                    return matches;
                 }
+
+                return !matches;
             }
 
+            return true;
+        }
+
+        private bool IsAllowedByFilterRules(ObjectContext context, ObjectContext parent)
+        {
             if (!CompiledFilterRules.IsNullOrEmpty())
             {
+                var hasIncludeRules = CompiledFilterRules.Any(r => r.Mode == FilterRuleMode.Include);
+                var includedByRules = !hasIncludeRules;
+
                 for (var i = 0; i < CompiledFilterRules.Count; i++)
                 {
                     var rule = CompiledFilterRules[i];
+
                     if (!rule.IsMatch(context))
                     {
                         continue;
@@ -124,11 +149,21 @@ namespace SearchHelper.Editor.Core
                         return false;
                     }
 
-                    included = true;
+                    includedByRules = true;
+                }
+
+                if (!includedByRules)
+                {
+                    return false;
                 }
             }
 
-            return included;
+            return true;
+        }
+
+        private void UpdateData()
+        {
+            OnFilterChanged?.Invoke();
         }
 
         #region FilterString
@@ -157,7 +192,7 @@ namespace SearchHelper.Editor.Core
 
             if (updated)
             {
-                OnFilterChanged?.Invoke();
+                UpdateData();
             }
         }
 
@@ -187,20 +222,20 @@ namespace SearchHelper.Editor.Core
                 }
             }
 
-            CurrentFilterRule.Data.OnDataChanged += OnFilterChanged;
-            OnFilterChanged?.Invoke();
+            CurrentFilterRule.Data.OnDataChanged += UpdateData;
+            UpdateData();
         }
 
         public void UnselectFilterRule()
         {
             if (CurrentFilterRule != null && CurrentFilterRule.Data != null)
             {
-                CurrentFilterRule.Data.OnDataChanged -= OnFilterChanged;
+                CurrentFilterRule.Data.OnDataChanged -= UpdateData;
             }
 
             CurrentFilterRule = null;
             CompiledFilterRules = null;
-            OnFilterChanged?.Invoke();
+            UpdateData();
         }
 
         public void UpdateFilterRules()
