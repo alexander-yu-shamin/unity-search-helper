@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using SearchHelper.Editor.Core;
 using Toolkit.Editor.Helpers.IMGUI;
 using UnityEditor;
@@ -13,13 +12,13 @@ namespace SearchHelper.Editor.Tools
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
 
-        private List<ObjectContext> Contexts { get; set; }
-        protected override IEnumerable<ObjectContext> Data => Contexts;
+        private List<Asset> Contexts { get; set; }
+        protected override IEnumerable<Asset> Assets => Contexts;
         protected override string EmptyObjectContextText
         {
             get
             {
-                if (IsScopeRulesSupported)
+                if (AreScopeRulesSupported)
                 {
                     if (IsGlobalScope)
                     {
@@ -37,8 +36,6 @@ namespace SearchHelper.Editor.Tools
             }
         } 
 
-
-        private Model DrawModel { get; set; }
         public override void Draw(Rect windowRect)
         {
             EGuiKit.Horizontal(() =>
@@ -55,12 +52,7 @@ namespace SearchHelper.Editor.Tools
                 DrawHeaderControls();
             });
 
-            DrawModel ??= new Model()
-            {
-                DrawObjectWithEmptyDependencies = true
-            };
-
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
         }
 
         public override void Run(Object selectedObject)
@@ -80,7 +72,7 @@ namespace SearchHelper.Editor.Tools
             Contexts = FindUsedBy(SelectedObject);
         }
 
-        private List<ObjectContext> FindUsedBy(Object obj)
+        private List<Asset> FindUsedBy(Object obj)
         {
             if (obj == null)
             {
@@ -92,11 +84,11 @@ namespace SearchHelper.Editor.Tools
 
             if (searchedCtx.IsFolder)
             {
-                IsFoldersShown = true;
+                ShowFolders = true;
             }
 
-            var contexts = new List<ObjectContext>() { searchedCtx };
-            UpdateData(contexts);
+            var contexts = new List<Asset>() { searchedCtx };
+            UpdateAssets(contexts);
             return contexts;
         }
     }

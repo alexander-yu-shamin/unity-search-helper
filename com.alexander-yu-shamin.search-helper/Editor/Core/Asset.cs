@@ -2,12 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Toolkit.Runtime.Extensions;
 using UnityEditor;
 using Object = UnityEngine.Object;
 
 namespace SearchHelper.Editor
 {
-    public enum ObjectState
+    public enum AssetMergeState
     {
         None,
         BaseObject,
@@ -15,7 +16,7 @@ namespace SearchHelper.Editor
         NotTheSameAsBaseObject
     }
     
-    public enum ObjectContextTarget
+    public enum AssetTarget
     {
         NoTarget,
         Path,
@@ -23,8 +24,34 @@ namespace SearchHelper.Editor
         Type,
     }
 
-    public class ObjectContext
+    [Flags]
+    public enum AssetState
     {
+        None = 0,
+        FilterByRule = 1 << 1,
+        FilterByString = 1 << 2,
+        HideFolders = 1 << 3,
+        Foldout = 1 << 4
+    }
+
+    public class Asset
+    {
+        public bool IsFolder { get; set; }
+        public bool IsSelected { get; set; } = true;
+        public bool IsBaseObject { get; set; } = false;
+        public bool IsMerged { get; set; } = false;
+        public AssetMergeState MergeState { get; set; } = AssetMergeState.None;
+
+        public List<Asset> Dependencies;
+
+        public AssetState State { get; set; } = AssetState.Foldout;
+
+        public bool IsFoldout
+        {
+            get => (State & AssetState.Foldout) != 0;
+            set => State = value ? State | AssetState.Foldout : State & ~AssetState.Foldout;
+        }
+
         private Object _object;
         public Object Object 
         {
@@ -102,30 +129,18 @@ namespace SearchHelper.Editor
             }
         }
 
-        public bool IsFolder { get; set; }
-        public bool IsSelected { get; set; } = true;
-        public bool IsBaseObject { get; set; } = false;
-        public bool IsMerged { get; set; } = false;
-        public ObjectState State { get; set; } = ObjectState.None;
-
-        public List<ObjectContext> Dependencies;
-
-        public bool IsExpanded { get; set; } = true;
-
-        public bool ShouldBeShown { get; set; } = true;
-
-        public ObjectContext()
+        public Asset()
         {
         }
 
-        public ObjectContext(ObjectContext context)
+        public Asset(Asset context)
         {
             _guid = context._guid;
             _object = context._object;
             _path = context._path;
         }
 
-        public static ObjectContext ToObjectContext(Object obj)
+        public static Asset ToObjectContext(Object obj)
         {
             if (obj == null)
             {
@@ -134,16 +149,16 @@ namespace SearchHelper.Editor
 
             var path = AssetDatabase.GetAssetPath(obj);
 
-            return new ObjectContext()
+            return new Asset()
             {
                 Object = obj,
                 Path = path,
                 IsFolder = AssetDatabase.IsValidFolder(path),
-                Dependencies = new List<ObjectContext>(),
+                Dependencies = new List<Asset>(),
             };
         }
 
-        public static IEnumerable<ObjectContext> ToObjectContexts(IEnumerable<Object> objects, Object mainObject = null)
+        public static IEnumerable<Asset> ToObjectContexts(IEnumerable<Object> objects, Object mainObject = null)
         {
             if (objects == null)
             {
@@ -158,22 +173,22 @@ namespace SearchHelper.Editor
             return objects.Select(ToObjectContext);
         }
         
-        public static ObjectContext FromPath(string path)
+        public static Asset FromPath(string path)
         {
             if (string.IsNullOrEmpty(path))
             {
                 return null;
             }
 
-            return new ObjectContext()
+            return new Asset()
             {
                 Path = path,
                 IsFolder = AssetDatabase.IsValidFolder(path),
-                Dependencies = new List<ObjectContext>(),
+                Dependencies = new List<Asset>(),
             };
         }
 
-        public static string FormatFileSize(long bytes)
+        private static string FormatFileSize(long bytes)
         {
             if (bytes == 0)
             {
@@ -210,14 +225,14 @@ namespace SearchHelper.Editor
             return $"{(bytes / (1024.0 * 1024 * 1024 * 1024)):0.##} TB";
         }
 
-        public string GetTarget(ObjectContextTarget target)
+        public string GetTarget(AssetTarget target)
         {
             return target switch
             {
-                ObjectContextTarget.Path => Path,
-                ObjectContextTarget.Name => Object != null ? Object.name : string.Empty,
-                ObjectContextTarget.Type => Object != null ? Object.GetType().Name : string.Empty,
-                ObjectContextTarget.NoTarget => string.Empty,
+                AssetTarget.Path => Path,
+                AssetTarget.Name => Object != null ? Object.name : string.Empty,
+                AssetTarget.Type => Object != null ? Object.GetType().Name : string.Empty,
+                AssetTarget.NoTarget => string.Empty,
                 _                        => throw new ArgumentOutOfRangeException(nameof(target), target, null)
             };
         }

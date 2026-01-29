@@ -14,63 +14,63 @@ namespace SearchHelper.Editor.Tools
 {
     public class MergeTool : ToolBase
     {
-        protected override bool IsShowingFoldersSupported { get; set; } = false;
-        protected override bool IsFilterRulesSupported { get; set; } = false;
+        protected override bool AreShowingFoldersSupported { get; set; } = false;
+        protected override bool AreFilterByRuleSupported { get; set; } = false;
         protected override string EmptyObjectContextText { get; set; } = "This object is not referenced anywhere in the project.";
 
-        private ObjectContext BaseObject { get; set; }
-        private List<ObjectContext> Contexts { get; set; } = new();
+        private Asset BaseObject { get; set; }
+        private List<Asset> Contexts { get; set; } = new();
         private Model DrawModel { get; set; }
         private bool ShowDependents { get; set; } = false;
 
         private readonly HashSet<string> _defaultLines = new() { "assetBundleName", "assetBundleVariant", "SpriteID", "userData" };
         private HashSet<string> IgnoredLines { get; set; } = new HashSet<string>();
 
-        protected override IEnumerable<ObjectContext> Data => Contexts;
+        protected override IEnumerable<Asset> Assets => Contexts;
 
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
         {
             using var measure = Profiler.Measure("AssetChanged");
-            foreach (var context in Contexts)
+            foreach (var asset in Contexts)
             {
-                if (context.Object != null)
+                if (asset.Object != null)
                 {
-                    context.IsMerged = false;
+                    asset.IsMerged = false;
                 }
             }
 
             CompareWithBaseObject(Contexts);
         }
 
-        public override void GetDataFromAnotherTool(ObjectContext context)
+        public override void GetDataFromAnotherTool(Asset asset)
         {
-            if (context == null)
+            if (asset == null)
             {
                 return;
             }
 
-            if (context.Dependencies.IsNullOrEmpty())
+            if (asset.Dependencies.IsNullOrEmpty())
             {
                 return;
             }
 
             BaseObject = null;
-            Contexts = new List<ObjectContext>();
+            Contexts = new List<Asset>();
 
-            if (Contexts.Contains(context))
+            if (Contexts.Contains(asset))
             {
                 return;
             }
 
-            if (Contexts.Any(element => element.Path == context.Path))
+            if (Contexts.Any(element => element.Path == asset.Path))
             {
                 return;
             }
 
-            AddObjectToMergeAsBase(context.Object);
+            AddObjectToMergeAsBase(asset.Object);
 
-            foreach (var dependency in context.Dependencies.Where(dependency => dependency.Path != context.Path))
+            foreach (var dependency in asset.Dependencies.Where(dependency => dependency.Path != asset.Path))
             {
                 AddObjectToMergeAsTheirs(dependency.Object);
             }
@@ -92,7 +92,7 @@ namespace SearchHelper.Editor.Tools
                 DrawSelectButton();
 
                 EGuiKit.FlexibleSpace();
-                EGuiKit.Button(BaseObject != null && BaseObject.ShouldBeShown && !Contexts.IsNullOrEmpty(), "Merge", () =>
+                EGuiKit.Button(BaseObject != null && IsMainAssetVisible(BaseObject) && !Contexts.IsNullOrEmpty(), "Merge", () =>
                 {
                     Merge(BaseObject, Contexts, IsCacheUsed);
                 });
@@ -198,26 +198,26 @@ namespace SearchHelper.Editor.Tools
                 menu.AddItem(new GUIContent("Select All"), false,
                     () =>
                     {
-                        Contexts.ForEach(context => context.IsSelected = context.ShouldBeShown);
+                        Contexts.ForEach(asset => asset.IsSelected = IsMainAssetVisible(asset));
                     });
 
                 menu.AddItem(new GUIContent("Unselect All"), false,
                     () =>
                     {
-                        Contexts.ForEach(context => context.IsSelected = false);
+                        Contexts.ForEach(asset => asset.IsSelected = false);
                     });
 
                 menu.AddItem(new GUIContent("Select Similar"), false,
                     () =>
                     {
-                        Contexts.ForEach(context => context.IsSelected = context.State == ObjectState.SameAsBaseObject && context.ShouldBeShown);
+                        Contexts.ForEach(asset => asset.IsSelected = asset.MergeState == AssetMergeState.SameAsBaseObject && IsMainAssetVisible(asset));
                     });
 
                 menu.ShowAsContext();
             }
         }
 
-        private void Merge(ObjectContext baseObject, List<ObjectContext> contexts, bool isCacheUsed)
+        private void Merge(Asset baseObject, List<Asset> contexts, bool isCacheUsed)
         {
             using var measure = Profiler.Measure("Merge");
             if (contexts.IsNullOrEmpty())
@@ -234,32 +234,33 @@ namespace SearchHelper.Editor.Tools
 
             var dependencyMap = SearchHelperService.BuildDependencyMap(useCache: isCacheUsed);
 
-            foreach (var context in contexts.Where(context => context is { IsBaseObject: false, IsSelected: true, ShouldBeShown: true }))
+            //foreach (var asset in contexts.Where(asset => asset is { IsBaseObject: false, IsSelected: true, IsVisible: true }))
+            foreach (var asset in contexts.Where(asset => asset is { IsBaseObject: false, IsSelected: true }))
             {
-                List<ObjectContext> dependencies = null;
-                if (!dependencyMap.TryGetValue(context.Path, out dependencies))
+                List<Asset> dependencies = null;
+                if (!dependencyMap.TryGetValue(asset.Path, out dependencies))
                 {
-                    dependencies = SearchHelperService.FindUsedBy(context.Object, isCacheUsed)?.Dependencies;
+                    dependencies = SearchHelperService.FindUsedBy(asset.Object, isCacheUsed)?.Dependencies;
                 }
 
                 if(dependencies == null)
                 {
-                    Debug.LogError($"Can't find dependencies for {context.Path}");
+                    Debug.LogError($"Can't find dependencies for {asset.Path}");
                     continue;
                 }
 
-                Merge(baseObject, context, dependencies);
+                Merge(baseObject, asset, dependencies);
 
-                using (Profiler.Measure($"Merge::Delete {context.Path}"))
+                using (Profiler.Measure($"Merge::Delete {asset.Path}"))
                 {
-                    File.Delete(context.Path);
+                    File.Delete(asset.Path);
                 }
 
-                using (Profiler.Measure($"Merge::Delete {context.MetaPath}"))
+                using (Profiler.Measure($"Merge::Delete {asset.MetaPath}"))
                 {
-                    File.Delete(context.MetaPath);
+                    File.Delete(asset.MetaPath);
                 }
-                context.IsMerged = true;
+                asset.IsMerged = true;
             }
 
             AssetDatabase.StopAssetEditing();
@@ -267,12 +268,12 @@ namespace SearchHelper.Editor.Tools
             AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
         }
 
-        private static void Merge(ObjectContext baseObject, ObjectContext theirsObject, List<ObjectContext> dependencies)
+        private static void Merge(Asset baseObject, Asset theirsObject, List<Asset> dependencies)
         {
             using var measure = Profiler.Measure("MergeElement");
             foreach (var dependency in dependencies)
             {
-                var dependencyObject = new ObjectContext(dependency);
+                var dependencyObject = new Asset(dependency);
 
                 if (!string.IsNullOrEmpty(dependencyObject.Path))
                 {
@@ -331,22 +332,22 @@ namespace SearchHelper.Editor.Tools
             EditorUtility.InvokeDiffTool(leftTitle, leftFile, rightTitle, rightFile, null, null);
         }
 
-        private Color GetObjectFieldColor(ObjectContext context)
+        private Color GetObjectFieldColor(Asset asset)
         {
-            if (context.IsMerged)
+            if (asset.IsMerged)
             {
                 return Color.cyan;
             }
 
-            switch (context.State)
+            switch (asset.MergeState)
             {
-                case ObjectState.BaseObject:
+                case AssetMergeState.BaseObject:
                     return Color.yellow;
-                case ObjectState.SameAsBaseObject:
+                case AssetMergeState.SameAsBaseObject:
                     return Color.green;
-                case ObjectState.NotTheSameAsBaseObject:
+                case AssetMergeState.NotTheSameAsBaseObject:
                     return Color.red;
-                case ObjectState.None:
+                case AssetMergeState.None:
                 default:
                     return GUI.color;
             }
@@ -359,9 +360,9 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            Contexts ??= new List<ObjectContext>();
+            Contexts ??= new List<Asset>();
 
-            var newBaseObject = ObjectContext.ToObjectContext(selectedObject);
+            var newBaseObject = Asset.ToObjectContext(selectedObject);
             var validationError = ValidateObjectContext(newBaseObject);
 
             switch (validationError)
@@ -369,11 +370,11 @@ namespace SearchHelper.Editor.Tools
                 case ValidationError.InContexts:
                 {
                     BaseObject.IsBaseObject = false;
-                    BaseObject = Contexts.FirstOrDefault(context => context.Path == newBaseObject.Path);
+                    BaseObject = Contexts.FirstOrDefault(asset => asset.Path == newBaseObject.Path);
                     if (BaseObject != null)
                     {
                         BaseObject.IsBaseObject = true;
-                        BaseObject.State = ObjectState.BaseObject;
+                        BaseObject.MergeState = AssetMergeState.BaseObject;
                     }
                     return;
                 }
@@ -397,13 +398,13 @@ namespace SearchHelper.Editor.Tools
             if (BaseObject != null)
             {
                 BaseObject.IsBaseObject = false;
-                BaseObject.State = ObjectState.None;
+                BaseObject.MergeState = AssetMergeState.None;
                 BaseObject = null;
             }
 
             Contexts.Add(newBaseObject);
             BaseObject = newBaseObject;
-            BaseObject.State = ObjectState.BaseObject;
+            BaseObject.MergeState = AssetMergeState.BaseObject;
             BaseObject.IsBaseObject = true;
             UpdateDependent(BaseObject);
 
@@ -417,9 +418,9 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            Contexts ??= new List<ObjectContext>();
+            Contexts ??= new List<Asset>();
 
-            var mergeObject = ObjectContext.ToObjectContext(selectedObject);
+            var mergeObject = Asset.ToObjectContext(selectedObject);
             var validationError = ValidateObjectContext(mergeObject);
 
             switch (validationError)
@@ -451,12 +452,12 @@ namespace SearchHelper.Editor.Tools
             Contexts.Add(mergeObject);
             CompareWithBaseObject(mergeObject);
             UpdateDependent(mergeObject);
-            UpdateData(Contexts);
+            UpdateAssets(Contexts);
         }
 
-        private void CompareWithBaseObject(ObjectContext context)
+        private void CompareWithBaseObject(Asset asset)
         {
-            if (BaseObject == null || context == null)
+            if (BaseObject == null || asset == null)
             {
                 return;
             }
@@ -467,18 +468,18 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            if (!File.Exists(context.MetaPath))
+            if (!File.Exists(asset.MetaPath))
             {
-                context.State = ObjectState.None;
-                Debug.LogError($"Cannot find theirs metafile [{context.MetaPath}].");
+                asset.MergeState = AssetMergeState.None;
+                Debug.LogError($"Cannot find theirs metafile [{asset.MetaPath}].");
                 return;
             }
 
-            var areMetasEqual = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2, IgnoredLines) == SearchHelperService.GetFileHashSHA256(context.MetaPath, 2, IgnoredLines);
-            context.State = areMetasEqual ? ObjectState.SameAsBaseObject : ObjectState.NotTheSameAsBaseObject;
+            var areMetasEqual = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2, IgnoredLines) == SearchHelperService.GetFileHashSHA256(asset.MetaPath, 2, IgnoredLines);
+            asset.MergeState = areMetasEqual ? AssetMergeState.SameAsBaseObject : AssetMergeState.NotTheSameAsBaseObject;
         }
 
-        private void CompareWithBaseObject(List<ObjectContext> contexts)
+        private void CompareWithBaseObject(List<Asset> contexts)
         {
             if (contexts.IsNullOrEmpty())
             {
@@ -487,7 +488,7 @@ namespace SearchHelper.Editor.Tools
 
             if (BaseObject == null)
             {
-                contexts.ForEach(context => context.State = ObjectState.None);
+                contexts.ForEach(asset => asset.MergeState = AssetMergeState.None);
                 return;
             }
 
@@ -499,37 +500,37 @@ namespace SearchHelper.Editor.Tools
 
             var baseObjectMetaHash = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2, IgnoredLines);
 
-            foreach (var context in contexts)
+            foreach (var asset in contexts)
             {
-                if (!context.Object)
+                if (!asset.Object)
                 {
-                    context.State = ObjectState.None;
+                    asset.MergeState = AssetMergeState.None;
                     continue;
                 }
 
-                if (context.IsMerged)
+                if (asset.IsMerged)
                 {
-                    context.State = ObjectState.None;
+                    asset.MergeState = AssetMergeState.None;
                     continue;
                 }
 
-                if (!File.Exists(context.MetaPath))
+                if (!File.Exists(asset.MetaPath))
                 {
-                    context.State = ObjectState.None;
-                    Debug.LogError($"Cannot find theirs metafile [{context.MetaPath}].");
+                    asset.MergeState = AssetMergeState.None;
+                    Debug.LogError($"Cannot find theirs metafile [{asset.MetaPath}].");
                     continue;
                 }
 
-                if (context.IsBaseObject)
+                if (asset.IsBaseObject)
                 {
-                    context.State = ObjectState.BaseObject;
+                    asset.MergeState = AssetMergeState.BaseObject;
                 }
                 else
                 {
-                    var hash = SearchHelperService.GetFileHashSHA256(context.MetaPath, 2, IgnoredLines);
-                    context.State = hash == baseObjectMetaHash
-                        ? ObjectState.SameAsBaseObject
-                        : ObjectState.NotTheSameAsBaseObject;
+                    var hash = SearchHelperService.GetFileHashSHA256(asset.MetaPath, 2, IgnoredLines);
+                    asset.MergeState = hash == baseObjectMetaHash
+                        ? AssetMergeState.SameAsBaseObject
+                        : AssetMergeState.NotTheSameAsBaseObject;
                 }
             }
         }
@@ -543,32 +544,32 @@ namespace SearchHelper.Editor.Tools
             InContexts,
         }
 
-        private ValidationError ValidateObjectContext(ObjectContext context)
+        private ValidationError ValidateObjectContext(Asset asset)
         {
-            if (context == null)
+            if (asset == null)
             {
                 return ValidationError.Null;
             }
 
-            if (string.IsNullOrEmpty(context.Path))
+            if (string.IsNullOrEmpty(asset.Path))
             {
                 return ValidationError.NotAFile;
             }
 
-            if (!File.Exists(context.Path))
+            if (!File.Exists(asset.Path))
             {
                 return ValidationError.NotAFile;
             }
 
-            if (BaseObject?.Path == context.Path)
+            if (BaseObject?.Path == asset.Path)
             {
-                Debug.LogError($"File {context.Path} is the base object.");
+                Debug.LogError($"File {asset.Path} is the base object.");
                 return ValidationError.BaseObject;
             }
 
-            if (Contexts.Any(ctx => ctx.Path == context.Path))
+            if (Contexts.Any(ctx => ctx.Path == asset.Path))
             {
-                Debug.LogError($"File {context.Path} has already added.");
+                Debug.LogError($"File {asset.Path} has already added.");
                 return ValidationError.InContexts;
             }
 
@@ -577,13 +578,13 @@ namespace SearchHelper.Editor.Tools
 
         private void UpdateDependents()
         {
-            foreach (var context in Contexts)
+            foreach (var asset in Contexts)
             {
-                UpdateDependent(context);
+                UpdateDependent(asset);
             }
         }
 
-        private void UpdateDependent(ObjectContext context)
+        private void UpdateDependent(Asset asset)
         {
             using var measure = Profiler.Measure("UpdateDependent");
             if (!ShowDependents)
@@ -591,28 +592,28 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            if (context == null)
+            if (asset == null)
             {
                 return;
             }
 
-            if (context.Object == null)
+            if (asset.Object == null)
             {
                 return;
             }
 
-            var usedBy = SearchHelperService.FindUsedBy(context.Object, IsCacheUsed);
-            context.Dependencies = usedBy.Dependencies;
+            var usedBy = SearchHelperService.FindUsedBy(asset.Object, IsCacheUsed);
+            asset.Dependencies = usedBy.Dependencies;
         }
 
-        private (string, Color)? GetObjectState(ObjectContext context)
+        private (string, Color)? GetObjectState(Asset asset)
         {
-            if (context.IsMerged)
+            if (asset.IsMerged)
             {
                 return ("Merged", Color.cyan);
             }
 
-            if (context.State == ObjectState.NotTheSameAsBaseObject)
+            if (asset.MergeState == AssetMergeState.NotTheSameAsBaseObject)
             {
                 return ("Meta mismatch", Color.red);
             }
@@ -620,49 +621,49 @@ namespace SearchHelper.Editor.Tools
             return null;
         }
 
-        private void DiffButtonPressedHandler(ObjectContext context)
+        private void DiffButtonPressedHandler(Asset asset)
         {
             var menu = new GenericMenu();
-            menu.AddItem(new GUIContent("Asset"), false, () => { InvokeDiffTool(BaseObject.Path, BaseObject.Path, context.Path, context.Path); });
-            menu.AddItem(new GUIContent("Meta"), false, () => { InvokeDiffTool(BaseObject.MetaPath, BaseObject.MetaPath, context.MetaPath, context.MetaPath); });
+            menu.AddItem(new GUIContent("Asset"), false, () => { InvokeDiffTool(BaseObject.Path, BaseObject.Path, asset.Path, asset.Path); });
+            menu.AddItem(new GUIContent("Meta"), false, () => { InvokeDiffTool(BaseObject.MetaPath, BaseObject.MetaPath, asset.MetaPath, asset.MetaPath); });
             menu.ShowAsContext();
         }
 
-        private void ComparandButtonPressedHandler(ObjectContext context)
+        private void ComparandButtonPressedHandler(Asset asset)
         {
-            if (context.IsBaseObject)
+            if (asset.IsBaseObject)
             {
-                context.IsBaseObject = false;
+                asset.IsBaseObject = false;
                 BaseObject = null;
             }
             else
             {
-                Contexts.ForEach(context =>
+                Contexts.ForEach(asset =>
                 {
-                    context.IsBaseObject = false;
-                    context.State = ObjectState.None;
+                    asset.IsBaseObject = false;
+                    asset.MergeState = AssetMergeState.None;
                 });
-                context.IsBaseObject = true;
-                BaseObject = context;
+                asset.IsBaseObject = true;
+                BaseObject = asset;
             }
 
             CompareWithBaseObject(Contexts);
         }
 
-        private void RemoveButtonPressedHandler(ObjectContext context)
+        private void RemoveButtonPressedHandler(Asset asset)
         {
-            Contexts.RemoveAll(match => match.Path == context.Path);
+            Contexts.RemoveAll(match => match.Path == asset.Path);
         }
 
-        private void SelectedButtonPressedHandler(ObjectContext context)
+        private void SelectedButtonPressedHandler(Asset asset)
         {
-            if (context.IsBaseObject)
+            if (asset.IsBaseObject)
             {
-                context.IsSelected = true;
+                asset.IsSelected = true;
             }
             else
             {
-                context.IsSelected = !context.IsSelected;
+                asset.IsSelected = !asset.IsSelected;
             }
         }
 

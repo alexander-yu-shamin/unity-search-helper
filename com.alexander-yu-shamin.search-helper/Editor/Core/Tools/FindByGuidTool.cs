@@ -13,10 +13,8 @@ namespace SearchHelper.Editor.Tools
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
         private string CurrentUsedObjectGuid { get; set; }
-        private List<ObjectContext> Contexts { get; set; }
-        protected override IEnumerable<ObjectContext> Data => Contexts;
-        private Model DrawModel { get; set; }
-
+        private List<Asset> Contexts { get; set; }
+        protected override IEnumerable<Asset> Assets => Contexts;
         public override void Draw(Rect windowRect)
         {
             EGuiKit.Horizontal(() => 
@@ -78,7 +76,7 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            Contexts = ObjectContext.ToObjectContext(foundObject).AsList();
+            Contexts = Asset.ToObjectContext(foundObject).AsList();
         }
 
         private void DrawContexts(Rect windowRect)
@@ -100,12 +98,7 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            DrawModel ??= new Model()
-            {
-                DrawObjectWithEmptyDependencies = true
-            };
-
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
         }
     }
 }

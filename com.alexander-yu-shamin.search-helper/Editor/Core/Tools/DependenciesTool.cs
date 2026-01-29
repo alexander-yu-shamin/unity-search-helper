@@ -11,9 +11,9 @@ namespace SearchHelper.Editor.Tools
     {
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
-        private List<ObjectContext> Contexts { get; set; }
-        private Model DrawModel { get; set; }
-        protected override IEnumerable<ObjectContext> Data => Contexts;
+
+        private List<Asset> _assets { get; set; }
+        protected override IEnumerable<Asset> Assets => _assets;
 
         public override void Draw(Rect windowRect)
         {
@@ -31,12 +31,7 @@ namespace SearchHelper.Editor.Tools
                 DrawHeaderControls();
             });
 
-            DrawModel = new Model()
-            {
-                DrawObjectWithEmptyDependencies = IsEmptyDependencyShown
-            };
-
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, _assets));
         }
 
         public override void Run(Object selectedObject)
@@ -53,10 +48,10 @@ namespace SearchHelper.Editor.Tools
 
         public override void Run()
         {
-            Contexts = FindDependencies(SelectedObject);
+            _assets = FindDependencies(SelectedObject);
         }
 
-        private List<ObjectContext> FindDependencies(Object obj)
+        private List<Asset> FindDependencies(Object obj)
         {
             if (obj == null)
             {
@@ -64,9 +59,9 @@ namespace SearchHelper.Editor.Tools
             }
 
             UsedObject = obj;
-            var contexts = FolderOrFile(obj).Select(SearchHelperService.FindDependencies).ToList();
-            UpdateData(contexts);
-            return contexts;
+            var assets = FolderOrFile(obj).Select(SearchHelperService.FindDependencies).ToList();
+            UpdateAssets(assets);
+            return assets;
         }
     }
 }

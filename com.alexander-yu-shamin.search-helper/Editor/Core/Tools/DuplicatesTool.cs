@@ -13,16 +13,14 @@ namespace SearchHelper.Editor.Tools
 {
     public class DuplicatesTool : ToolBase
     {
-        protected override bool IsShowingFoldersSupported { get; set; } = false;
-        protected override bool IsSizeShowingSupported { get; set; } = true;
+        protected override bool AreShowingFoldersSupported { get; set; } = false;
+        protected override bool ShowSize { get; set; } = true;
 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
 
-        private List<ObjectContext> Contexts { get; set; }
-        private Model DrawModel { get; set; }
-
-        protected override IEnumerable<ObjectContext> Data => Contexts;
+        private List<Asset> Contexts { get; set; }
+        protected override IEnumerable<Asset> Assets => Contexts;
 
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
@@ -57,12 +55,7 @@ namespace SearchHelper.Editor.Tools
                 DrawHeaderControls();
             });
 
-            DrawModel ??= new Model()
-            {
-                DrawObjectWithEmptyDependencies = true
-            };
-
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
         }
 
         public override void Run(Object selectedObject)
@@ -76,7 +69,7 @@ namespace SearchHelper.Editor.Tools
             Contexts = FindDuplicates(SelectedObject);
         }
 
-        private List<ObjectContext> FindDuplicates(Object obj)
+        private List<Asset> FindDuplicates(Object obj)
         {
             var searchedPath = string.Empty;
 
@@ -143,16 +136,16 @@ namespace SearchHelper.Editor.Tools
             var contexts = 
                 dict.Where(kv => (string.IsNullOrEmpty(searchedHash) || kv.Key == searchedHash) && kv.Value.Count > 1).Select(kv =>
                 {
-                    var ctx = ObjectContext.FromPath(kv.Value.First());
-                    ctx.Dependencies = kv.Value.Select(ObjectContext.FromPath).ToList();
+                    var ctx = Asset.FromPath(kv.Value.First());
+                    ctx.Dependencies = kv.Value.Select(Asset.FromPath).ToList();
                     return ctx;
                 }).ToList();
 
-            UpdateData(contexts);
+            UpdateAssets(contexts);
             return contexts;
         }
 
-        protected override void AddContextMenu(GenericMenu menu, ObjectContext context)
+        protected override void AddContextMenu(GenericMenu menu, Asset context)
         {
             if (context.Dependencies.IsNullOrEmpty())
             {
@@ -165,21 +158,21 @@ namespace SearchHelper.Editor.Tools
             });
         }
 
-        private void TransferToMergeTool(ObjectContext context)
+        private void TransferToMergeTool(Asset asset)
         {
-            if (context == null)
+            if (asset == null)
             {
                 return;
             }
 
-            if (!context.ShouldBeShown)
+            if (!IsMainAssetVisible(asset))
             {
                 return;
             }
 
-            var transferContext = new ObjectContext(context)
+            var transferContext = new Asset(asset)
             {
-                Dependencies = context.Dependencies.Where(dependency => dependency.ShouldBeShown).ToList()
+                Dependencies = asset.Dependencies.Where(IsMainAssetVisible).ToList()
             };
 
             SearchHelperWindow.TransferToTool(SearchHelperWindow.ToolType.MergeTool, transferContext);

@@ -18,7 +18,7 @@ namespace SearchHelper.Editor.Core
         private const string ObjectSearchFilter = "t:Object";
         public static event Action<string[], string[], string[], string[]> OnAssetChanged;
 #if SEARCH_HELPER_ENABLE_CACHING
-        private static Dictionary<string, List<ObjectContext>> DependencyMap { get; set; } = new Dictionary<string, List<ObjectContext>>();
+        private static Dictionary<string, List<Asset>> DependencyMap { get; set; } = new Dictionary<string, List<Asset>>();
         private static bool HasOnlyNames { get; set; } = false;
         private static bool HasFullDependencyMap { get; set; } = false;
 #endif
@@ -41,7 +41,7 @@ namespace SearchHelper.Editor.Core
                 using (Profiler.Measure($"FindAssetPaths:: Caching {root}"))
                 {
                     HasOnlyNames = true;
-                    DependencyMap = assets.ToDictionary(k => k, v => null as List<ObjectContext>);
+                    DependencyMap = assets.ToDictionary(k => k, v => null as List<Asset>);
                 }
             }
 #endif
@@ -63,7 +63,7 @@ namespace SearchHelper.Editor.Core
             return AssetDatabase.FindAssets(searchFilter, GetSearchDirs(root));
         }
 
-        public static ObjectContext FindUsedBy(Object obj, bool useCache = true)
+        public static Asset FindUsedBy(Object obj, bool useCache = true)
         {
             if (obj == null)
             {
@@ -74,7 +74,7 @@ namespace SearchHelper.Editor.Core
 
             AssetDatabase.SaveAssets();
 
-            var searchedCtx = ObjectContext.ToObjectContext(obj);
+            var searchedCtx = Asset.ToObjectContext(obj);
 
 #if SEARCH_HELPER_ENABLE_CACHING
             if (useCache && (DependencyMap?.ContainsKey(searchedCtx.Path) ?? false))
@@ -108,7 +108,7 @@ namespace SearchHelper.Editor.Core
                     var dependencies = AssetDatabase.GetDependencies(path);
                     if (dependencies.ToHashSet().Contains(searchedCtx.Path))
                     {
-                        searchedCtx.Dependencies.Add(ObjectContext.FromPath(path));
+                        searchedCtx.Dependencies.Add(Asset.FromPath(path));
                     }
                 }
             }
@@ -119,7 +119,7 @@ namespace SearchHelper.Editor.Core
             return searchedCtx;
         }
 
-        public static ObjectContext FindDependencies(Object obj)
+        public static Asset FindDependencies(Object obj)
         {
             if (obj == null)
             {
@@ -130,7 +130,7 @@ namespace SearchHelper.Editor.Core
 
             AssetDatabase.SaveAssets();
 
-            var dependencies = ObjectContext.ToObjectContexts(EditorUtility.CollectDependencies(new[] { obj }), obj);
+            var dependencies = Asset.ToObjectContexts(EditorUtility.CollectDependencies(new[] { obj }), obj);
             var path = AssetDatabase.GetAssetPath(obj);
             var guid = string.Empty;
             var isFolder = false;
@@ -141,7 +141,7 @@ namespace SearchHelper.Editor.Core
                 isFolder = AssetDatabase.IsValidFolder(path);
             }
 
-            var objectContext = new ObjectContext()
+            var objectContext = new Asset()
             {
                 Object = obj,
                 Path = path,
@@ -153,7 +153,7 @@ namespace SearchHelper.Editor.Core
             return objectContext;
         }
 
-        public static Dictionary<string, List<ObjectContext>> BuildDependencyMap(string root = null, bool useCache = true)
+        public static Dictionary<string, List<Asset>> BuildDependencyMap(string root = null, bool useCache = true)
         {
             AssetDatabase.SaveAssets();
             using var measure = Profiler.Measure($"BuildDependencyMap {root ?? "global"}");
@@ -166,7 +166,7 @@ namespace SearchHelper.Editor.Core
             }
 #endif
 
-            var result = new Dictionary<string, List<ObjectContext>>();
+            var result = new Dictionary<string, List<Asset>>();
             var paths = SearchHelperService.FindAssetPaths(root);
             foreach (var path in paths)
             {
@@ -177,13 +177,13 @@ namespace SearchHelper.Editor.Core
                     {
                         if(!result.ContainsKey(path))
                         {
-                            result.Add(path, new List<ObjectContext>());
+                            result.Add(path, new List<Asset>());
                         }
                         EnsureMainKeyExists(path);
                         continue;
                     }
 
-                    var context = ObjectContext.FromPath(path);
+                    var context = Asset.FromPath(path);
 #if SEARCH_HELPER_ENABLE_CACHING
                     CacheDependencyObject(context, dependency);
 #endif
@@ -193,7 +193,7 @@ namespace SearchHelper.Editor.Core
                     }
                     else
                     {
-                        result.Add(dependency, new List<ObjectContext>() { context });
+                        result.Add(dependency, new List<Asset>() { context });
                     }
                 }
             }
@@ -338,10 +338,10 @@ namespace SearchHelper.Editor.Core
         {
             HasOnlyNames = false;
             HasFullDependencyMap = false;
-            DependencyMap = new Dictionary<string, List<ObjectContext>>();
+            DependencyMap = new Dictionary<string, List<Asset>>();
         }
 
-        private static void UpdateCachedDependencies(string main, List<ObjectContext> dependencies = null)
+        private static void UpdateCachedDependencies(string main, List<Asset> dependencies = null)
         {
             DependencyMap[main] = dependencies;
         }
@@ -351,17 +351,17 @@ namespace SearchHelper.Editor.Core
         {
             if (!DependencyMap.ContainsKey(main))
             {
-                DependencyMap[main] = new List<ObjectContext>();
+                DependencyMap[main] = new List<Asset>();
             }
         }
 
         [Conditional("SEARCH_HELPER_ENABLE_CACHING")]
-        private static void CacheDependencyObject(ObjectContext dependency, string main)
+        private static void CacheDependencyObject(Asset dependency, string main)
         {
-            DependencyMap.TryAdd(main, new List<ObjectContext>());
+            DependencyMap.TryAdd(main, new List<Asset>());
             if (DependencyMap[main] == null)
             {
-                DependencyMap[main] = new List<ObjectContext>() { dependency };
+                DependencyMap[main] = new List<Asset>() { dependency };
             }
             else
             {

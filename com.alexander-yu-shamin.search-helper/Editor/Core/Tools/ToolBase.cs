@@ -2,7 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using Codice.CM.Common.Matcher;
+using PlasticPipe.PlasticProtocol.Messages;
 using SearchHelper.Editor.Core;
+using SearchHelper.Editor.Core.Filter;
+using SearchHelper.Editor.Core.Sort;
 using Toolkit.Editor.Helpers.Diagnostics;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
@@ -17,41 +22,47 @@ namespace SearchHelper.Editor
         protected class Model
         {
             public bool DrawDependencies { get; set; } = true;
-            public bool DrawObjectWithEmptyDependencies { get; set; } = true;
             public bool DrawMergeButtons { get; set; }
             public bool DrawEmptyDependency { get; set; } = true;
             public bool DrawState { get; set; } = true;
-            public bool DrawEmptyFolder { get; set; } = true;
 
-            public Func<ObjectContext, (string, Color)?> GetState { get; set; }
-            public Func<ObjectContext, Color> GetObjectFieldColor { get; set; }
-            public Action<ObjectContext> OnSelectedButtonPressed { get; set; }
-            public Action<ObjectContext> OnRemoveButtonPressed { get; set; }
-            public Action<ObjectContext> OnComparandButtonPressed { get; set; }
-            public Action<ObjectContext> OnDiffButtonPressed { get; set; }
+            protected internal bool DrawObjectWithEmptyDependencies { get; set; } = true;
+            protected internal bool DrawEmptyFolder { get; set; } = true;
+
+            public Func<Asset, (string, Color)?> GetState { get; set; }
+            public Func<Asset, Color> GetObjectFieldColor { get; set; }
+            public Action<Asset> OnSelectedButtonPressed { get; set; }
+            public Action<Asset> OnRemoveButtonPressed { get; set; }
+            public Action<Asset> OnComparandButtonPressed { get; set; }
+            public Action<Asset> OnDiffButtonPressed { get; set; }
         }
 
         #region Capabilities
 
-        protected virtual bool IsScopeRulesSupported { get; set; } = false;
-        protected virtual bool IsVisibilityRulesSupported { get; set; } = true;
-        protected virtual bool IsSortingRulesSupported { get; set; } = true;
-        protected virtual bool IsFilterRulesSupported { get; set; } = true;
-        protected virtual bool IsFilterStringRulesSupported { get; set; } = true;
+        protected virtual bool AreActionsSupported { get; set; } = true;
 
         // Settings
-        protected virtual bool IsSettingsButtonEnabled { get; set; } = true;
-        protected virtual bool IsSizeShowingSupported { get; set; } = false;
+        protected virtual bool AreSettingsSupported { get; set; } = true;
+        protected virtual bool ShowSize { get; set; } = false;
         protected virtual bool IsCacheUsed { get; set; } = true;
 
         // Visibility
-        protected virtual bool IsShowingFoldersSupported { get; set; } = true;
-        protected virtual bool IsEmptyDependencyShown { get; set; } = true;
-        protected virtual bool IsHiddenDependencyCounted { get; set; } = true;
+        protected virtual bool AreVisibilityRulesSupported { get; set; } = true;
+        protected virtual bool AreShowingFoldersSupported { get; set; } = true;
+        protected virtual bool ShowFolders { get; set; } = false;
+        protected virtual bool ShowEmptyDependencies { get; set; } = true;
+        protected virtual bool CountHiddenDependencies { get; set; } = false;
         protected virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
+
+        protected virtual bool AreScopeRulesSupported { get; set; } = false;
+        public virtual bool IsGlobalScope { get; set; } = true;
+        protected virtual bool AreSortingRulesSupported { get; set; } = true;
+        protected virtual bool AreFilterByRuleSupported { get; set; } = true;
+        protected virtual bool AreFilterByStringRulesSupported { get; set; } = true;
         #endregion
 
         #region DrawSettings
+
         protected const float RowHeight = 20.0f;
         protected const float RowPadding = 2f;
 
@@ -62,6 +73,7 @@ namespace SearchHelper.Editor
         protected const float HeaderHeight = ContentHeight;
         protected const float HeaderPadding = 6.0f;
         protected const float HeaderHeightWithPadding = ContentHeight + HeaderPadding * 2;
+        protected const float HeaderIndent = 5.0f;
 
         protected const float HorizontalIndent = 15.0f;
         protected const float FirstElementIndent = 4.0f;
@@ -82,25 +94,25 @@ namespace SearchHelper.Editor
         protected const string SceneHierarchySearchReferenceFormat = "ref:{0}";
 
         protected static readonly Color ErrorColor = Color.red;
+
         #endregion
 
         private Vector2 ScrollViewPosition { get; set; }
-        protected bool IsFoldersShown { get; set; } = false;
-        public bool IsGlobalScope { get; set; } = true;
-        private SearchHelperFilterManager FilterManager { get; set; }
-        private SearchHelperSortManager SortManager { get; set; }
+        private FilterByRuleManager FilterByRuleManager { get; set; }
+        private FilterByStringManager FilterByStringManager { get; set; }
+        private SortManager SortManager { get; set; }
         protected Model DefaultModel { get; set; }
-        protected abstract IEnumerable<ObjectContext> Data { get; }
 
+        protected abstract IEnumerable<Asset> Assets { get; }
         public abstract void Run(Object selectedObject);
         public abstract void Run();
         public abstract void Draw(Rect windowRect);
 
-        public virtual void GetDataFromAnotherTool(IEnumerable<ObjectContext> contexts)
+        public virtual void GetDataFromAnotherTool(IEnumerable<Asset> assets)
         {
         }
 
-        public virtual void GetDataFromAnotherTool(ObjectContext context)
+        public virtual void GetDataFromAnotherTool(Asset asset)
         {
         }
 
@@ -111,96 +123,129 @@ namespace SearchHelper.Editor
 
         public virtual void Init()
         {
-            FilterManager ??= new SearchHelperFilterManager(OnDataChanged);
-            SortManager ??= new SearchHelperSortManager(OnDataChanged);
+            FilterByRuleManager = new FilterByRuleManager();
+            FilterByStringManager = new FilterByStringManager();
+            SortManager = new SortManager();
+
+            FilterByRuleManager.DataChanged += OnDataChanged;
+            FilterByStringManager.DataChanged += OnDataChanged;
+            SortManager.DataChanged += OnDataChanged;
 
             DefaultModel ??= new Model()
             {
-                DrawDependencies = IsEmptyDependencyShown,
-                DrawEmptyDependency = IsEmptyDependencyShown,
+                DrawDependencies = ShowEmptyDependencies,
+                DrawEmptyDependency = ShowEmptyDependencies,
                 DrawMergeButtons = false,
-                DrawEmptyFolder = IsFoldersShown,
-                DrawObjectWithEmptyDependencies = IsEmptyDependencyShown,
+                DrawEmptyFolder = ShowFolders,
+                DrawObjectWithEmptyDependencies = ShowEmptyDependencies,
                 DrawState = false
             };
         }
 
         #region Data
 
-        protected void UpdateData(IEnumerable<ObjectContext> contexts = null)
+        private void OnDataChanged()
         {
-            contexts ??= Data;
+            UpdateAssets();
+        }
 
-            if (contexts.IsNullOrEmpty())
+        protected virtual bool IsMainAssetVisible(Asset asset)
+        {
+            return asset.State.HasNoneFlags(AssetState.None
+                                            | AssetState.FilterByRule
+                                            | AssetState.FilterByString
+                                            | AssetState.HideFolders);
+        }
+
+        protected virtual bool IsDependencyAssetVisible(Asset asset)
+        {
+            return asset.State.HasNoneFlags(AssetState.None
+                                            | AssetState.FilterByRule
+                                            | AssetState.FilterByString
+                                            | AssetState.HideFolders);
+        }
+
+        protected void UpdateAssets(IEnumerable<Asset> assets = null)
+        {
+            assets ??= Assets;
+
+            if (assets.IsNullOrEmpty())
             {
                 return;
             }
 
-            using (Profiler.Measure($"UpdateData::ShouldBeShown"))
+            using (Profiler.Measure($"UpdateData::Filter"))
             {
-                foreach (var context in contexts)
+                var useFilterByRule = AreFilterByRuleSupported && FilterByRuleManager is { RequiresUpdate: true };
+                var useFilterByString = AreFilterByStringRulesSupported && FilterByStringManager is { RequiresUpdate: true };
+                foreach (var asset in assets)
                 {
-                    if (context.Dependencies.IsNullOrEmpty())
+                    if (useFilterByRule)
                     {
-                        context.ShouldBeShown = ShouldMainContextBeShown(context);
+                        asset.State = FilterByRuleManager.IsAllowed(asset)
+                            ? asset.State & ~AssetState.FilterByRule
+                            : asset.State | AssetState.FilterByRule;
+                    }
+
+                    if (AreShowingFoldersSupported && asset.IsFolder)
+                    {
+                        asset.State = ShowFolders 
+                            ? asset.State & ~AssetState.HideFolders
+                            : asset.State | AssetState.HideFolders;
+                    }
+
+                    if (!useFilterByString && (asset.State & AssetState.FilterByRule) != 0 && !useFilterByRule)
+                    {
                         continue;
                     }
 
-                    var showMainContext = false;
-                    foreach (var dependency in context.Dependencies)
+                    var isAllowed = FilterByStringManager.IsAllowed(asset);
+                    if (!asset.Dependencies.IsNullOrEmpty())
                     {
-                        dependency.ShouldBeShown = ShouldDependencyBeShown(dependency, context);
-                        showMainContext |= dependency.ShouldBeShown;
+                        foreach (var dependency in asset.Dependencies)
+                        {
+                            var isDependencyAllowed = true;
+                            if (useFilterByRule)
+                            {
+                                isDependencyAllowed = FilterByRuleManager.IsAllowed(dependency);
+                                dependency.State = isDependencyAllowed
+                                    ? dependency.State & ~AssetState.FilterByRule
+                                    : dependency.State | AssetState.FilterByRule;
+                            }
+
+                            if (!isDependencyAllowed)
+                            {
+                                continue;
+                            }
+
+                            isDependencyAllowed = FilterByStringManager.IsAllowed(dependency);
+
+                            dependency.State = isDependencyAllowed
+                                ? dependency.State & ~AssetState.FilterByString
+                                : dependency.State | AssetState.FilterByString;
+
+                            isAllowed |= isDependencyAllowed;
+                        }
                     }
 
-                    showMainContext |= ShouldMainContextBeShown(context);
-
-                    context.ShouldBeShown = showMainContext;
+                    asset.State = isAllowed
+                        ? asset.State & ~AssetState.FilterByString
+                        : asset.State | AssetState.FilterByString;
                 }
+
+                FilterByRuleManager.CompleteUpdate();
+                FilterByStringManager.CompleteUpdate();
             }
 
             using (Profiler.Measure($"UpdateData:: Sorting"))
             {
-                SortManager?.Sort(contexts);
-            }
-        }
-
-        protected virtual bool ShouldMainContextBeShown(ObjectContext objectContext)
-        {
-            if (objectContext.IsFolder && !IsFoldersShown)
-            {
-                return false;
-            }
-
-            if (IsFilterRulesSupported && FilterManager != null)
-            {
-                if (!FilterManager.IsAllowed(objectContext))
+                if (AreSortingRulesSupported && SortManager is { RequiresUpdate: true })
                 {
-                    return false;
+                    SortManager.Sort(assets);
+                    SortManager.CompleteUpdate();
                 }
             }
-
-            return true;
         }
-
-        protected virtual bool ShouldDependencyBeShown(ObjectContext objectContext, ObjectContext parentContext = null)
-        {
-            if (IsFilterRulesSupported && FilterManager != null)
-            {
-                if (!FilterManager.IsAllowed(objectContext, parentContext))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private void OnDataChanged()
-        {
-            UpdateData();
-        }
-
         #endregion
 
         #region DrawFunctions
@@ -209,6 +254,7 @@ namespace SearchHelper.Editor
         {
             EGuiKit.Horizontal(() =>
             {
+                DrawActions();
                 DrawSettingsRules();
                 DrawVisibilityRules();
                 DrawScopeRules();
@@ -218,22 +264,83 @@ namespace SearchHelper.Editor
             });
         }
 
-        private void DrawSettingsRules()
+        private void DrawActions()
         {
-            if (!IsSettingsButtonEnabled)
+            if (!AreActionsSupported)
             {
                 return;
             }
 
-            EGuiKit.Space(HorizontalIndent);
+            EGuiKit.Space(HeaderIndent);
+            var content = new GUIContent($"Actions");
+
+            if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
+            {
+                var menu = new GenericMenu();
+
+                menu.AddItem(new GUIContent("Copy/Asset Paths"), false, () =>
+                {
+                    CopyToClipboard(string.Join("\n", Assets?.Where(IsMainAssetVisible)?.Select(asset => asset.Path) ?? Array.Empty<string>()));
+                });
+
+                menu.AddItem(new GUIContent("Copy/Asset Dependency Map"), false, () =>
+                {
+                    if (Assets.IsNullOrEmpty())
+                    {
+                        return;
+                    }
+
+                    var sb = new StringBuilder();
+                    foreach (var asset in Assets)
+                    {
+                        if (!IsMainAssetVisible(asset))
+                        {
+                            continue;
+                        }
+
+                        sb.AppendLine($"- {asset.Path}");
+                        if (asset.Dependencies.IsNullOrEmpty())
+                        {
+                            continue;
+                        }
+
+                        foreach (var dependency in asset.Dependencies.Where(IsDependencyAssetVisible).Select(d => d.Path).Distinct())
+                        {
+                            sb.AppendLine($"  - {dependency}");
+                        }
+
+                        sb.AppendLine();
+                    }
+
+                    CopyToClipboard(sb.ToString());
+                });
+
+                AddActionContextMenu(menu);
+
+                menu.ShowAsContext();
+            }
+        }
+
+        protected virtual void AddActionContextMenu(GenericMenu menu)
+        {
+        }
+
+        private void DrawSettingsRules()
+        {
+            if (!AreSettingsSupported)
+            {
+                return;
+            }
+
+            EGuiKit.Space(HeaderIndent);
             var content = new GUIContent($"Settings");
 
             if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
                 var menu = new GenericMenu();
 
-                menu.AddItem(new GUIContent("Show File Size"), IsSizeShowingSupported,
-                    () => { IsSizeShowingSupported = !IsSizeShowingSupported; });
+                menu.AddItem(new GUIContent("Show File Size"), ShowSize,
+                    () => { ShowSize = !ShowSize; });
 
                 menu.AddItem(new GUIContent("Use Cache"), IsCacheUsed, () => { IsCacheUsed = !IsCacheUsed; });
 
@@ -249,12 +356,12 @@ namespace SearchHelper.Editor
 
         protected void DrawVisibilityRules()
         {
-            if (!IsVisibilityRulesSupported)
+            if (!AreVisibilityRulesSupported)
             {
                 return;
             }
 
-            EGuiKit.Space(HorizontalIndent);
+            EGuiKit.Space(HeaderIndent);
             var content = new GUIContent($"Visibility");
 
             if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
@@ -262,40 +369,40 @@ namespace SearchHelper.Editor
                 var menu = new GenericMenu();
                 menu.AddItem(new GUIContent("Show Dependencies"), false, () =>
                 {
-                    foreach (var context in Data)
+                    foreach (var asset in Assets)
                     {
-                        context.IsExpanded = true;
+                        asset.IsFoldout = true;
                     }
                 });
 
                 menu.AddItem(new GUIContent("Hide Dependencies"), false, () =>
                 {
-                    foreach (var context in Data)
+                    foreach (var asset in Assets)
                     {
-                        context.IsExpanded = false;
+                        asset.IsFoldout = false;
                     }
                 });
 
                 menu.AddSeparator(string.Empty);
-                if (IsShowingFoldersSupported)
+                if (AreShowingFoldersSupported)
                 {
-                    menu.AddItem(new GUIContent("Show Folders"), IsFoldersShown, () =>
+                    menu.AddItem(new GUIContent("Show Folders"), ShowFolders, () =>
                     {
-                        IsFoldersShown = !IsFoldersShown;
-                        UpdateData();
+                        ShowFolders = !ShowFolders;
+                        UpdateAssets();
                     });
                 }
 
-                menu.AddItem(new GUIContent("Show Empty Dependencies"), IsEmptyDependencyShown, () =>
+                menu.AddItem(new GUIContent("Show Empty Dependencies"), ShowEmptyDependencies, () =>
                 {
-                    IsEmptyDependencyShown = !IsEmptyDependencyShown;
-                    UpdateData();
+                    ShowEmptyDependencies = !ShowEmptyDependencies;
+                    UpdateAssets();
                 });
 
-                menu.AddItem(new GUIContent("Calculate Hidden Dependencies"), IsHiddenDependencyCounted, () =>
+                menu.AddItem(new GUIContent("Count Hidden Dependencies"), CountHiddenDependencies, () =>
                 {
-                    IsHiddenDependencyCounted = !IsHiddenDependencyCounted;
-                    UpdateData();
+                    CountHiddenDependencies = !CountHiddenDependencies;
+                    UpdateAssets();
                 });
 
                 menu.ShowAsContext();
@@ -304,12 +411,12 @@ namespace SearchHelper.Editor
 
         private void DrawScopeRules()
         {
-            if (!IsScopeRulesSupported)
+            if (!AreScopeRulesSupported)
             {
                 return;
             }
 
-            EGuiKit.Space(HorizontalIndent);
+            EGuiKit.Space(HeaderIndent);
 
             EGuiKit.Button(IsGlobalScope ? "Global" : "Local", () =>
             {
@@ -320,12 +427,12 @@ namespace SearchHelper.Editor
 
         private void DrawSortingRules()
         {
-            if (!IsSortingRulesSupported || SortManager == null)
+            if (!AreSortingRulesSupported || SortManager == null)
             {
                 return;
             }
 
-            EGuiKit.Space(HorizontalIndent);
+            EGuiKit.Space(HeaderIndent);
 
             var currentSortVariant = SortManager.CurrentSortVariant;
             var content = new GUIContent(currentSortVariant.ToString().ToSpacedWords());
@@ -344,15 +451,13 @@ namespace SearchHelper.Editor
                 var currentSortOrder = SortManager.CurrentSortOrder;
                 foreach (var sortOrder in SortManager.PossibleSortOrders)
                 {
-                    menu.AddItem(new GUIContent(sortOrder.ToString()), sortOrder == currentSortOrder, () =>
-                    {
-                        SortManager.Select(sortOrder);
-                    });
+                    menu.AddItem(new GUIContent(sortOrder.ToString()), sortOrder == currentSortOrder,
+                        () => { SortManager.Select(sortOrder); });
                 }
 
                 menu.AddSeparator(string.Empty);
-                menu.AddItem(new GUIContent("Sort Main Elements"), SortManager.ShouldMainObjectsBeSorted,
-                    () => { SortManager.ShouldMainObjectsBeSorted = !SortManager.ShouldMainObjectsBeSorted; });
+                menu.AddItem(new GUIContent("Sort Main Assets"), SortManager.SortMainAssets,
+                    () => { SortManager.SortMainAssets = !SortManager.SortMainAssets; });
 
                 menu.ShowAsContext();
             }
@@ -360,55 +465,55 @@ namespace SearchHelper.Editor
 
         private void DrawFilterRules()
         {
-            if (!IsFilterRulesSupported || FilterManager == null)
+            if (!AreFilterByRuleSupported || FilterByRuleManager == null)
             {
                 return;
             }
 
-            EGuiKit.Space(HorizontalIndent);
+            EGuiKit.Space(HeaderIndent);
 
-            var currentFilterName = FilterManager.CurrentFilterRule?.Name;
+            var currentFilterName = FilterByRuleManager.CurrentFilterRule?.Name;
             var content = new GUIContent(currentFilterName ?? "No Filter Rule");
 
             if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
-                FilterManager.UpdateFilterRulesIfEmpty();
+                FilterByRuleManager.UpdateFilterRulesIfEmpty();
 
                 var menu = new GenericMenu();
-                foreach (var rule in FilterManager.FilterRules)
+                foreach (var rule in FilterByRuleManager.FilterRules)
                 {
                     menu.AddItem(new GUIContent(rule.Name), currentFilterName == rule.Name,
-                        () => { FilterManager.SelectFilterRule(rule); });
+                        () => { FilterByRuleManager.SelectFilterRule(rule); });
                 }
 
                 menu.AddSeparator(string.Empty);
-                menu.AddItem(new GUIContent("Load more from disk"), false, FilterManager.UpdateFilterRules);
-                menu.AddItem(new GUIContent("Remove Filter Rule"), false, FilterManager.UnselectFilterRule);
+                menu.AddItem(new GUIContent("Load more from disk"), false, FilterByRuleManager.UpdateFilterRules);
+                menu.AddItem(new GUIContent("Remove Filter Rule"), false, FilterByRuleManager.UnselectFilterRule);
                 menu.ShowAsContext();
             }
         }
 
         private void DrawFilterString()
         {
-            if (!IsFilterStringRulesSupported || FilterManager == null)
+            if (!AreFilterByStringRulesSupported || FilterByStringManager == null)
             {
                 return;
             }
 
-            EGuiKit.Space(HorizontalIndent);
+            EGuiKit.Space(HeaderIndent);
 
-            var target = FilterManager.CurrentFilterByStringTarget;
-            var mode = FilterManager.CurrentFilterByStringMode;
-            var filter = FilterManager.CurrentFilterString;
+            var target = FilterByStringManager.CurrentFilterByStringTarget;
+            var mode = FilterByStringManager.CurrentFilterByStringMode;
+            var filter = FilterByStringManager.CurrentFilterString;
 
             var content = new GUIContent($"{target}");
             if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
                 var menu = new GenericMenu();
-                foreach (var possibleTarget in FilterManager.PossibleObjectContextTargets)
+                foreach (var possibleTarget in FilterByStringManager.PossibleAssetTargets)
                 {
                     menu.AddItem(new GUIContent(possibleTarget.ToString()), target == possibleTarget,
-                        () => { FilterManager.SelectFilterByString(possibleTarget, mode, filter); });
+                        () => { FilterByStringManager.SelectFilterByString(possibleTarget, mode, filter); });
                 }
 
                 menu.ShowAsContext();
@@ -418,16 +523,17 @@ namespace SearchHelper.Editor
             if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
                 var menu = new GenericMenu();
-                foreach (var possibleMode in FilterManager.PossibleFilterRuleModes)
+                foreach (var possibleMode in FilterByStringManager.PossibleFilterRuleModes)
                 {
                     menu.AddItem(new GUIContent(ToString(possibleMode)), mode == possibleMode,
-                        () => { FilterManager.SelectFilterByString(target, possibleMode, filter); });
+                        () => { FilterByStringManager.SelectFilterByString(target, possibleMode, filter); });
                 }
 
                 menu.ShowAsContext();
             }
 
-            FilterManager.SelectFilterByString(target, mode, EditorGUILayout.TextArea(filter, GUILayout.Width(250)));
+            FilterByStringManager.SelectFilterByString(target, mode,
+                EditorGUILayout.TextArea(filter, GUILayout.Width(250)));
 
             string ToString(FilterRuleMode mode)
             {
@@ -443,9 +549,9 @@ namespace SearchHelper.Editor
             }
         }
 
-        protected void DrawVirtualScroll(Rect windowRect, List<ObjectContext> contexts, Model model = null)
+        protected void DrawVirtualScroll(Rect windowRect, List<Asset> assets, Model model = null)
         {
-            if (contexts.IsNullOrEmpty())
+            if (assets.IsNullOrEmpty())
             {
                 return;
             }
@@ -454,10 +560,10 @@ namespace SearchHelper.Editor
             {
                 model = DefaultModel;
 
-                model.DrawDependencies = IsEmptyDependencyShown;
-                model.DrawEmptyDependency = IsEmptyDependencyShown;
-                model.DrawEmptyFolder = IsFoldersShown;
-                model.DrawObjectWithEmptyDependencies = IsEmptyDependencyShown;
+                model.DrawDependencies = ShowEmptyDependencies;
+                model.DrawEmptyDependency = ShowEmptyDependencies;
+                model.DrawEmptyFolder = ShowFolders;
+                model.DrawObjectWithEmptyDependencies = ShowEmptyDependencies;
             }
 
             GUILayout.Space(HeaderPadding);
@@ -465,7 +571,7 @@ namespace SearchHelper.Editor
             ScrollViewPosition = EditorGUILayout.BeginScrollView(ScrollViewPosition,
                 GUILayout.Height(windowRect.height - BottomIndent));
 
-            var totalHeight = CalculateDisplayedHeight(contexts, model);
+            var totalHeight = CalculateDisplayedHeight(assets, model);
             var fullRect = GUILayoutUtility.GetRect(0, totalHeight);
 
             var x = fullRect.x;
@@ -478,7 +584,7 @@ namespace SearchHelper.Editor
                     ? windowRect.width - ScrollBarWidth
                     : windowRect.width - NoScrollBarWidth, windowRect.height + ExtraHeightToPreventBlinking);
 
-            foreach (var ctx in contexts)
+            foreach (var ctx in assets)
             {
                 if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect,
                         () => TryDrawObjectHeader(ref x, ref y, displayRect.width, ctx, model),
@@ -495,8 +601,8 @@ namespace SearchHelper.Editor
                 if (ctx.Dependencies.IsNullOrEmpty())
                 {
                     if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect,
-                            () => TryDrawEmptyContent(ref x, ref y, displayRect.width, ctx, model),
-                            () => CalculateEmptyHeight(ctx, model)))
+                            () => TryDrawEmptyDependency(ref x, ref y, displayRect.width, ctx, model),
+                            () => CalculateEmptyDependencyHeight(ctx, model)))
                     {
                         break;
                     }
@@ -526,9 +632,9 @@ namespace SearchHelper.Editor
             return !beforeVisibleRect && !afterVisibleRect;
         }
 
-        private float CalculateDisplayedHeight(List<ObjectContext> contexts, Model model)
+        private float CalculateDisplayedHeight(List<Asset> assets, Model model)
         {
-            return contexts.Sum(ctx => CalculateHeaderHeight(ctx, model) + CalculateDependenciesHeight(ctx, model));
+            return assets.Sum(ctx => CalculateHeaderHeight(ctx, model) + CalculateDependenciesHeight(ctx, model));
         }
 
         private bool TryDraw(ref float currentY, Vector2 scrollViewPosition, ref float drawnHeight, Rect windowRect,
@@ -543,43 +649,36 @@ namespace SearchHelper.Editor
             return !afterVisibleRect;
         }
 
-        private float CalculateDependenciesHeight(ObjectContext context, Model model)
+        private float CalculateDependenciesHeight(Asset asset, Model model)
         {
-            return context.Dependencies.IsNullOrEmpty()
-                ? CalculateEmptyHeight(context, model)
-                : context.Dependencies.Sum(dependency => CalculateDependencyHeight(dependency, context));
+            return asset.Dependencies.IsNullOrEmpty()
+                ? CalculateEmptyDependencyHeight(asset, model)
+                : asset.Dependencies.Sum(dependency => CalculateDependencyHeight(dependency, asset));
         }
 
-        private float CalculateHeaderHeight(ObjectContext context, Model model)
+        private float CalculateHeaderHeight(Asset asset, Model model)
         {
-            var dependencies = context.Dependencies;
-            var showSelf = context.ShouldBeShown;
-            var showEmpty = model.DrawObjectWithEmptyDependencies;
-
-            if (dependencies.IsNullOrEmpty())
-            {
-                if (!showSelf && !showEmpty)
-                {
-                    return 0.0f;
-                }
-            }
-
-            return showSelf ? HeaderHeightWithPadding : 0.0f;
-        }
-
-        private float TryDrawObjectHeader(ref float x, ref float y, float width, ObjectContext context, Model model)
-        {
-            if (CalculateHeaderHeight(context, model) == 0.0f)
+            if (!IsMainAssetVisible(asset))
             {
                 return 0.0f;
             }
 
-            var result = DrawObjectHeader(new Rect(x, y, width, HeaderHeightWithPadding), context, model);
+            return HeaderHeightWithPadding;
+        }
+
+        private float TryDrawObjectHeader(ref float x, ref float y, float width, Asset asset, Model model)
+        {
+            if (CalculateHeaderHeight(asset, model) == 0.0f)
+            {
+                return 0.0f;
+            }
+
+            var result = DrawObjectHeader(new Rect(x, y, width, HeaderHeightWithPadding), asset, model);
             y += result;
             return result;
         }
 
-        private float DrawObjectHeader(Rect rect, ObjectContext context, Model model)
+        private float DrawObjectHeader(Rect rect, Asset asset, Model model)
         {
             var x = rect.x + FirstElementIndent;
             var y = rect.y;
@@ -594,10 +693,10 @@ namespace SearchHelper.Editor
             {
                 elementWidth = 75.0f;
                 var toggleRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
-                var selected = EditorGUI.ToggleLeft(toggleRect, "Selected", context.IsSelected);
-                if (selected != context.IsSelected)
+                var selected = EditorGUI.ToggleLeft(toggleRect, "Selected", asset.IsSelected);
+                if (selected != asset.IsSelected)
                 {
-                    model?.OnSelectedButtonPressed?.Invoke(context);
+                    model?.OnSelectedButtonPressed?.Invoke(asset);
                 }
 
                 x += elementWidth + HorizontalIndent / 2;
@@ -605,21 +704,21 @@ namespace SearchHelper.Editor
                 var removeRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
                 if (GUI.Button(removeRect, "Remove"))
                 {
-                    model?.OnRemoveButtonPressed?.Invoke(context);
+                    model?.OnRemoveButtonPressed?.Invoke(asset);
                 }
 
                 x += elementWidth + HorizontalIndent / 2;
                 var comporandRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
-                if (GUI.Button(comporandRect, context.IsBaseObject ? "Base" : "Theirs"))
+                if (GUI.Button(comporandRect, asset.IsBaseObject ? "Base" : "Theirs"))
                 {
-                    model?.OnComparandButtonPressed?.Invoke(context);
+                    model?.OnComparandButtonPressed?.Invoke(asset);
                 }
 
                 x += elementWidth + HorizontalIndent / 2;
                 var diffRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
                 if (GUI.Button(diffRect, "Diff"))
                 {
-                    model?.OnDiffButtonPressed?.Invoke(context);
+                    model?.OnDiffButtonPressed?.Invoke(asset);
                 }
 
                 x += elementWidth + HorizontalIndent / 2;
@@ -629,23 +728,23 @@ namespace SearchHelper.Editor
             if (GUI.Button(new Rect(x, y - 1, elementWidth, HeaderHeight),
                     EditorGUIUtility.IconContent(FolderIconName)))
             {
-                OpenInDefaultFileBrowser(context);
+                OpenInDefaultFileBrowser(asset);
             }
 
             x += elementWidth + HorizontalIndent / 2;
             elementWidth = 250.0f;
             var objectFieldRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
-            var objectColor = model?.GetObjectFieldColor != null ? model.GetObjectFieldColor(context) : GUI.color;
+            var objectColor = model?.GetObjectFieldColor != null ? model.GetObjectFieldColor(asset) : GUI.color;
 
             EGuiKit.Color(objectColor,
-                () => { EditorGUI.ObjectField(objectFieldRect, context.Object, typeof(Object), context.Object); });
+                () => { EditorGUI.ObjectField(objectFieldRect, asset.Object, typeof(Object), asset.Object); });
 
-            DrawContextMenu(context, objectFieldRect);
+            DrawContextMenu(asset, objectFieldRect);
 
             x += elementWidth + HorizontalIndent / 2;
-            elementWidth = EditorStyles.foldoutHeader.CalcSize(new GUIContent(context.Path)).x;
-            context.IsExpanded = EditorGUI.BeginFoldoutHeaderGroup(new Rect(x, y, elementWidth, HeaderHeight),
-                context.IsExpanded, context.Path);
+            elementWidth = EditorStyles.foldoutHeader.CalcSize(new GUIContent(asset.Path)).x;
+            asset.IsFoldout = EditorGUI.BeginFoldoutHeaderGroup(new Rect(x, y, elementWidth, HeaderHeight), asset.IsFoldout, asset.Path);
+
             EditorGUI.EndFoldoutHeaderGroup();
 
             x += elementWidth + HorizontalIndent;
@@ -657,7 +756,7 @@ namespace SearchHelper.Editor
             {
                 elementWidth = GuidTextAreaWidth;
                 x = rect.width - elementWidth;
-                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Guid);
+                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), asset.Guid);
 
                 elementWidth = 40.0f;
                 x -= elementWidth;
@@ -669,7 +768,10 @@ namespace SearchHelper.Editor
             {
                 elementWidth = 50.0f;
                 x -= elementWidth + HorizontalIndent;
-                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), IsHiddenDependencyCounted ? context.Dependencies.Count(dependency => dependency.ShouldBeShown).ToString() : context.Dependencies?.Count.ToString());
+                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight),
+                    !CountHiddenDependencies
+                        ? asset.Dependencies.Count(IsDependencyAssetVisible).ToString()
+                        : asset.Dependencies?.Count.ToString());
 
                 elementWidth = 90.0f;
                 x -= elementWidth;
@@ -677,14 +779,14 @@ namespace SearchHelper.Editor
             }
 
             var neededWidthForSize = neededWidthForDependency + HorizontalIndent;
-            if (IsSizeShowingSupported)
+            if (ShowSize)
             {
                 neededWidthForSize = neededWidthForDependency + 70 + 40.0f + HorizontalIndent;
                 if (leftWidth > neededWidthForSize)
                 {
                     elementWidth = 70.0f;
                     x -= elementWidth + HorizontalIndent;
-                    EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), context.Size ?? "");
+                    EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), asset.Size ?? "");
 
                     elementWidth = 40.0f;
                     x -= elementWidth;
@@ -697,7 +799,7 @@ namespace SearchHelper.Editor
             {
                 if (model?.DrawState ?? true)
                 {
-                    var message = model?.GetState != null ? model.GetState(context) : null;
+                    var message = model?.GetState != null ? model.GetState(asset) : null;
                     if (message.HasValue)
                     {
                         elementWidth = StateTextAreaWidth;
@@ -715,14 +817,14 @@ namespace SearchHelper.Editor
             return HeaderHeightWithPadding;
         }
 
-        private float CalculateEmptyHeight(ObjectContext mainContext, Model model)
+        private float CalculateEmptyDependencyHeight(Asset mainAsset, Model model)
         {
-            if (!mainContext.ShouldBeShown)
+            if (!IsMainAssetVisible(mainAsset))
             {
                 return 0.0f;
             }
 
-            if (!mainContext.IsExpanded)
+            if (!mainAsset.IsFoldout)
             {
                 return 0.0f;
             }
@@ -735,9 +837,9 @@ namespace SearchHelper.Editor
             return ContentHeightWithPadding;
         }
 
-        private float TryDrawEmptyContent(ref float x, ref float y, float width, ObjectContext mainContext, Model model)
+        private float TryDrawEmptyDependency(ref float x, ref float y, float width, Asset mainAsset, Model model)
         {
-            if (CalculateEmptyHeight(mainContext, model) == 0.0f)
+            if (CalculateEmptyDependencyHeight(mainAsset, model) == 0.0f)
             {
                 return 0.0f;
             }
@@ -758,14 +860,19 @@ namespace SearchHelper.Editor
             return ContentHeightWithPadding;
         }
 
-        private float CalculateDependencyHeight(ObjectContext dependency, ObjectContext mainContext)
+        private float CalculateDependencyHeight(Asset dependency, Asset mainAsset)
         {
-            if (!mainContext.IsExpanded)
+            if (!IsMainAssetVisible(mainAsset))
             {
                 return 0.0f;
             }
 
-            if (!dependency.ShouldBeShown)
+            if (!mainAsset.IsFoldout)
+            {
+                return 0.0f;
+            }
+
+            if (!IsDependencyAssetVisible(dependency))
             {
                 return 0.0f;
             }
@@ -773,36 +880,36 @@ namespace SearchHelper.Editor
             return ContentHeightWithPadding;
         }
 
-        private float TryDrawContent(ref float x, ref float y, float width, ObjectContext context,
-            ObjectContext mainContext)
+        private float TryDrawContent(ref float x, ref float y, float width, Asset asset,
+            Asset mainContext)
         {
-            if (CalculateDependencyHeight(context, mainContext) == 0.0f)
+            if (CalculateDependencyHeight(asset, mainContext) == 0.0f)
             {
                 return 0.0f;
             }
 
-            var result = DrawContent(new Rect(x, y, width, ContentHeightWithPadding), context);
+            var result = DrawContent(new Rect(x, y, width, ContentHeightWithPadding), asset);
             y += result;
             return result;
         }
 
-        private float DrawContent(Rect rect, ObjectContext context)
+        private float DrawContent(Rect rect, Asset asset)
         {
             EditorGUI.DrawRect(rect, RectBoxColor);
 
             var elementWidth = 500.0f;
             var x = rect.x + FirstElementIndent;
             var objectFieldRect = new Rect(x, rect.y, elementWidth, ContentHeight);
-            EditorGUI.ObjectField(objectFieldRect, context.Object, typeof(Object), context.Object);
+            EditorGUI.ObjectField(objectFieldRect, asset.Object, typeof(Object), asset.Object);
             x += elementWidth + HorizontalIndent / 2;
 
-            DrawContextMenu(context, objectFieldRect);
+            DrawContextMenu(asset, objectFieldRect);
 
             elementWidth = ContentHeight;
             if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight),
                     EditorGUIUtility.IconContent(HierarchyIconName)))
             {
-                FindInHierarchyWindow(context);
+                FindInHierarchyWindow(asset);
             }
 
             x += elementWidth + HorizontalIndent / 2;
@@ -810,7 +917,7 @@ namespace SearchHelper.Editor
             if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight),
                     EditorGUIUtility.IconContent(InspectorIconName)))
             {
-                OpenProperty(context);
+                OpenProperty(asset);
             }
 
             x += elementWidth + HorizontalIndent / 2;
@@ -819,16 +926,16 @@ namespace SearchHelper.Editor
             x += elementWidth;
 
             elementWidth = GuidTextAreaWidth;
-            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), context.Guid);
+            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), asset.Guid);
             x += elementWidth + HorizontalIndent / 2;
 
             elementWidth = ContentHeight;
             if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight),
                     EditorGUIUtility.IconContent(FolderIconName)))
             {
-                if (!string.IsNullOrEmpty(context.Path))
+                if (!string.IsNullOrEmpty(asset.Path))
                 {
-                    EditorUtility.RevealInFinder(context.Path);
+                    EditorUtility.RevealInFinder(asset.Path);
                 }
             }
 
@@ -838,55 +945,57 @@ namespace SearchHelper.Editor
             x += elementWidth;
 
             elementWidth = rect.width - x;
-            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), context.Path);
+            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), asset.Path);
 
             return ContentHeightWithPadding;
         }
 
-        private void DrawContextMenu(ObjectContext context, Rect objectFieldRect)
+        private void DrawContextMenu(Asset asset, Rect objectFieldRect)
         {
             var e = Event.current;
             if (e.type == EventType.MouseDown && e.button == 1 && objectFieldRect.Contains(e.mousePosition))
             {
-                ShowContextMenu(context);
+                ShowContextMenu(asset);
             }
         }
 
-        private void ShowContextMenu(ObjectContext context)
+        private void ShowContextMenu(Asset asset)
         {
             var menu = new GenericMenu();
 
-            menu.AddItem(new GUIContent("Open Folder"), false, () => { OpenInDefaultFileBrowser(context); });
-            menu.AddItem(new GUIContent("Find in Project"), false, () => { FindInProject(context); });
-            menu.AddItem(new GUIContent("Find in Scene"), false, () => { FindInHierarchyWindow(context); });
-            menu.AddItem(new GUIContent("Properties"), false, () => { OpenProperty(context); });
+            menu.AddItem(new GUIContent("Open Folder"), false, () => { OpenInDefaultFileBrowser(asset); });
+            menu.AddItem(new GUIContent("Find in Project"), false, () => { FindInProject(asset); });
+            menu.AddItem(new GUIContent("Find in Scene"), false, () => { FindInHierarchyWindow(asset); });
+            menu.AddItem(new GUIContent("Properties"), false, () => { OpenProperty(asset); });
 
-            menu.AddItem(new GUIContent("Copy/Path"), false, () => { CopyToClipboard(context.Path); });
-            menu.AddItem(new GUIContent("Copy/GUID"), false, () => { CopyToClipboard(context.Guid); });
-            menu.AddItem(new GUIContent("Copy/Type"), false, () => { CopyToClipboard(context.Object.GetType().Name); });
+            menu.AddItem(new GUIContent("Copy/Path"), false, () => { CopyToClipboard(asset.Path); });
+            menu.AddItem(new GUIContent("Copy/GUID"), false, () => { CopyToClipboard(asset.Guid); });
+            menu.AddItem(new GUIContent("Copy/Type"), false, () => { CopyToClipboard(asset.Object.GetType().Name); });
 
-            if (!context.Dependencies.IsNullOrEmpty())
+            if (!asset.Dependencies.IsNullOrEmpty())
             {
-                menu.AddItem(new GUIContent("Select All in Project"), false, () => { SelectAll(context); });
+                menu.AddItem(new GUIContent("Select All in Project"), false, () => { SelectAll(asset); });
                 menu.AddItem(new GUIContent("Select Dependencies in Project"), false,
-                    () => { SelectDependencies(context); });
+                    () => { SelectDependencies(asset); });
                 menu.AddItem(new GUIContent("Copy/Dependency Paths"), false,
                     () =>
                     {
-                        CopyToClipboard(string.Join(", ", context.Dependencies.Select(element => element.Path)));
+                        CopyToClipboard(string.Join(", ", asset.Dependencies.Select(element => element.Path)));
                     });
             }
 
-            AddContextMenu(menu, context);
+            AddContextMenu(menu, asset);
 
             menu.ShowAsContext();
         }
 
-        protected virtual void AddContextMenu(GenericMenu menu, ObjectContext context)
+        protected virtual void AddContextMenu(GenericMenu menu, Asset asset)
         {
         }
 
         #endregion
+
+        #region Helpers
 
         protected IEnumerable<Object> FolderOrFile(Object obj)
         {
@@ -912,29 +1021,29 @@ namespace SearchHelper.Editor
             return AssetDatabase.IsValidFolder(path) ? path : null;
         }
 
-        protected void SelectDependencies(ObjectContext context)
+        protected void SelectDependencies(Asset asset)
         {
-            if (context == null || context.Dependencies.IsNullOrEmpty())
+            if (asset == null || asset.Dependencies.IsNullOrEmpty())
             {
                 return;
             }
 
-            Selection.objects = context.Dependencies.Select(el => el.Object).ToArray();
+            Selection.objects = asset.Dependencies.Select(el => el.Object).ToArray();
         }
 
-        protected void SelectAll(ObjectContext context)
+        protected void SelectAll(Asset asset)
         {
-            if (context == null || context.Dependencies.IsNullOrEmpty())
+            if (asset == null || asset.Dependencies.IsNullOrEmpty())
             {
                 return;
             }
 
-            Selection.objects = new[] { context.Object }.Concat(context.Dependencies.Select(el => el.Object)).ToArray();
+            Selection.objects = new[] { asset.Object }.Concat(asset.Dependencies.Select(el => el.Object)).ToArray();
         }
 
-        protected void FindInHierarchyWindow(ObjectContext context)
+        protected void FindInHierarchyWindow(Asset asset)
         {
-            if (context?.Path == null)
+            if (asset?.Path == null)
             {
                 return;
             }
@@ -952,46 +1061,48 @@ namespace SearchHelper.Editor
 
             method.Invoke(window, new object[]
             {
-                string.Format(SceneHierarchySearchReferenceFormat, context.Path),
+                string.Format(SceneHierarchySearchReferenceFormat, asset.Path),
                 0, // SearchableEditorWindow.SearchMode.All
                 false, // setAll
                 false // delayed
             });
         }
 
-        protected void OpenInDefaultFileBrowser(ObjectContext context)
+        protected void OpenInDefaultFileBrowser(Asset asset)
         {
-            if (string.IsNullOrEmpty(context?.Path))
+            if (string.IsNullOrEmpty(asset?.Path))
             {
                 return;
             }
 
-            EditorUtility.RevealInFinder(context.Path);
+            EditorUtility.RevealInFinder(asset.Path);
         }
 
-        protected void FindInProject(ObjectContext context)
+        protected void FindInProject(Asset asset)
         {
-            if (context?.Object == null)
+            if (asset?.Object == null)
             {
                 return;
             }
 
-            EditorGUIUtility.PingObject(context.Object);
+            EditorGUIUtility.PingObject(asset.Object);
         }
 
-        protected void OpenProperty(ObjectContext context)
+        protected void OpenProperty(Asset asset)
         {
-            if (context?.Object == null)
+            if (asset?.Object == null)
             {
                 return;
             }
 
-            EditorUtility.OpenPropertyEditor(context.Object);
+            EditorUtility.OpenPropertyEditor(asset.Object);
         }
 
         protected void CopyToClipboard(string text)
         {
             EditorGUIUtility.systemCopyBuffer = text;
         }
+
+        #endregion
     }
 }

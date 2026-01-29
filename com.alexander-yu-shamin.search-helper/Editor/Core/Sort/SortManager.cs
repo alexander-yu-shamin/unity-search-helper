@@ -4,7 +4,7 @@ using System.Linq;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
 
-namespace SearchHelper.Editor.Core
+namespace SearchHelper.Editor.Core.Sort
 {
     public enum SortVariant
     {
@@ -21,20 +21,20 @@ namespace SearchHelper.Editor.Core
         Descending
     }
 
-    public class SearchHelperSortManager
+    public class SortManager : ObservableData
     {
         public SortVariant CurrentSortVariant { get; private set; } = SortVariant.NoSorting;
         public SortOrder CurrentSortOrder { get; private set; } = SortOrder.Descending;
 
-        private bool _shouldBeMainObjectBeSorted = true;
+        private bool _sortMainAssets = true;
 
-        public bool ShouldMainObjectsBeSorted
+        public bool SortMainAssets
         {
-            get => _shouldBeMainObjectBeSorted;
+            get => _sortMainAssets;
             set
             {
-                _shouldBeMainObjectBeSorted = value;
-                UpdateData();
+                _sortMainAssets = value;
+                OnDataChanged();
             }
         }
 
@@ -53,14 +53,7 @@ namespace SearchHelper.Editor.Core
             SortOrder.Ascending
         };
         
-        private Action OnFilterChanged { get; set; }
-
-        public SearchHelperSortManager(Action onFilterChanged)
-        {
-            OnFilterChanged = onFilterChanged;
-        }
-
-        public bool Sort(IEnumerable<ObjectContext> data)
+        public bool Sort(IEnumerable<Asset> data)
         {
             if (CurrentSortVariant == SortVariant.NoSorting)
             {
@@ -72,9 +65,9 @@ namespace SearchHelper.Editor.Core
                 return false;
             }
 
-            if (ShouldMainObjectsBeSorted)
+            if (SortMainAssets)
             {
-                if (data is List<ObjectContext> list)
+                if (data is List<Asset> list)
                 {
                     SortInPlace(list, CurrentSortVariant, CurrentSortOrder);
                 }
@@ -82,7 +75,7 @@ namespace SearchHelper.Editor.Core
 
             foreach (var context in data.Where(context => !context.Dependencies.IsNullOrEmpty()))
             {
-                if (context.Dependencies is List<ObjectContext> list)
+                if (context.Dependencies is List<Asset> list)
                 {
                     SortInPlace(list, CurrentSortVariant, CurrentSortOrder);
                 }
@@ -99,7 +92,7 @@ namespace SearchHelper.Editor.Core
             }
 
             CurrentSortVariant = sortVariant;
-            UpdateData();
+            OnDataChanged();
         }
 
         public void Select(SortOrder sortOrder)
@@ -110,15 +103,10 @@ namespace SearchHelper.Editor.Core
             }
 
             CurrentSortOrder = sortOrder;
-            UpdateData();
+            OnDataChanged();
         }
 
-        private void UpdateData()
-        {
-            OnFilterChanged?.Invoke();
-        }
-
-        private void SortInPlace(List<ObjectContext> list, SortVariant sortVariant, SortOrder sortOrder)
+        private void SortInPlace(List<Asset> list, SortVariant sortVariant, SortOrder sortOrder)
         {
             if (sortVariant == SortVariant.NoSorting)
             {
@@ -127,7 +115,7 @@ namespace SearchHelper.Editor.Core
 
             var target = ToTarget(sortVariant);
 
-            Comparison<ObjectContext> comparison = sortVariant switch
+            Comparison<Asset> comparison = sortVariant switch
             {
                 SortVariant.ByName or SortVariant.ByPath => (a, b) =>
                     string.CompareOrdinal(a.GetTarget(target), b.GetTarget(target)),
@@ -153,15 +141,15 @@ namespace SearchHelper.Editor.Core
             list.Sort(comparison);
         }
 
-        private ObjectContextTarget ToTarget(SortVariant sortVariant)
+        private AssetTarget ToTarget(SortVariant sortVariant)
         {
             return sortVariant switch
             {
-                SortVariant.ByName                           => ObjectContextTarget.Name,
-                SortVariant.ByPath                           => ObjectContextTarget.Path,
-                SortVariant.Natural                          => ObjectContextTarget.Path,
-                SortVariant.NoSorting or SortVariant.ByCount => ObjectContextTarget.NoTarget,
-                _                                            => ObjectContextTarget.NoTarget
+                SortVariant.ByName                           => AssetTarget.Name,
+                SortVariant.ByPath                           => AssetTarget.Path,
+                SortVariant.Natural                          => AssetTarget.Path,
+                SortVariant.NoSorting or SortVariant.ByCount => AssetTarget.NoTarget,
+                _                                            => AssetTarget.NoTarget
             };
         }
     }
