@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using SearchHelper.Editor.Core;
+using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.Diagnostics;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
@@ -26,7 +27,10 @@ namespace SearchHelper.Editor.Tools
         private readonly HashSet<string> _defaultLines = new() { "assetBundleName", "assetBundleVariant", "SpriteID", "userData" };
         private HashSet<string> IgnoredLines { get; set; } = new HashSet<string>();
 
-        protected override IEnumerable<Asset> Assets => Contexts;
+        protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
+            SearchHelperWindow.ToolType.MergeTool;
+
+        protected override IEnumerable<Asset> Data => Contexts;
 
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
@@ -43,7 +47,8 @@ namespace SearchHelper.Editor.Tools
             CompareWithBaseObject(Contexts);
         }
 
-        public override void GetDataFromAnotherTool(Asset asset)
+        public override void GetDataFromAnotherTool(SearchHelperWindow.ToolType from,
+            SearchHelperWindow.ToolType to, Asset asset)
         {
             if (asset == null)
             {
@@ -109,11 +114,8 @@ namespace SearchHelper.Editor.Tools
 
             DrawModel ??= new Model()
             {
-                DrawDependencies = ShowDependents,
-                DrawObjectWithEmptyDependencies = true,
                 DrawMergeButtons = true,
                 DrawState = true,
-                DrawEmptyDependency = ShowDependents,
 
                 GetState = GetObjectState,
                 GetObjectFieldColor = GetObjectFieldColor,
@@ -123,8 +125,6 @@ namespace SearchHelper.Editor.Tools
                 OnDiffButtonPressed = DiffButtonPressedHandler
             };
 
-            DrawModel.DrawDependencies = ShowDependents;
-            DrawModel.DrawEmptyDependency = ShowDependents;
 
             EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
         }

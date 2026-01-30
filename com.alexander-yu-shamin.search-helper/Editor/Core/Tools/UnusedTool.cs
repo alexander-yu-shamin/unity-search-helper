@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using SearchHelper.Editor.Core;
+using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
@@ -12,6 +13,7 @@ namespace SearchHelper.Editor.Tools
     public class UnusedTool : ToolBase
     {
         protected override bool AreScopeRulesSupported { get; set; } = true;
+        protected override bool ShowAssetWithDependencies { get; set; } = false;
         protected override bool ShowSize { get; set; } = true;
 
         protected override string EmptyObjectContextText
@@ -37,25 +39,17 @@ namespace SearchHelper.Editor.Tools
         } 
 
         private Object SelectedObject { get; set; }
-        private Object UsedObject { get; set; }
-        private bool ShowUsedItems { get; set; } = false;
-        private bool ShowUnusedItems { get; set; } = true;
+        private List<Asset> Assets { get; set; }
+        protected override IEnumerable<Asset> Data => Assets;
 
-        private List<Asset> _assets { get; set; }
-
-        protected override IEnumerable<Asset> Assets => _assets;
+        protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
+            SearchHelperWindow.ToolType.UnusedTool;
 
         public override void Draw(Rect windowRect)
         {
             EGuiKit.Horizontal(() =>
             {
-                SelectedObject = EditorGUILayout.ObjectField(SelectedObject, typeof(Object), true,
-                    GUILayout.Width(SelectedObjectWidth));
-                if (UsedObject != SelectedObject)
-                {
-                    UsedObject = null;
-                }
-
+                SelectedObject = DrawObject(SelectedObject);
                 EGuiKit.Button("Find", Run);
 
                 EGuiKit.Space();
@@ -68,7 +62,7 @@ namespace SearchHelper.Editor.Tools
                 DrawHeaderControls();
             });
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, _assets));
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Assets));
         }
 
         public override void Run(Object selectedObject)
@@ -79,27 +73,12 @@ namespace SearchHelper.Editor.Tools
 
         public override void Run()
         {
-            _assets = FindUnused(SelectedObject);
-        }
-
-        protected override void AddSettingsContextMenu(GenericMenu menu)
-        {
-            menu.AddItem(new GUIContent("Show Unused Items"), ShowUnusedItems, () =>
-            {
-                ShowUnusedItems = !ShowUnusedItems;
-                UpdateAssets(_assets);
-            });
-
-            menu.AddItem(new GUIContent("Show Used Items"), ShowUsedItems, () =>
-            {
-                ShowUsedItems = !ShowUsedItems;
-                UpdateAssets(_assets);
-            });
+            Assets = FindUnused(SelectedObject);
         }
 
         protected override void AddActionContextMenu(GenericMenu menu)
         {
-            if (_assets.IsNullOrEmpty())
+            if (Assets.IsNullOrEmpty())
             {
                 menu.AddDisabledItem(new GUIContent("Remove Unused Items"));
             }
@@ -116,9 +95,7 @@ namespace SearchHelper.Editor.Tools
                 return null;
             }
 
-            UsedObject = obj;
-
-            var map = FolderOrFile(UsedObject).Select(Asset.ToObjectContext).ToDictionary(key => key.Path);
+            var map = FolderOrFile(obj).Select(Asset.ToObjectContext).ToDictionary(key => key.Path);
 
             var root = IsGlobalScope ? null : FolderPathFromObject(obj);
             var dependencyMap = SearchHelperService.BuildDependencyMap(root, IsCacheUsed);
@@ -130,48 +107,20 @@ namespace SearchHelper.Editor.Tools
                 }
             }
 
-            var contexts = map.Values.ToList();
-            UpdateAssets(contexts);
-            return contexts;
+            var assets = map.Values.ToList();
+            UpdateAssets(assets);
+            return assets;
         }
-
-        //protected override bool ShouldBeShown(ObjectContext objectContext, ObjectContext parentContext = null)
-        //{
-        //    var isTopLevel = parentContext == null;
-
-        //    if (!isTopLevel)
-        //    {
-        //        if (!ShowUsedItems)
-        //        {
-        //            return false;
-        //        }
-        //    }
-        //    else
-        //    {
-        //        var hasDependencies = objectContext.Dependencies.Count != 0;
-        //        if (hasDependencies && !ShowUsedItems)
-        //        {
-        //            return false;
-        //        }
-
-        //        if (!hasDependencies && !ShowUnusedItems)
-        //        {
-        //            return false;
-        //        }
-        //    }
-
-        //    return base.ShouldBeShown(objectContext, parentContext);
-        //}
 
         private void RemovedUnusedItems()
         {
-            if (_assets.IsNullOrEmpty())
+            if (Assets.IsNullOrEmpty())
             {
                 return;
             }
 
             AssetDatabase.StartAssetEditing();
-            foreach (var asset in _assets)
+            foreach (var asset in Assets)
             {
                 if (!IsMainAssetVisible(asset))
                 {

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using SearchHelper.Editor.Core;
+using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
@@ -9,18 +10,26 @@ namespace SearchHelper.Editor.Tools
 {
     public class FindByGuidTool : ToolBase
     {
+        protected override bool ShowEmptyDependencyText { get; set; } = false;
+        protected override bool ShowDependenciesCount { get; set; } = false;
+
         private string CurrentGuid { get; set; } 
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
         private string CurrentUsedObjectGuid { get; set; }
         private List<Asset> Contexts { get; set; }
-        protected override IEnumerable<Asset> Assets => Contexts;
+
+        protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
+            SearchHelperWindow.ToolType.FindByGuidTool;
+        protected override IEnumerable<Asset> Data => Contexts;
         public override void Draw(Rect windowRect)
         {
-            EGuiKit.Horizontal(() => 
+            EGuiKit.Horizontal(() =>
             {
-                EGuiKit.Label("GUID:");
-                var newGuid = EditorGUILayout.TextField(CurrentGuid, GUILayout.Width(GuidTextAreaWidth));
+                var height = GUILayout.Height(HeaderHeight);
+
+                EGuiKit.Label("GUID:", height);
+                var newGuid = EditorGUILayout.TextField(CurrentGuid, GUILayout.Width(GuidTextAreaWidth), height);
                 if (newGuid != CurrentGuid)
                 {
                     CurrentGuid = newGuid;
@@ -30,12 +39,11 @@ namespace SearchHelper.Editor.Tools
                 EGuiKit.Button("Find", () =>
                 {
                     FindAssetByGuid(CurrentGuid);
-                });
+                }, height);
 
                 EGuiKit.FlexibleSpace();
 
-                SelectedObject = EditorGUILayout.ObjectField(SelectedObject, typeof(Object), true,
-                    GUILayout.Width(SelectedObjectWidth));
+                SelectedObject = DrawObject(SelectedObject);
 
                 if (UsedObject != SelectedObject)
                 {
@@ -44,7 +52,7 @@ namespace SearchHelper.Editor.Tools
                     CurrentUsedObjectGuid = SearchHelperService.GetObjectGuid(UsedObject);
                 }
                 
-                EditorGUILayout.TextField(CurrentUsedObjectGuid, GUILayout.Width(GuidTextAreaWidth));
+                EditorGUILayout.TextField(CurrentUsedObjectGuid, GUILayout.Width(GuidTextAreaWidth), height);
             });
 
             DrawContexts(windowRect);

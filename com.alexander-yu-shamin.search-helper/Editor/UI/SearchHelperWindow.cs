@@ -120,14 +120,14 @@ namespace SearchHelper.Editor.UI
             SearchHelperService.OnAssetChanged -= AssetChangedHandler;
         }
 
-        public static void TransferToTool(ToolType toolType, Asset context)
+        public static void TransferToTool(ToolType from, ToolType to, Asset context)
         {
-            OpenWindow()?.SelectTool(toolType).GetDataFromAnotherTool(context);
+            OpenWindow()?.SelectTool(to).GetDataFromAnotherTool(from, to, context);
         }
 
-        public static void TransferToTool(ToolType toolType, IEnumerable<Asset> contexts)
+        public static void TransferToTool(ToolType from, ToolType to, IEnumerable<Asset> contexts)
         {
-            OpenWindow()?.SelectTool(toolType).GetDataFromAnotherTool(contexts);
+            OpenWindow()?.SelectTool(to).GetDataFromAnotherTool(from, to, contexts);
         }
 
         public void OnGUI()

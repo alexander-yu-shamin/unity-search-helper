@@ -155,6 +155,7 @@ namespace SearchHelper.Editor.Core
 
         public static Dictionary<string, List<Asset>> BuildDependencyMap(string root = null, bool useCache = true)
         {
+            // Cache is broken with global and local mode
             AssetDatabase.SaveAssets();
             using var measure = Profiler.Measure($"BuildDependencyMap {root ?? "global"}");
 

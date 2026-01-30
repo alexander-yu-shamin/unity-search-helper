@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using Codice.CM.Common.Matcher;
-using PlasticPipe.PlasticProtocol.Messages;
 using SearchHelper.Editor.Core;
 using SearchHelper.Editor.Core.Filter;
 using SearchHelper.Editor.Core.Sort;
+using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.Diagnostics;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
@@ -21,13 +20,8 @@ namespace SearchHelper.Editor
     {
         protected class Model
         {
-            public bool DrawDependencies { get; set; } = true;
             public bool DrawMergeButtons { get; set; }
-            public bool DrawEmptyDependency { get; set; } = true;
             public bool DrawState { get; set; } = true;
-
-            protected internal bool DrawObjectWithEmptyDependencies { get; set; } = true;
-            protected internal bool DrawEmptyFolder { get; set; } = true;
 
             public Func<Asset, (string, Color)?> GetState { get; set; }
             public Func<Asset, Color> GetObjectFieldColor { get; set; }
@@ -45,13 +39,16 @@ namespace SearchHelper.Editor
         protected virtual bool AreSettingsSupported { get; set; } = true;
         protected virtual bool ShowSize { get; set; } = false;
         protected virtual bool IsCacheUsed { get; set; } = true;
+        protected virtual bool ShowDependenciesCount { get; set; } = true;
 
         // Visibility
         protected virtual bool AreVisibilityRulesSupported { get; set; } = true;
         protected virtual bool AreShowingFoldersSupported { get; set; } = true;
         protected virtual bool ShowFolders { get; set; } = false;
-        protected virtual bool ShowEmptyDependencies { get; set; } = true;
+        protected virtual bool ShowEmptyDependencyText { get; set; } = true;
         protected virtual bool CountHiddenDependencies { get; set; } = false;
+        protected virtual bool ShowAssetWithNoDependencies { get; set; } = true;
+        protected virtual bool ShowAssetWithDependencies { get; set; } = true;
         protected virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
         protected virtual bool AreScopeRulesSupported { get; set; } = false;
@@ -59,6 +56,7 @@ namespace SearchHelper.Editor
         protected virtual bool AreSortingRulesSupported { get; set; } = true;
         protected virtual bool AreFilterByRuleSupported { get; set; } = true;
         protected virtual bool AreFilterByStringRulesSupported { get; set; } = true;
+        protected virtual bool IsTransferSupported { get; set; } = true;
         #endregion
 
         #region DrawSettings
@@ -96,23 +94,36 @@ namespace SearchHelper.Editor
         protected static readonly Color ErrorColor = Color.red;
 
         #endregion
-
         private Vector2 ScrollViewPosition { get; set; }
         private FilterByRuleManager FilterByRuleManager { get; set; }
         private FilterByStringManager FilterByStringManager { get; set; }
         private SortManager SortManager { get; set; }
+
+        private List<SearchHelperWindow.ToolType> PossibleTransferTypes { get; set; } =
+            new List<SearchHelperWindow.ToolType>()
+            {
+                SearchHelperWindow.ToolType.DependencyTool,
+                SearchHelperWindow.ToolType.UsedByTool,
+                SearchHelperWindow.ToolType.DuplicatesTool,
+                SearchHelperWindow.ToolType.MergeTool
+            };
+
         protected Model DefaultModel { get; set; }
 
-        protected abstract IEnumerable<Asset> Assets { get; }
+        #region I
+        protected abstract SearchHelperWindow.ToolType CurrentToolType { get; set; }
+        protected abstract IEnumerable<Asset> Data { get; }
         public abstract void Run(Object selectedObject);
         public abstract void Run();
         public abstract void Draw(Rect windowRect);
 
-        public virtual void GetDataFromAnotherTool(IEnumerable<Asset> assets)
+        public virtual void GetDataFromAnotherTool(SearchHelperWindow.ToolType from,
+            SearchHelperWindow.ToolType to, IEnumerable<Asset> assets)
         {
         }
 
-        public virtual void GetDataFromAnotherTool(Asset asset)
+        public virtual void GetDataFromAnotherTool(SearchHelperWindow.ToolType from,
+            SearchHelperWindow.ToolType to, Asset asset)
         {
         }
 
@@ -133,14 +144,11 @@ namespace SearchHelper.Editor
 
             DefaultModel ??= new Model()
             {
-                DrawDependencies = ShowEmptyDependencies,
-                DrawEmptyDependency = ShowEmptyDependencies,
                 DrawMergeButtons = false,
-                DrawEmptyFolder = ShowFolders,
-                DrawObjectWithEmptyDependencies = ShowEmptyDependencies,
                 DrawState = false
             };
         }
+        #endregion
 
         #region Data
 
@@ -154,7 +162,9 @@ namespace SearchHelper.Editor
             return asset.State.HasNoneFlags(AssetState.None
                                             | AssetState.FilterByRule
                                             | AssetState.FilterByString
-                                            | AssetState.HideFolders);
+                                            | AssetState.HideFolders
+                                            | AssetState.HideEmptyDependencies
+                                            | AssetState.HideDependencies);
         }
 
         protected virtual bool IsDependencyAssetVisible(Asset asset)
@@ -167,31 +177,48 @@ namespace SearchHelper.Editor
 
         protected void UpdateAssets(IEnumerable<Asset> assets = null)
         {
-            assets ??= Assets;
+            assets ??= Data;
 
             if (assets.IsNullOrEmpty())
             {
                 return;
             }
 
-            using (Profiler.Measure($"UpdateData::Filter"))
+            using (Profiler.Measure($"UpdateData::State"))
             {
                 var useFilterByRule = AreFilterByRuleSupported && FilterByRuleManager is { RequiresUpdate: true };
                 var useFilterByString = AreFilterByStringRulesSupported && FilterByStringManager is { RequiresUpdate: true };
                 foreach (var asset in assets)
                 {
-                    if (useFilterByRule)
-                    {
-                        asset.State = FilterByRuleManager.IsAllowed(asset)
-                            ? asset.State & ~AssetState.FilterByRule
-                            : asset.State | AssetState.FilterByRule;
-                    }
+                    asset.State &= ~AssetState.HideFolders;
+                    asset.State &= ~AssetState.HideEmptyDependencies;
+                    asset.State &= ~AssetState.HideDependencies;
 
                     if (AreShowingFoldersSupported && asset.IsFolder)
                     {
                         asset.State = ShowFolders 
                             ? asset.State & ~AssetState.HideFolders
                             : asset.State | AssetState.HideFolders;
+                    }
+
+                    if (asset.Dependencies.IsNullOrEmpty())
+                    {
+                        asset.State = ShowAssetWithNoDependencies
+                            ? asset.State & ~AssetState.HideEmptyDependencies
+                            : asset.State | AssetState.HideEmptyDependencies;
+                    }
+                    else
+                    {
+                        asset.State = ShowAssetWithDependencies
+                            ? asset.State & ~AssetState.HideDependencies
+                            : asset.State | AssetState.HideDependencies;
+                    }
+
+                    if (useFilterByRule)
+                    {
+                        asset.State = FilterByRuleManager.IsAllowed(asset)
+                            ? asset.State & ~AssetState.FilterByRule
+                            : asset.State | AssetState.FilterByRule;
                     }
 
                     if (!useFilterByString && (asset.State & AssetState.FilterByRule) != 0 && !useFilterByRule)
@@ -280,18 +307,18 @@ namespace SearchHelper.Editor
 
                 menu.AddItem(new GUIContent("Copy/Asset Paths"), false, () =>
                 {
-                    CopyToClipboard(string.Join("\n", Assets?.Where(IsMainAssetVisible)?.Select(asset => asset.Path) ?? Array.Empty<string>()));
+                    CopyToClipboard(string.Join("\n", Data?.Where(IsMainAssetVisible)?.Select(asset => asset.Path) ?? Array.Empty<string>()));
                 });
 
                 menu.AddItem(new GUIContent("Copy/Asset Dependency Map"), false, () =>
                 {
-                    if (Assets.IsNullOrEmpty())
+                    if (Data.IsNullOrEmpty())
                     {
                         return;
                     }
 
                     var sb = new StringBuilder();
-                    foreach (var asset in Assets)
+                    foreach (var asset in Data)
                     {
                         if (!IsMainAssetVisible(asset))
                         {
@@ -354,7 +381,7 @@ namespace SearchHelper.Editor
         {
         }
 
-        protected void DrawVisibilityRules()
+        private void DrawVisibilityRules()
         {
             if (!AreVisibilityRulesSupported)
             {
@@ -367,17 +394,17 @@ namespace SearchHelper.Editor
             if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
                 var menu = new GenericMenu();
-                menu.AddItem(new GUIContent("Show Dependencies"), false, () =>
+                menu.AddItem(new GUIContent("Expand All"), false, () =>
                 {
-                    foreach (var asset in Assets)
+                    foreach (var asset in Data)
                     {
                         asset.IsFoldout = true;
                     }
                 });
 
-                menu.AddItem(new GUIContent("Hide Dependencies"), false, () =>
+                menu.AddItem(new GUIContent("Collapse All"), false, () =>
                 {
-                    foreach (var asset in Assets)
+                    foreach (var asset in Data)
                     {
                         asset.IsFoldout = false;
                     }
@@ -393,15 +420,27 @@ namespace SearchHelper.Editor
                     });
                 }
 
-                menu.AddItem(new GUIContent("Show Empty Dependencies"), ShowEmptyDependencies, () =>
+                menu.AddItem(new GUIContent("Show Asset with No Dependencies"), ShowAssetWithNoDependencies, () =>
                 {
-                    ShowEmptyDependencies = !ShowEmptyDependencies;
+                    ShowAssetWithNoDependencies = !ShowAssetWithNoDependencies;
+                    UpdateAssets();
+                });
+
+                menu.AddItem(new GUIContent("Show Asset with Dependencies"), ShowAssetWithDependencies, () =>
+                {
+                    ShowAssetWithDependencies = !ShowAssetWithDependencies;
                     UpdateAssets();
                 });
 
                 menu.AddItem(new GUIContent("Count Hidden Dependencies"), CountHiddenDependencies, () =>
                 {
                     CountHiddenDependencies = !CountHiddenDependencies;
+                    UpdateAssets();
+                });
+
+                menu.AddItem(new GUIContent("Show Empty Dependency Text"), ShowEmptyDependencyText, () =>
+                {
+                    ShowEmptyDependencyText = !ShowEmptyDependencyText;
                     UpdateAssets();
                 });
 
@@ -559,11 +598,6 @@ namespace SearchHelper.Editor
             if (model == null)
             {
                 model = DefaultModel;
-
-                model.DrawDependencies = ShowEmptyDependencies;
-                model.DrawEmptyDependency = ShowEmptyDependencies;
-                model.DrawEmptyFolder = ShowFolders;
-                model.DrawObjectWithEmptyDependencies = ShowEmptyDependencies;
             }
 
             GUILayout.Space(HeaderPadding);
@@ -591,11 +625,6 @@ namespace SearchHelper.Editor
                         () => CalculateHeaderHeight(ctx, model)))
                 {
                     break;
-                }
-
-                if (!model.DrawDependencies)
-                {
-                    continue;
                 }
 
                 if (ctx.Dependencies.IsNullOrEmpty())
@@ -763,19 +792,23 @@ namespace SearchHelper.Editor
                 EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "GUID:");
             }
 
-            var neededWidthForDependency = neededWidthForGuid + 50.0f + 90.0f + HorizontalIndent;
-            if (leftWidth > neededWidthForDependency)
+            var neededWidthForDependency = neededWidthForGuid + HorizontalIndent;
+            if (ShowDependenciesCount)
             {
-                elementWidth = 50.0f;
-                x -= elementWidth + HorizontalIndent;
-                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight),
-                    !CountHiddenDependencies
-                        ? asset.Dependencies.Count(IsDependencyAssetVisible).ToString()
-                        : asset.Dependencies?.Count.ToString());
+                neededWidthForDependency = neededWidthForGuid + 50.0f + 90.0f + HorizontalIndent;
+                if (leftWidth > neededWidthForDependency)
+                {
+                    elementWidth = 50.0f;
+                    x -= elementWidth + HorizontalIndent;
+                    EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight),
+                        !CountHiddenDependencies
+                            ? asset.Dependencies.Count(IsDependencyAssetVisible).ToString()
+                            : asset.Dependencies?.Count.ToString());
 
-                elementWidth = 90.0f;
-                x -= elementWidth;
-                EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Dependencies:");
+                    elementWidth = 90.0f;
+                    x -= elementWidth;
+                    EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Dependencies:");
+                }
             }
 
             var neededWidthForSize = neededWidthForDependency + HorizontalIndent;
@@ -829,7 +862,7 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            if (!model.DrawObjectWithEmptyDependencies)
+            if (!ShowEmptyDependencyText)
             {
                 return 0.0f;
             }
@@ -974,6 +1007,7 @@ namespace SearchHelper.Editor
 
             if (!asset.Dependencies.IsNullOrEmpty())
             {
+                menu.AddSeparator(string.Empty);
                 menu.AddItem(new GUIContent("Select All in Project"), false, () => { SelectAll(asset); });
                 menu.AddItem(new GUIContent("Select Dependencies in Project"), false,
                     () => { SelectDependencies(asset); });
@@ -984,6 +1018,18 @@ namespace SearchHelper.Editor
                     });
             }
 
+            if (IsTransferSupported && asset.Object != null)
+            {
+                menu.AddSeparator(string.Empty);
+                foreach (var transferType in PossibleTransferTypes)
+                {
+                    menu.AddItem(new GUIContent($"Transfer To/{transferType.ToString().ToSpacedWords()}"), false, () =>
+                    {
+                        TransferTo(CurrentToolType, transferType, asset);
+                    });
+                }
+            }
+
             AddContextMenu(menu, asset);
 
             menu.ShowAsContext();
@@ -991,6 +1037,11 @@ namespace SearchHelper.Editor
 
         protected virtual void AddContextMenu(GenericMenu menu, Asset asset)
         {
+        }
+
+        protected virtual Object DrawObject(Object obj, Action<Object> onNewObject = null)
+        {
+            return EGuiKit.Object(obj, typeof(Object), true, onNewObject, GUILayout.Width(SelectedObjectWidth), GUILayout.Height(HeaderHeight));
         }
 
         #endregion
@@ -1102,7 +1153,26 @@ namespace SearchHelper.Editor
         {
             EditorGUIUtility.systemCopyBuffer = text;
         }
+        
+        protected void TransferTo(SearchHelperWindow.ToolType from, SearchHelperWindow.ToolType to, Asset asset)
+        {
+            if (asset == null)
+            {
+                return;
+            }
 
+            if (!IsMainAssetVisible(asset))
+            {
+                return;
+            }
+
+            var transferContext = new Asset(asset)
+            {
+                Dependencies = asset.Dependencies.Where(IsDependencyAssetVisible).ToList()
+            };
+
+            SearchHelperWindow.TransferToTool(from, to, transferContext);
+        }
         #endregion
     }
 }

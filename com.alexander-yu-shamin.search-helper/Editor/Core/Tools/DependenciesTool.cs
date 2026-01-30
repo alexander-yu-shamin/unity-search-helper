@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using SearchHelper.Editor.Core;
+using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
-using UnityEditor;
 using UnityEngine;
 
 namespace SearchHelper.Editor.Tools
@@ -10,28 +10,24 @@ namespace SearchHelper.Editor.Tools
     public class DependenciesTool : ToolBase
     {
         private Object SelectedObject { get; set; }
-        private Object UsedObject { get; set; }
+        private List<Asset> Assets { get; set; }
+        protected override IEnumerable<Asset> Data => Assets;
 
-        private List<Asset> _assets { get; set; }
-        protected override IEnumerable<Asset> Assets => _assets;
+        protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
+            SearchHelperWindow.ToolType.DependencyTool;
 
         public override void Draw(Rect windowRect)
         {
             EGuiKit.Horizontal(() =>
             {
-                SelectedObject = EditorGUILayout.ObjectField(SelectedObject, typeof(Object), true,
-                    GUILayout.Width(SelectedObjectWidth));
-                if (UsedObject != SelectedObject)
-                {
-                    UsedObject = null;
-                }
+                SelectedObject = DrawObject(SelectedObject);
 
                 EGuiKit.Button("Find", Run);
                 EGuiKit.FlexibleSpace();
                 DrawHeaderControls();
             });
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, _assets));
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Assets));
         }
 
         public override void Run(Object selectedObject)
@@ -48,7 +44,12 @@ namespace SearchHelper.Editor.Tools
 
         public override void Run()
         {
-            _assets = FindDependencies(SelectedObject);
+            Assets = FindDependencies(SelectedObject);
+        }
+
+        public override void GetDataFromAnotherTool(SearchHelperWindow.ToolType from, SearchHelperWindow.ToolType to, Asset asset)
+        {
+            Run(asset.Object);
         }
 
         private List<Asset> FindDependencies(Object obj)
@@ -58,7 +59,6 @@ namespace SearchHelper.Editor.Tools
                 return null;
             }
 
-            UsedObject = obj;
             var assets = FolderOrFile(obj).Select(SearchHelperService.FindDependencies).ToList();
             UpdateAssets(assets);
             return assets;

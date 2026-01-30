@@ -17,10 +17,11 @@ namespace SearchHelper.Editor.Tools
         protected override bool ShowSize { get; set; } = true;
 
         private Object SelectedObject { get; set; }
-        private Object UsedObject { get; set; }
+        private List<Asset> Assets { get; set; }
+        protected override IEnumerable<Asset> Data => Assets;
 
-        private List<Asset> Contexts { get; set; }
-        protected override IEnumerable<Asset> Assets => Contexts;
+        protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
+            SearchHelperWindow.ToolType.DuplicatesTool;
 
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
@@ -32,13 +33,7 @@ namespace SearchHelper.Editor.Tools
         {
             EGuiKit.Horizontal(() =>
             {
-                SelectedObject = EditorGUILayout.ObjectField(SelectedObject, typeof(Object), true,
-                    GUILayout.Width(SelectedObjectWidth));
-                if (UsedObject != SelectedObject)
-                {
-                    UsedObject = null;
-                }
-
+                SelectedObject = DrawObject(SelectedObject);
                 EGuiKit.Button("Find", Run);
 
                 EGuiKit.Space();
@@ -48,14 +43,14 @@ namespace SearchHelper.Editor.Tools
                 });
 
                 EGuiKit.FlexibleSpace();
-                EGuiKit.Button(UsedObject != null && !Contexts.IsNullOrEmpty() && Contexts.Count == 1, "Open in Merge Tool", () =>
+                EGuiKit.Button(!Assets.IsNullOrEmpty() && Assets.Count == 1, "Open in Merge Tool", () =>
                 {
-                    TransferToMergeTool(Contexts.FirstOrDefault());
+                    TransferTo(CurrentToolType, SearchHelperWindow.ToolType.MergeTool, Assets.FirstOrDefault());
                 });
                 DrawHeaderControls();
             });
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Assets));
         }
 
         public override void Run(Object selectedObject)
@@ -66,7 +61,12 @@ namespace SearchHelper.Editor.Tools
 
         public override void Run()
         {
-            Contexts = FindDuplicates(SelectedObject);
+            Assets = FindDuplicates(SelectedObject);
+        }
+
+        public override void GetDataFromAnotherTool(SearchHelperWindow.ToolType from, SearchHelperWindow.ToolType to, Asset asset)
+        {
+            Run(asset.Object);
         }
 
         private List<Asset> FindDuplicates(Object obj)
@@ -76,7 +76,6 @@ namespace SearchHelper.Editor.Tools
             IEnumerable<string> paths;
             if (obj != null)
             {
-                UsedObject = obj;
                 var objPath = AssetDatabase.GetAssetPath(obj);
                 if (!string.IsNullOrEmpty(objPath) && AssetDatabase.IsValidFolder(objPath))
                 {
@@ -90,7 +89,6 @@ namespace SearchHelper.Editor.Tools
             }
             else
             {
-                UsedObject = AssetDatabase.LoadMainAssetAtPath("Assets");
                 paths = SearchHelperService.FindAssetPaths();
             }
 
@@ -133,7 +131,7 @@ namespace SearchHelper.Editor.Tools
                 }
             }
 
-            var contexts = 
+            var assets = 
                 dict.Where(kv => (string.IsNullOrEmpty(searchedHash) || kv.Key == searchedHash) && kv.Value.Count > 1).Select(kv =>
                 {
                     var ctx = Asset.FromPath(kv.Value.First());
@@ -141,41 +139,8 @@ namespace SearchHelper.Editor.Tools
                     return ctx;
                 }).ToList();
 
-            UpdateAssets(contexts);
-            return contexts;
-        }
-
-        protected override void AddContextMenu(GenericMenu menu, Asset context)
-        {
-            if (context.Dependencies.IsNullOrEmpty())
-            {
-                return;
-            }
-
-            menu.AddItem(new GUIContent("Open in Merge Tool"), false, () =>
-            {
-                TransferToMergeTool(context);
-            });
-        }
-
-        private void TransferToMergeTool(Asset asset)
-        {
-            if (asset == null)
-            {
-                return;
-            }
-
-            if (!IsMainAssetVisible(asset))
-            {
-                return;
-            }
-
-            var transferContext = new Asset(asset)
-            {
-                Dependencies = asset.Dependencies.Where(IsMainAssetVisible).ToList()
-            };
-
-            SearchHelperWindow.TransferToTool(SearchHelperWindow.ToolType.MergeTool, transferContext);
+            UpdateAssets(assets);
+            return assets;
         }
     }
 }

@@ -31,7 +31,9 @@ namespace SearchHelper.Editor
         FilterByRule = 1 << 1,
         FilterByString = 1 << 2,
         HideFolders = 1 << 3,
-        Foldout = 1 << 4
+        HideDependencies = 1 << 4,
+        HideEmptyDependencies = 1 << 5,
+        Foldout = 1 << 6
     }
 
     public class Asset
