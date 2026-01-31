@@ -84,7 +84,7 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            Contexts = Asset.ToObjectContext(foundObject).AsList();
+            Contexts = Asset.ToAsset(foundObject).AsList();
         }
 
         private void DrawContexts(Rect windowRect)

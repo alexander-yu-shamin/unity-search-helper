@@ -17,128 +17,118 @@ namespace SearchHelper.Editor.Tools
     {
         protected override bool AreShowingFoldersSupported { get; set; } = false;
         protected override bool AreFilterByRuleSupported { get; set; } = false;
-        protected override string EmptyObjectContextText { get; set; } = "This object is not referenced anywhere in the project.";
+        protected override bool ShowEmptyDependencyText { get; set; } = false;
+        protected override bool IsMetaDiffSupported { get; set; } = true;
+        protected override bool MetaDiffEnabled { get; set; } = true;
 
         private Asset BaseObject { get; set; }
-        private List<Asset> Contexts { get; set; } = new();
         private Model DrawModel { get; set; }
         private bool ShowDependents { get; set; } = false;
-
-        private readonly HashSet<string> _defaultLines = new() { "assetBundleName", "assetBundleVariant", "SpriteID", "userData" };
-        private HashSet<string> IgnoredLines { get; set; } = new HashSet<string>();
+        private List<Asset> Assets { get; set; } = new();
+        protected override IEnumerable<Asset> Data => Assets;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.MergeTool;
 
-        protected override IEnumerable<Asset> Data => Contexts;
 
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
         {
-            using var measure = Profiler.Measure("AssetChanged");
-            foreach (var asset in Contexts)
-            {
-                if (asset.Object != null)
-                {
-                    asset.IsMerged = false;
-                }
-            }
+            //using var measure = Profiler.Measure("AssetChanged");
+            //foreach (var asset in Contexts)
+            //{
+            //    if (asset.Object != null)
+            //    {
+            //        asset.IsMerged = false;
+            //    }
+            //}
 
-            CompareWithBaseObject(Contexts);
+            //CompareWithBaseObject(Contexts);
         }
 
-        public override void GetDataFromAnotherTool(SearchHelperWindow.ToolType from,
-            SearchHelperWindow.ToolType to, Asset asset)
+        public override void Init()
         {
-            if (asset == null)
-            {
-                return;
-            }
+            base.Init();
 
-            if (asset.Dependencies.IsNullOrEmpty())
-            {
-                return;
-            }
-
-            BaseObject = null;
-            Contexts = new List<Asset>();
-
-            if (Contexts.Contains(asset))
-            {
-                return;
-            }
-
-            if (Contexts.Any(element => element.Path == asset.Path))
-            {
-                return;
-            }
-
-            AddObjectToMergeAsBase(asset.Object);
-
-            foreach (var dependency in asset.Dependencies.Where(dependency => dependency.Path != asset.Path))
-            {
-                AddObjectToMergeAsTheirs(dependency.Object);
-            }
+            DefaultModel.DrawMergeButtons = true;
+            DefaultModel.DrawState = true;
+            DefaultModel.OnSelectedButtonPressed = SelectedButtonPressedHandler;
+            DefaultModel.OnRemoveButtonPressed = RemoveButtonPressedHandler;
+            DefaultModel.OnComparandButtonPressed = ComparandButtonPressedHandler;
+            DefaultModel.OnDiffButtonPressed = DiffButtonPressedHandler;
         }
 
         public override void Draw(Rect windowRect)
         {
             EGuiKit.Horizontal(() =>
             {
-                EGuiKit.Button("Add Selected Object as Base", () => { AddObjectToMergeAsBase(Selection.activeObject); });
-                EGuiKit.Button("Add Selected Object as Theirs", () => { AddObjectToMergeAsTheirs(Selection.activeObject);});
+                EGuiKit.Button("Add Selected Object as Base", () => { AddToMerge(Selection.activeObject, isBaseAsset: true); });
+                EGuiKit.Button("Add Selected Object as Theirs", () => { AddToMerge(Selection.activeObject); });
 
-                EGuiKit.Button(BaseObject != null || !Contexts.IsNullOrEmpty(), "Clear", () =>
+                EGuiKit.Button(BaseObject != null || !Assets.IsNullOrEmpty(), "Clear", () =>
                 {
                     BaseObject = null;
-                    Contexts = null;
+                    Assets = null;
                 });
-
-                DrawSelectButton();
 
                 EGuiKit.FlexibleSpace();
-                EGuiKit.Button(BaseObject != null && IsMainAssetVisible(BaseObject) && !Contexts.IsNullOrEmpty(), "Merge", () =>
+                EGuiKit.Button(BaseObject != null && IsMainAssetVisible(BaseObject) && !Assets.IsNullOrEmpty(), "Merge", () =>
                 {
-                    Merge(BaseObject, Contexts, IsCacheUsed);
+                    Merge(BaseObject, Assets, IsCacheUsed);
                 });
+
+                EGuiKit.Space(HeaderIndent);
+                DrawSelectButton();
 
                 DrawHeaderControls();
             });
 
             EGuiKit.Space(HeaderPadding);
 
-            if (Contexts.IsNullOrEmpty())
-            {
-                return;
-            }
-
-            DrawModel ??= new Model()
-            {
-                DrawMergeButtons = true,
-                DrawState = true,
-
-                GetState = GetObjectState,
-                GetObjectFieldColor = GetObjectFieldColor,
-                OnSelectedButtonPressed = SelectedButtonPressedHandler,
-                OnRemoveButtonPressed = RemoveButtonPressedHandler,
-                OnComparandButtonPressed = ComparandButtonPressedHandler,
-                OnDiffButtonPressed = DiffButtonPressedHandler
-            };
-
-
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts, DrawModel));
+            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Assets, DrawModel));
         }
 
         public override void Run(Object selectedObject)
         {
             if (selectedObject != null)
             {
-                AddObjectToMergeAsBase(selectedObject);
+                AddToMerge(selectedObject, isBaseAsset: true);
             }
         }
 
         public override void Run()
         {
+        }
+
+        public override void GetDataFromAnotherTool(SearchHelperWindow.ToolType from,
+            SearchHelperWindow.ToolType to, Asset asset)
+        {
+            using var measure = Profiler.Measure("GetDataFromAnotherTool");
+
+            if (asset == null || asset.Dependencies.IsNullOrEmpty())
+            {
+                return;
+            }
+
+            Assets ??= new List<Asset>();
+            if (Assets.Any(element => element.Path == asset.Path))
+            {
+                Debug.LogError($"The asset {asset.Path} has already added.");
+                return;
+            }
+
+            BaseObject = null;
+
+            AddToMerge(asset.Object, isBaseAsset: true, batching: true);
+
+            foreach (var dependency in asset.Dependencies.Where(dependency => dependency.Path != asset.Path))
+            {
+                AddToMerge(dependency.Object, batching: true);
+            }
+
+
+            UpdateDependents(ShowDependents);
+            UpdateAssets(Assets, forceUpdate: true);
         }
 
         protected override void AddSettingsContextMenu(GenericMenu menu)
@@ -147,85 +137,43 @@ namespace SearchHelper.Editor.Tools
             menu.AddItem(new GUIContent("Show Dependents"), ShowDependents, () =>
             {
                 ShowDependents = !ShowDependents;
-                UpdateDependents();
+                UpdateDependents(ShowDependents);
             });
-
-            var hashset = new HashSet<string>();
-            hashset.UnionWith(_defaultLines);
-            hashset.UnionWith(IgnoredLines);
-
-            foreach (var ignoredLine in hashset)
-            {
-                AddItem(ignoredLine);
-            }
-
-            menu.AddItem(new GUIContent($"Ignore Line in Diff/Add your line"), false, () =>
-            {
-                InputDialog.Show("Add Ignore Line", "", result =>
-                {
-                    if (!string.IsNullOrEmpty(result))
-                    {
-                        IgnoredLines.Add(result);
-                    }
-                });
-            });
-
-
-            void AddItem(string s)
-            {
-                menu.AddItem(new GUIContent($"Ignore Line in Diff/{s}"), IgnoredLines.Contains(s), () =>
-                {
-                    if (IgnoredLines.Contains(s))
-                    {
-                        IgnoredLines.Remove(s);
-                    }
-                    else
-                    {
-                        IgnoredLines.Add(s);
-                    }
-
-                    CompareWithBaseObject(Contexts);
-                });
-            }
         }
 
         private void DrawSelectButton()
         {
             var content = new GUIContent($"Selection");
-            if (EditorGUILayout.DropdownButton(content, FocusType.Passive, GUI.skin.button, GUILayout.Width(75)))
+            if (EditorGUILayout.DropdownButton(content, FocusType.Passive, GUILayout.Width(75)))
             {
                 var menu = new GenericMenu();
                 menu.AddItem(new GUIContent("Select All"), false,
                     () =>
                     {
-                        Contexts.ForEach(asset => asset.IsSelected = IsMainAssetVisible(asset));
+                        Assets.ForEach(asset => asset.IsSelected = IsMainAssetVisible(asset));
                     });
 
                 menu.AddItem(new GUIContent("Unselect All"), false,
                     () =>
                     {
-                        Contexts.ForEach(asset => asset.IsSelected = false);
+                        Assets.ForEach(asset => asset.IsSelected = false);
                     });
 
                 menu.AddItem(new GUIContent("Select Similar"), false,
                     () =>
                     {
-                        Contexts.ForEach(asset => asset.IsSelected = asset.MergeState == AssetMergeState.SameAsBaseObject && IsMainAssetVisible(asset));
+                        Assets.ForEach(asset => asset.IsSelected = asset.MetaDiffState == AssetDiffState.SameAsBaseObject && IsMainAssetVisible(asset));
                     });
 
                 menu.ShowAsContext();
             }
         }
 
+        #region Merge
         private void Merge(Asset baseObject, List<Asset> contexts, bool isCacheUsed)
         {
             using var measure = Profiler.Measure("Merge");
-            if (contexts.IsNullOrEmpty())
-            {
-                return;
-            }
-
-            if (baseObject == null)
+            if (contexts.IsNullOrEmpty() || baseObject == null)
             {
                 return;
             }
@@ -303,236 +251,192 @@ namespace SearchHelper.Editor.Tools
             }
         }
 
-        private void InvokeDiffTool(string leftTitle, string leftFile, string rightTitle, string rightFile)
-        {
-            if (string.IsNullOrEmpty(leftFile))
-            {
-                Debug.LogError($"LeftFile is null");
-                return;
-            }
-
-            if (string.IsNullOrEmpty(leftFile))
-            {
-                Debug.LogError($"RightFile is null");
-                return;
-            }
-
-            if (!File.Exists(leftFile))
-            {
-                Debug.LogError($"Can not find Left File");
-                return;
-            }
-
-            if (!File.Exists(rightFile))
-            {
-                Debug.LogError($"Can not find Right File");
-                return;
-            }
-
-            EditorUtility.InvokeDiffTool(leftTitle, leftFile, rightTitle, rightFile, null, null);
-        }
-
-        private Color GetObjectFieldColor(Asset asset)
-        {
-            if (asset.IsMerged)
-            {
-                return Color.cyan;
-            }
-
-            switch (asset.MergeState)
-            {
-                case AssetMergeState.BaseObject:
-                    return Color.yellow;
-                case AssetMergeState.SameAsBaseObject:
-                    return Color.green;
-                case AssetMergeState.NotTheSameAsBaseObject:
-                    return Color.red;
-                case AssetMergeState.None:
-                default:
-                    return GUI.color;
-            }
-        }
-
-        private void AddObjectToMergeAsBase(Object selectedObject)
+        private void AddToMerge(Object selectedObject, bool isBaseAsset = false, bool batching = false)
         {
             if (selectedObject == null)
             {
                 return;
             }
 
-            Contexts ??= new List<Asset>();
+            Assets ??= new List<Asset>();
 
-            var newBaseObject = Asset.ToObjectContext(selectedObject);
-            var validationError = ValidateObjectContext(newBaseObject);
+            var newAsset = Asset.ToAsset(selectedObject);
+            var validationError = ValidateAsset(newAsset);
 
             switch (validationError)
             {
-                case ValidationError.InContexts:
-                {
-                    BaseObject.IsBaseObject = false;
-                    BaseObject = Contexts.FirstOrDefault(asset => asset.Path == newBaseObject.Path);
-                    if (BaseObject != null)
-                    {
-                        BaseObject.IsBaseObject = true;
-                        BaseObject.MergeState = AssetMergeState.BaseObject;
-                    }
-                    return;
-                }
-
-                case ValidationError.NoError:
-                {
-                    break;
-                }
-                case ValidationError.BaseObject:
                 case ValidationError.Null:
                 case ValidationError.NotAFile:
                 {
+                    Debug.LogError($"The asset {selectedObject.name}:{newAsset.Path} can't be used");
                     return;
-                }
-                default:
-                {
-                    throw new ArgumentOutOfRangeException();
-                }
-            }
-
-            if (BaseObject != null)
-            {
-                BaseObject.IsBaseObject = false;
-                BaseObject.MergeState = AssetMergeState.None;
-                BaseObject = null;
-            }
-
-            Contexts.Add(newBaseObject);
-            BaseObject = newBaseObject;
-            BaseObject.MergeState = AssetMergeState.BaseObject;
-            BaseObject.IsBaseObject = true;
-            UpdateDependent(BaseObject);
-
-            CompareWithBaseObject(Contexts);
-        }
-
-        private void AddObjectToMergeAsTheirs(Object selectedObject)
-        {
-            if (selectedObject == null)
-            {
-                return;
-            }
-
-            Contexts ??= new List<Asset>();
-
-            var mergeObject = Asset.ToObjectContext(selectedObject);
-            var validationError = ValidateObjectContext(mergeObject);
-
-            switch (validationError)
-            {
-                case ValidationError.NoError:
-                {
-                    break;
                 }
                 case ValidationError.BaseObject:
                 {
-                    if (EditorUtility.DisplayDialog("WARNING",
-                            "This file is a base object. Would you like to add it to the merge list?", "Yes", "No"))
+                    if (BaseObject == null)
+                    {
+                        Debug.LogError($"The asset {newAsset.Object.name}:{newAsset.Path} is a base, but the Base is null!");
+                        return;
+                    }
+
+                    if (!isBaseAsset)
+                    {
+                        return;
+                    }
+
+                    if (EditorUtility.DisplayDialog("WARNING", "This file is Base. Would you like to add it as theirs?", "Yes", "No"))
                     {
                         BaseObject.IsBaseObject = false;
                         BaseObject = null;
+                        break;
                     }
+
                     return;
                 }
-                case ValidationError.Null:
+
                 case ValidationError.InContexts:
-                case ValidationError.NotAFile:
+                {
+                    if (BaseObject != null && !isBaseAsset)
+                    {
+                        return;
+                    }
+
+                    // update base
+                    if (BaseObject != null)
+                    {
+                        BaseObject.IsBaseObject = false;
+                    }
+
+                    BaseObject = Assets.FirstOrDefault(asset => asset.Path == newAsset.Path);
+
+                    if (BaseObject != null)
+                    {
+                        BaseObject.IsBaseObject = true;
+                    }
+
                     return;
+                }
+                case ValidationError.NoError:
+                {
+                    if (BaseObject == null || isBaseAsset)
+                    {
+                        if (BaseObject != null)
+                        {
+                            BaseObject.IsBaseObject = false;
+                        }
+
+                        BaseObject = newAsset;
+                        BaseObject.IsBaseObject = true;
+                    }
+                    break;
+                }
+
                 default:
                 {
                     throw new ArgumentOutOfRangeException();
                 }
             }
 
-            Contexts.Add(mergeObject);
-            CompareWithBaseObject(mergeObject);
-            UpdateDependent(mergeObject);
-            UpdateAssets(Contexts);
+            Assets.Add(newAsset);
+            UpdateDiff(newAsset);
+            if (!batching)
+            {
+                UpdateDependent(newAsset);
+                UpdateAssets(Assets);
+            }
         }
+        #endregion
 
-        private void CompareWithBaseObject(Asset asset)
+        protected override void UpdateDiff(Asset asset)
         {
-            if (BaseObject == null || asset == null)
+            if (asset == null || BaseObject == null || !asset.Object || asset.IsMerged)
             {
+                asset.DiffState = AssetDiffState.None;
+                asset.MetaDiffState = AssetDiffState.None;
                 return;
             }
 
-            if (!File.Exists(BaseObject.MetaPath))
+            if (asset.IsBaseObject)
             {
-                Debug.LogError($"Cannot find base metafile [{BaseObject.MetaPath}].");
+                asset.DiffState = AssetDiffState.BaseObject;
+                asset.MetaDiffState = AssetDiffState.BaseObject;
                 return;
             }
 
-            if (!File.Exists(asset.MetaPath))
-            {
-                asset.MergeState = AssetMergeState.None;
-                Debug.LogError($"Cannot find theirs metafile [{asset.MetaPath}].");
-                return;
-            }
+            var result = DiffManager.CompareFilesBinary(BaseObject.Path, asset.Path);
+            asset.DiffState = result.HasValue
+                ? result.Value 
+                    ? AssetDiffState.SameAsBaseObject 
+                    : AssetDiffState.NotTheSameAsBaseObject
+                : AssetDiffState.None;
 
-            var areMetasEqual = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2, IgnoredLines) == SearchHelperService.GetFileHashSHA256(asset.MetaPath, 2, IgnoredLines);
-            asset.MergeState = areMetasEqual ? AssetMergeState.SameAsBaseObject : AssetMergeState.NotTheSameAsBaseObject;
+            result = DiffManager.CompareMetaFiles(BaseObject.MetaPath, asset.MetaPath);
+            asset.MetaDiffState = result.HasValue
+                ? result.Value 
+                    ? AssetDiffState.SameAsBaseObject 
+                    : AssetDiffState.NotTheSameAsBaseObject
+                : AssetDiffState.None;
         }
-
-        private void CompareWithBaseObject(List<Asset> contexts)
+        
+        /// <summary>
+        /// Returns text description and color coding for asset diff states:
+        /// - Cyan: Merged asset
+        /// - Gray: Both states are None (error)
+        /// - Orange: Both main and meta files differ from base
+        /// - Red: Main file differs from base
+        /// - Magenta: Meta file differs from base
+        /// - Yellow: Base object (one or both are base)
+        /// - Green: Both match base
+        /// - Light green: One matches base, other is None
+        /// - Default: GUI.color for all other cases
+        /// </summary>
+        protected override (string, Color)? GetAssetStateText(Asset asset)
         {
-            if (contexts.IsNullOrEmpty())
+            if (asset.IsMerged)
             {
-                return;
+                return ("Asset merged", Color.cyan);
             }
 
-            if (BaseObject == null)
+            var diff = asset.DiffState;
+            var meta = asset.MetaDiffState;
+
+            if (diff == AssetDiffState.None && meta == AssetDiffState.None)
             {
-                contexts.ForEach(asset => asset.MergeState = AssetMergeState.None);
-                return;
+                return ("Error: Missing states", GUI.color);
             }
 
-            if (!File.Exists(BaseObject.MetaPath))
+            if (diff == AssetDiffState.NotTheSameAsBaseObject && meta == AssetDiffState.NotTheSameAsBaseObject)
             {
-                Debug.LogError($"Cannot find base metafile [{BaseObject.MetaPath}].");
-                return;
+                return ("Asset and Meta mismatch", new Color(1f, 0.5f, 0f)); // Orange
             }
 
-            var baseObjectMetaHash = SearchHelperService.GetFileHashSHA256(BaseObject.MetaPath, 2, IgnoredLines);
-
-            foreach (var asset in contexts)
+            if (diff == AssetDiffState.NotTheSameAsBaseObject)
             {
-                if (!asset.Object)
-                {
-                    asset.MergeState = AssetMergeState.None;
-                    continue;
-                }
-
-                if (asset.IsMerged)
-                {
-                    asset.MergeState = AssetMergeState.None;
-                    continue;
-                }
-
-                if (!File.Exists(asset.MetaPath))
-                {
-                    asset.MergeState = AssetMergeState.None;
-                    Debug.LogError($"Cannot find theirs metafile [{asset.MetaPath}].");
-                    continue;
-                }
-
-                if (asset.IsBaseObject)
-                {
-                    asset.MergeState = AssetMergeState.BaseObject;
-                }
-                else
-                {
-                    var hash = SearchHelperService.GetFileHashSHA256(asset.MetaPath, 2, IgnoredLines);
-                    asset.MergeState = hash == baseObjectMetaHash
-                        ? AssetMergeState.SameAsBaseObject
-                        : AssetMergeState.NotTheSameAsBaseObject;
-                }
+                return ("Asset mismatch", Color.red);
             }
+
+            if (meta == AssetDiffState.NotTheSameAsBaseObject)
+            {
+                return ("Meta mismatch", Color.magenta);
+            }
+
+            if (diff == AssetDiffState.BaseObject || meta == AssetDiffState.BaseObject)
+            {
+                return ("Base object", Color.yellow);
+            }
+
+            if (diff == AssetDiffState.SameAsBaseObject && meta == AssetDiffState.SameAsBaseObject)
+            {
+                return ("Matches Base", Color.green);
+            }
+
+            if ((diff == AssetDiffState.SameAsBaseObject && meta == AssetDiffState.None)
+                || (diff == AssetDiffState.None && meta == AssetDiffState.SameAsBaseObject))
+            {
+                return ("Partial match", new Color(0.5f, 1f, 0.5f)); // Light green
+            }
+
+            return null;
         }
 
         private enum ValidationError
@@ -544,7 +448,7 @@ namespace SearchHelper.Editor.Tools
             InContexts,
         }
 
-        private ValidationError ValidateObjectContext(Asset asset)
+        private ValidationError ValidateAsset(Asset asset)
         {
             if (asset == null)
             {
@@ -567,7 +471,7 @@ namespace SearchHelper.Editor.Tools
                 return ValidationError.BaseObject;
             }
 
-            if (Contexts.Any(ctx => ctx.Path == asset.Path))
+            if (Assets.Any(ctx => ctx.Path == asset.Path))
             {
                 Debug.LogError($"File {asset.Path} has already added.");
                 return ValidationError.InContexts;
@@ -576,28 +480,29 @@ namespace SearchHelper.Editor.Tools
             return ValidationError.NoError;
         }
 
-        private void UpdateDependents()
+        private void UpdateDependents(bool isEnable)
         {
-            foreach (var asset in Contexts)
+            ShowEmptyDependencyText = isEnable;
+            if (isEnable)
             {
-                UpdateDependent(asset);
+                foreach (var asset in Assets)
+                {
+                    UpdateDependent(asset);
+                }
+            }
+            else
+            {
+                foreach (var asset in Assets)
+                {
+                    asset.Dependencies = new List<Asset>();
+                }
             }
         }
 
         private void UpdateDependent(Asset asset)
         {
             using var measure = Profiler.Measure("UpdateDependent");
-            if (!ShowDependents)
-            {
-                return;
-            }
-
-            if (asset == null)
-            {
-                return;
-            }
-
-            if (asset.Object == null)
+            if (!ShowDependents || asset == null || asset.Object == null)
             {
                 return;
             }
@@ -606,26 +511,14 @@ namespace SearchHelper.Editor.Tools
             asset.Dependencies = usedBy.Dependencies;
         }
 
-        private (string, Color)? GetObjectState(Asset asset)
-        {
-            if (asset.IsMerged)
-            {
-                return ("Merged", Color.cyan);
-            }
 
-            if (asset.MergeState == AssetMergeState.NotTheSameAsBaseObject)
-            {
-                return ("Meta mismatch", Color.red);
-            }
 
-            return null;
-        }
-
+        #region Handlers
         private void DiffButtonPressedHandler(Asset asset)
         {
             var menu = new GenericMenu();
-            menu.AddItem(new GUIContent("Asset"), false, () => { InvokeDiffTool(BaseObject.Path, BaseObject.Path, asset.Path, asset.Path); });
-            menu.AddItem(new GUIContent("Meta"), false, () => { InvokeDiffTool(BaseObject.MetaPath, BaseObject.MetaPath, asset.MetaPath, asset.MetaPath); });
+            menu.AddItem(new GUIContent("Asset"), false, () => { InvokeDiffTool(BaseObject?.Path, BaseObject?.Path, asset?.Path, asset?.Path); });
+            menu.AddItem(new GUIContent("Meta"), false, () => { InvokeDiffTool(BaseObject?.MetaPath, BaseObject?.MetaPath, asset?.MetaPath, asset?.MetaPath); });
             menu.ShowAsContext();
         }
 
@@ -638,21 +531,22 @@ namespace SearchHelper.Editor.Tools
             }
             else
             {
-                Contexts.ForEach(asset =>
+                Assets.ForEach(asset =>
                 {
                     asset.IsBaseObject = false;
-                    asset.MergeState = AssetMergeState.None;
+                    asset.MetaDiffState = AssetDiffState.None;
                 });
+
                 asset.IsBaseObject = true;
                 BaseObject = asset;
             }
 
-            CompareWithBaseObject(Contexts);
+            DiffManager.UpdateState();
         }
 
         private void RemoveButtonPressedHandler(Asset asset)
         {
-            Contexts.RemoveAll(match => match.Path == asset.Path);
+            Assets.RemoveAll(match => match.Path == asset.Path);
         }
 
         private void SelectedButtonPressedHandler(Asset asset)
@@ -666,48 +560,6 @@ namespace SearchHelper.Editor.Tools
                 asset.IsSelected = !asset.IsSelected;
             }
         }
-
-        public class InputDialog : EditorWindow
-        {
-            private static string _inputText = "";
-            private static Action<string> _onConfirm;
-
-            public static void Show(string title, string initialValue, Action<string> callback)
-            {
-                _inputText = initialValue;
-                _onConfirm = callback;
-
-                var window = CreateInstance<InputDialog>();
-                window.titleContent = new GUIContent(title);
-                var size = new Vector2(400, 60);
-                window.minSize = size;
-                window.maxSize = size;
-                window.position = new Rect(Screen.width / 2, Screen.height / 2, size.x, size.y);
-
-                window.ShowModalUtility();
-            }
-
-            void OnGUI()
-            {
-                GUILayout.Label("Input:", EditorStyles.boldLabel);
-                _inputText = EditorGUILayout.TextField(_inputText);
-
-                GUILayout.FlexibleSpace();
-
-                EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("OK", GUILayout.Width(100)))
-                {
-                    _onConfirm?.Invoke(_inputText);
-                    Close();
-                }
-
-                if (GUILayout.Button("Cancel", GUILayout.Width(100)))
-                {
-                    Close();
-                }
-
-                EditorGUILayout.EndHorizontal();
-            }
-        }
+        #endregion
     }
 }

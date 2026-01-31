@@ -52,6 +52,18 @@ namespace SearchHelper.Editor.Tools
             Run(asset.Object);
         }
 
+        protected override string GetEmptyAssetText(Asset mainAsset)
+        {
+            if (mainAsset.IsFolder)
+            {
+                return "Folders are not supported.";
+            }
+            else
+            {
+                return "The asset has no dependencies.";
+            }
+        }
+
         private List<Asset> FindDependencies(Object obj)
         {
             if (obj == null)
@@ -60,7 +72,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             var assets = FolderOrFile(obj).Select(SearchHelperService.FindDependencies).ToList();
-            UpdateAssets(assets);
+            UpdateAssets(assets, forceUpdate: true);
             return assets;
         }
     }

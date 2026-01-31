@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using Toolkit.Runtime.Extensions;
 using UnityEngine;
 
-namespace SearchHelper.Editor.Core
+namespace SearchHelper.Editor.Core.Filter
 {
     public enum FilterRuleMode
     {

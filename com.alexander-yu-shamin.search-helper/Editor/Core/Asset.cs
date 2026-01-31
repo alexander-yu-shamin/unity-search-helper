@@ -8,12 +8,12 @@ using Object = UnityEngine.Object;
 
 namespace SearchHelper.Editor
 {
-    public enum AssetMergeState
+    public enum AssetDiffState
     {
         None,
         BaseObject,
         SameAsBaseObject,
-        NotTheSameAsBaseObject
+        NotTheSameAsBaseObject,
     }
     
     public enum AssetTarget
@@ -38,14 +38,17 @@ namespace SearchHelper.Editor
 
     public class Asset
     {
-        public bool IsFolder { get; set; }
+        #region Merge
+        public AssetDiffState MetaDiffState { get; set; } = AssetDiffState.None;
+        public AssetDiffState DiffState { get; set; } = AssetDiffState.None;
+
         public bool IsSelected { get; set; } = true;
         public bool IsBaseObject { get; set; } = false;
         public bool IsMerged { get; set; } = false;
-        public AssetMergeState MergeState { get; set; } = AssetMergeState.None;
+        #endregion
 
+        public bool IsFolder { get; set; }
         public List<Asset> Dependencies;
-
         public AssetState State { get; set; } = AssetState.Foldout;
 
         public bool IsFoldout
@@ -103,31 +106,27 @@ namespace SearchHelper.Editor
             set => _guid = value;
         }
 
-        private string _size = null;
-        public string Size
+        private (long bytes, string readable)? _sizeInfo = null;
+
+        private (long Bytes, string Readable) SizeInfo =>
+            _sizeInfo ??= CalculateSize();
+
+        public string ReadableSize => SizeInfo.Readable;
+        public long Size => SizeInfo.Bytes;
+
+        private (long Bytes, string Readable) CalculateSize()
         {
-            get
+            if (string.IsNullOrEmpty(Path) || !File.Exists(Path))
+                return (0, "NaN");
+
+            try
             {
-                if (_size != null)
-                {
-                    return _size;
-                }
-
-                if (!string.IsNullOrEmpty(Path))
-                {
-                    if (File.Exists(Path))
-                    {
-                        _size = FormatFileSize(new FileInfo(Path).Length);
-                    }
-                    else
-                    {
-                        _size = "NaN";
-                    }
-
-                    return _size;
-                }
-
-                return null;
+                var length = new FileInfo(Path).Length;
+                return (length, FormatExtensions.ToHumanReadableSize(length));
+            }
+            catch
+            {
+                return (0, "NaN");
             }
         }
 
@@ -142,7 +141,7 @@ namespace SearchHelper.Editor
             _path = context._path;
         }
 
-        public static Asset ToObjectContext(Object obj)
+        public static Asset ToAsset(Object obj)
         {
             if (obj == null)
             {
@@ -160,7 +159,7 @@ namespace SearchHelper.Editor
             };
         }
 
-        public static IEnumerable<Asset> ToObjectContexts(IEnumerable<Object> objects, Object mainObject = null)
+        public static IEnumerable<Asset> ToAssets(IEnumerable<Object> objects, Object mainObject = null)
         {
             if (objects == null)
             {
@@ -172,7 +171,7 @@ namespace SearchHelper.Editor
                 objects = objects.Where(value => value != mainObject).ToArray();
             }
 
-            return objects.Select(ToObjectContext);
+            return objects.Select(ToAsset);
         }
         
         public static Asset FromPath(string path)
@@ -188,43 +187,6 @@ namespace SearchHelper.Editor
                 IsFolder = AssetDatabase.IsValidFolder(path),
                 Dependencies = new List<Asset>(),
             };
-        }
-
-        private static string FormatFileSize(long bytes)
-        {
-            if (bytes == 0)
-            {
-                return "0 B";
-            }
-
-            if (bytes == 1)
-            {
-                return "1 B";
-            }
-
-            var absBytes = Math.Abs(bytes);
-
-            if (absBytes < 1024)
-            {
-                return $"{bytes} B";
-            }
-
-            if (absBytes < 1024 * 1024)
-            {
-                return $"{(bytes / 1024.0):0.##} KB";
-            }
-
-            if (absBytes < 1024L * 1024 * 1024)
-            {
-                return $"{(bytes / (1024.0 * 1024)):0.##} MB";
-            }
-
-            if (absBytes < 1024L * 1024 * 1024 * 1024)
-            {
-                return $"{(bytes / (1024.0 * 1024 * 1024)):0.##} GB";
-            }
-
-            return $"{(bytes / (1024.0 * 1024 * 1024 * 1024)):0.##} TB";
         }
 
         public string GetTarget(AssetTarget target)

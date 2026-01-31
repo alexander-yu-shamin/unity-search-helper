@@ -15,29 +15,6 @@ namespace SearchHelper.Editor.Tools
         protected override bool AreScopeRulesSupported { get; set; } = true;
         protected override bool ShowAssetWithDependencies { get; set; } = false;
         protected override bool ShowSize { get; set; } = true;
-
-        protected override string EmptyObjectContextText
-        {
-            get
-            {
-                if (AreScopeRulesSupported)
-                {
-                    if (IsGlobalScope)
-                    {
-                        return "This object is not referenced anywhere in the project.";
-                    }
-                    else
-                    {
-                        return "This object is not referenced locally";
-                    }
-                }
-                else
-                {
-                    return "This object is not referenced anywhere in the project.";
-                }
-            }
-        } 
-
         private Object SelectedObject { get; set; }
         private List<Asset> Assets { get; set; }
         protected override IEnumerable<Asset> Data => Assets;
@@ -95,7 +72,7 @@ namespace SearchHelper.Editor.Tools
                 return null;
             }
 
-            var map = FolderOrFile(obj).Select(Asset.ToObjectContext).ToDictionary(key => key.Path);
+            var map = FolderOrFile(obj).Select(Asset.ToAsset).ToDictionary(key => key.Path);
 
             var root = IsGlobalScope ? null : FolderPathFromObject(obj);
             var dependencyMap = SearchHelperService.BuildDependencyMap(root, IsCacheUsed);
@@ -108,7 +85,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             var assets = map.Values.ToList();
-            UpdateAssets(assets);
+            UpdateAssets(assets, forceUpdate: true);
             return assets;
         }
 

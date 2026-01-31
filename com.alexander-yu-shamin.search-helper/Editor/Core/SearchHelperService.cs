@@ -74,7 +74,7 @@ namespace SearchHelper.Editor.Core
 
             AssetDatabase.SaveAssets();
 
-            var searchedCtx = Asset.ToObjectContext(obj);
+            var searchedCtx = Asset.ToAsset(obj);
 
 #if SEARCH_HELPER_ENABLE_CACHING
             if (useCache && (DependencyMap?.ContainsKey(searchedCtx.Path) ?? false))
@@ -130,7 +130,7 @@ namespace SearchHelper.Editor.Core
 
             AssetDatabase.SaveAssets();
 
-            var dependencies = Asset.ToObjectContexts(EditorUtility.CollectDependencies(new[] { obj }), obj);
+            var dependencies = Asset.ToAssets(EditorUtility.CollectDependencies(new[] { obj }), obj);
             var path = AssetDatabase.GetAssetPath(obj);
             var guid = string.Empty;
             var isFolder = false;
@@ -286,15 +286,35 @@ namespace SearchHelper.Editor.Core
             }
         }
 
-        public static string GetFileHashMD5(ref MD5 md5, string path)
+        public static string GetFileHashMd5(ref MD5 md5, string path)
         {
+            if (string.IsNullOrEmpty(path))
+            {
+                return string.Empty;
+            }
+
+            if (!File.Exists(path))
+            {
+                return string.Empty;
+            }
+
             var hashBytes = md5.ComputeHash(File.ReadAllBytes(path));
             var hash = BitConverter.ToString(hashBytes);
             return hash;
         }
 
-        public static string GetFileHashSHA256(string path, int skipLines, HashSet<string> ignored = null)
+        public static string GetFileHashSha256(string path, int skipLines, HashSet<string> ignored = null)
         {
+            if (string.IsNullOrEmpty(path))
+            {
+                return string.Empty;
+            }
+
+            if (!File.Exists(path))
+            {
+                return string.Empty;
+            }
+
             using var sha = SHA256.Create();
             using var reader = new StreamReader(path, Encoding.UTF8);
 
@@ -325,7 +345,6 @@ namespace SearchHelper.Editor.Core
                 var bytes = Encoding.UTF8.GetBytes(line);
                 sha.TransformBlock(bytes, 0, bytes.Length, null, 0);
 
-                // сохраняем структуру файла
                 sha.TransformBlock(Encoding.UTF8.GetBytes("\n"), 0, 1, null, 0);
             }
 

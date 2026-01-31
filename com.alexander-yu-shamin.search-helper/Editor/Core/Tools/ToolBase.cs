@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -20,11 +21,14 @@ namespace SearchHelper.Editor
     {
         protected class Model
         {
+            public Func<Asset, string> GetEmptyAssetText { get; set; }
+            public Func<Asset, string> GetSizeTooltipText { get; set; }
+
+            // Merge
             public bool DrawMergeButtons { get; set; }
             public bool DrawState { get; set; } = true;
 
-            public Func<Asset, (string, Color)?> GetState { get; set; }
-            public Func<Asset, Color> GetObjectFieldColor { get; set; }
+            public Func<Asset, (string, Color)?> GetAssetStateText { get; set; }
             public Action<Asset> OnSelectedButtonPressed { get; set; }
             public Action<Asset> OnRemoveButtonPressed { get; set; }
             public Action<Asset> OnComparandButtonPressed { get; set; }
@@ -40,6 +44,8 @@ namespace SearchHelper.Editor
         protected virtual bool ShowSize { get; set; } = false;
         protected virtual bool IsCacheUsed { get; set; } = true;
         protected virtual bool ShowDependenciesCount { get; set; } = true;
+        protected virtual bool IsMetaDiffSupported { get; set; } = false;
+        protected virtual bool MetaDiffEnabled { get; set; } = false;
 
         // Visibility
         protected virtual bool AreVisibilityRulesSupported { get; set; } = true;
@@ -49,7 +55,6 @@ namespace SearchHelper.Editor
         protected virtual bool CountHiddenDependencies { get; set; } = false;
         protected virtual bool ShowAssetWithNoDependencies { get; set; } = true;
         protected virtual bool ShowAssetWithDependencies { get; set; } = true;
-        protected virtual string EmptyObjectContextText { get; set; } = "The object doesn't have any dependencies.";
 
         protected virtual bool AreScopeRulesSupported { get; set; } = false;
         public virtual bool IsGlobalScope { get; set; } = true;
@@ -78,7 +83,7 @@ namespace SearchHelper.Editor
         protected const float ScrollBarWidth = 16.0f;
         protected const float NoScrollBarWidth = 4.0f;
         protected const float GuidTextAreaWidth = 275.0f;
-        protected const float StateTextAreaWidth = 150.0f;
+        protected const float StateTextAreaWidth = 180.0f;
         protected const float ExtraHeightToPreventBlinking = ContentHeightWithPadding * 5;
         protected const float BottomIndent = ContentHeightWithPadding * 3;
         protected const float SelectedObjectWidth = HeaderHeight + 250.0f + HorizontalIndent / 2;
@@ -98,7 +103,8 @@ namespace SearchHelper.Editor
         private FilterByRuleManager FilterByRuleManager { get; set; }
         private FilterByStringManager FilterByStringManager { get; set; }
         private SortManager SortManager { get; set; }
-
+        protected DiffManager DiffManager { get; set; }
+        
         private List<SearchHelperWindow.ToolType> PossibleTransferTypes { get; set; } =
             new List<SearchHelperWindow.ToolType>()
             {
@@ -137,15 +143,19 @@ namespace SearchHelper.Editor
             FilterByRuleManager = new FilterByRuleManager();
             FilterByStringManager = new FilterByStringManager();
             SortManager = new SortManager();
+            DiffManager = new DiffManager();
 
             FilterByRuleManager.DataChanged += OnDataChanged;
             FilterByStringManager.DataChanged += OnDataChanged;
             SortManager.DataChanged += OnDataChanged;
+            DiffManager.DataChanged += OnDataChanged;
 
             DefaultModel ??= new Model()
             {
                 DrawMergeButtons = false,
-                DrawState = false
+                DrawState = false,
+                GetAssetStateText = GetAssetStateText,
+                GetEmptyAssetText = GetEmptyAssetText
             };
         }
         #endregion
@@ -175,7 +185,7 @@ namespace SearchHelper.Editor
                                             | AssetState.HideFolders);
         }
 
-        protected void UpdateAssets(IEnumerable<Asset> assets = null)
+        protected void UpdateAssets(IEnumerable<Asset> assets = null, bool forceUpdate = false)
         {
             assets ??= Data;
 
@@ -186,19 +196,33 @@ namespace SearchHelper.Editor
 
             using (Profiler.Measure($"UpdateData::State"))
             {
-                var useFilterByRule = AreFilterByRuleSupported && FilterByRuleManager is { RequiresUpdate: true };
-                var useFilterByString = AreFilterByStringRulesSupported && FilterByStringManager is { RequiresUpdate: true };
+                var useFilterByRule = forceUpdate || AreFilterByRuleSupported && FilterByRuleManager is { RequiresUpdate: true };
+                var useFilterByString = forceUpdate || AreFilterByStringRulesSupported && FilterByStringManager is { RequiresUpdate: true };
+                var useMetaDiff = forceUpdate || IsMetaDiffSupported && DiffManager is { RequiresUpdate: true };
                 foreach (var asset in assets)
                 {
                     asset.State &= ~AssetState.HideFolders;
                     asset.State &= ~AssetState.HideEmptyDependencies;
                     asset.State &= ~AssetState.HideDependencies;
 
-                    if (AreShowingFoldersSupported && asset.IsFolder)
+                    //if (AreShowingFoldersSupported && asset.IsFolder)
+                    //{
+                    //    asset.State = ShowFolders 
+                    //        ? asset.State & ~AssetState.HideFolders
+                    //        : asset.State | AssetState.HideFolders;
+                    //}
+                    if (asset.IsFolder)
                     {
-                        asset.State = ShowFolders 
-                            ? asset.State & ~AssetState.HideFolders
-                            : asset.State | AssetState.HideFolders;
+                        if (!AreShowingFoldersSupported)
+                        {
+                            asset.State |= AssetState.HideFolders;
+                        }
+                        else
+                        {
+                            asset.State = ShowFolders
+                                ? asset.State & ~AssetState.HideFolders
+                                : asset.State | AssetState.HideFolders;
+                        }
                     }
 
                     if (asset.Dependencies.IsNullOrEmpty())
@@ -221,7 +245,24 @@ namespace SearchHelper.Editor
                             : asset.State | AssetState.FilterByRule;
                     }
 
-                    if (!useFilterByString && (asset.State & AssetState.FilterByRule) != 0 && !useFilterByRule)
+                    if (useMetaDiff)
+                    {
+                        if (MetaDiffEnabled)
+                        {
+                            UpdateDiff(asset);
+                        }
+                        else
+                        {
+                            ClearMetaState(asset);
+                        }
+                    }
+
+                    if ((asset.State & AssetState.FilterByRule) != 0)
+                    {
+                        continue;
+                    }
+
+                    if (!useFilterByString && !useFilterByRule)
                     {
                         continue;
                     }
@@ -231,7 +272,7 @@ namespace SearchHelper.Editor
                     {
                         foreach (var dependency in asset.Dependencies)
                         {
-                            var isDependencyAllowed = true;
+                            var isDependencyAllowed = (dependency.State & AssetState.FilterByRule) == 0;
                             if (useFilterByRule)
                             {
                                 isDependencyAllowed = FilterByRuleManager.IsAllowed(dependency);
@@ -271,6 +312,51 @@ namespace SearchHelper.Editor
                     SortManager.Sort(assets);
                     SortManager.CompleteUpdate();
                 }
+            }
+        }
+
+        protected virtual void UpdateDiff(Asset asset)
+        {
+            if (asset == null)
+            {
+                return;
+            }
+
+            if (asset.Dependencies.IsNullOrEmpty())
+            {
+                asset.MetaDiffState = AssetDiffState.None;
+                return;
+            }
+
+            asset.MetaDiffState = AssetDiffState.BaseObject;
+            foreach (var dependency in asset.Dependencies)
+            {
+                var result = DiffManager.CompareMetaFiles(asset.MetaPath, dependency.MetaPath);
+                dependency.MetaDiffState = result.HasValue
+                    ? result.Value 
+                        ? AssetDiffState.SameAsBaseObject 
+                        : AssetDiffState.NotTheSameAsBaseObject
+                    : AssetDiffState.None;
+            }
+        }
+
+        protected virtual void ClearMetaState(Asset asset)
+        {
+            if (asset == null)
+            {
+                return;
+            }
+
+            if (asset.Dependencies.IsNullOrEmpty())
+            {
+                asset.MetaDiffState = AssetDiffState.None;
+                return;
+            }
+
+            asset.MetaDiffState = AssetDiffState.None;
+            foreach (var dependency in asset.Dependencies)
+            {
+                dependency.MetaDiffState = AssetDiffState.None;
             }
         }
         #endregion
@@ -371,10 +457,63 @@ namespace SearchHelper.Editor
 
                 menu.AddItem(new GUIContent("Use Cache"), IsCacheUsed, () => { IsCacheUsed = !IsCacheUsed; });
 
+                if (IsMetaDiffSupported && DiffManager != null)
+                {
+                    var ignoredLines = DiffManager.IgnoredLines;
+                    var possibleLines = DiffManager.PossibleIgnoredLines;
+
+                    menu.AddItem(new GUIContent("Meta Diff/Enabled"), MetaDiffEnabled, () =>
+                    {
+                        MetaDiffEnabled = !MetaDiffEnabled;
+                        DiffManager.UpdateState();
+                    });
+
+                    menu.AddSeparator("Meta Diff/");
+
+                    foreach (var ignoredLine in possibleLines)
+                    {
+                        AddItem(ignoredLine);
+                    }
+
+                    menu.AddItem(new GUIContent($"Meta Diff/Add your line"), false, () =>
+                    {
+                        InputDialog.Show("Add Ignore Line", "", result =>
+                        {
+                            if (!string.IsNullOrEmpty(result))
+                            {
+                                DiffManager.AddToIgnoreLines(result);
+                                MetaDiffSettingsUpdated();
+                            }
+                        });
+                    });
+
+                    void AddItem(string line)
+                    {
+                        var containLine = ignoredLines.Contains(line);
+                        menu.AddItem(new GUIContent($"Meta Diff/Ignore line with: {line}"), ignoredLines.Contains(line), () =>
+                        {
+                            if (containLine)
+                            {
+                                DiffManager.RemoveLine(line);
+                            }
+                            else
+                            {
+                                DiffManager.AddToIgnoreLines(line);
+                            }
+
+                            MetaDiffSettingsUpdated();
+                        });
+                    }
+                }
+
                 AddSettingsContextMenu(menu);
 
                 menu.ShowAsContext();
             }
+        }
+
+        protected virtual void MetaDiffSettingsUpdated()
+        {
         }
 
         protected virtual void AddSettingsContextMenu(GenericMenu menu)
@@ -641,7 +780,7 @@ namespace SearchHelper.Editor
                     foreach (var dependency in ctx.Dependencies)
                     {
                         if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect,
-                                () => TryDrawContent(ref x, ref y, displayRect.width, dependency, ctx),
+                                () => TryDrawDependency(ref x, ref y, displayRect.width, dependency, ctx, model),
                                 () => CalculateDependencyHeight(dependency, ctx)))
                         {
                             break;
@@ -763,7 +902,8 @@ namespace SearchHelper.Editor
             x += elementWidth + HorizontalIndent / 2;
             elementWidth = 250.0f;
             var objectFieldRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
-            var objectColor = model?.GetObjectFieldColor != null ? model.GetObjectFieldColor(asset) : GUI.color;
+            var assetState = model?.GetAssetStateText?.Invoke(asset);
+            var objectColor = assetState?.Item2 ?? GUI.color;
 
             EGuiKit.Color(objectColor,
                 () => { EditorGUI.ObjectField(objectFieldRect, asset.Object, typeof(Object), asset.Object); });
@@ -819,11 +959,11 @@ namespace SearchHelper.Editor
                 {
                     elementWidth = 70.0f;
                     x -= elementWidth + HorizontalIndent;
-                    EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), asset.Size ?? "");
+                    EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), asset.ReadableSize ?? "");
 
                     elementWidth = 40.0f;
                     x -= elementWidth;
-                    EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Size:");
+                    EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), new GUIContent("Size:", model?.GetSizeTooltipText?.Invoke(asset)));
                 }
             }
 
@@ -832,7 +972,7 @@ namespace SearchHelper.Editor
             {
                 if (model?.DrawState ?? true)
                 {
-                    var message = model?.GetState != null ? model.GetState(asset) : null;
+                    var message = model?.GetAssetStateText?.Invoke(asset);
                     if (message.HasValue)
                     {
                         elementWidth = StateTextAreaWidth;
@@ -877,12 +1017,12 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            var result = DrawEmptyContent(new Rect(x, y, width, ContentHeightWithPadding), EmptyObjectContextText);
+            var result = DrawEmptyDependency(new Rect(x, y, width, ContentHeightWithPadding), model.GetEmptyAssetText(mainAsset) ?? "None");
             y += result;
             return result;
         }
 
-        private float DrawEmptyContent(Rect rect, string text)
+        private float DrawEmptyDependency(Rect rect, string text)
         {
             EditorGUI.DrawRect(rect, RectBoxColor);
             EGuiKit.Color(ErrorColor,
@@ -913,30 +1053,38 @@ namespace SearchHelper.Editor
             return ContentHeightWithPadding;
         }
 
-        private float TryDrawContent(ref float x, ref float y, float width, Asset asset,
-            Asset mainContext)
+        private float TryDrawDependency(ref float x, ref float y, float width, Asset asset,
+            Asset mainAsset, Model model)
         {
-            if (CalculateDependencyHeight(asset, mainContext) == 0.0f)
+            if (CalculateDependencyHeight(asset, mainAsset) == 0.0f)
             {
                 return 0.0f;
             }
 
-            var result = DrawContent(new Rect(x, y, width, ContentHeightWithPadding), asset);
+            var result = DrawDependency(new Rect(x, y, width, ContentHeightWithPadding), asset, mainAsset, model);
             y += result;
             return result;
         }
 
-        private float DrawContent(Rect rect, Asset asset)
+        private float DrawDependency(Rect rect, Asset asset, Asset mainAsset, Model model)
         {
             EditorGUI.DrawRect(rect, RectBoxColor);
 
             var elementWidth = 500.0f;
             var x = rect.x + FirstElementIndent;
             var objectFieldRect = new Rect(x, rect.y, elementWidth, ContentHeight);
-            EditorGUI.ObjectField(objectFieldRect, asset.Object, typeof(Object), asset.Object);
+
+            var assetState = model?.GetAssetStateText?.Invoke(asset);
+            var objectColor = assetState?.Item2 ?? GUI.color;
+
+            EGuiKit.Color(objectColor, () =>
+            {
+                EditorGUI.ObjectField(objectFieldRect, asset.Object, typeof(Object), asset.Object);
+            });
+
             x += elementWidth + HorizontalIndent / 2;
 
-            DrawContextMenu(asset, objectFieldRect);
+            DrawContextMenu(asset, objectFieldRect, mainAsset);
 
             elementWidth = ContentHeight;
             if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight),
@@ -977,22 +1125,46 @@ namespace SearchHelper.Editor
             EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "Path:");
             x += elementWidth;
 
-            elementWidth = rect.width - x;
+            var drawState = (model?.DrawState ?? false) && (asset.DiffState != AssetDiffState.None || asset.MetaDiffState != AssetDiffState.None);
+            if (drawState)
+            {
+                elementWidth = rect.width - x - StateTextAreaWidth;
+            }
+            else
+            {
+                elementWidth = rect.width - x;
+            }
+
             EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), asset.Path);
+            x += elementWidth;
+
+            if (drawState)
+            {
+                var message = model?.GetAssetStateText?.Invoke(asset);
+                if (message.HasValue)
+                {
+                    elementWidth = StateTextAreaWidth;
+                    EGuiKit.Color(message.Value.Item2,
+                        () =>
+                        {
+                            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, HeaderHeight), message.Value.Item1);
+                        });
+                }
+            }
 
             return ContentHeightWithPadding;
         }
 
-        private void DrawContextMenu(Asset asset, Rect objectFieldRect)
+        private void DrawContextMenu(Asset asset, Rect objectFieldRect, Asset mainAsset = null)
         {
             var e = Event.current;
             if (e.type == EventType.MouseDown && e.button == 1 && objectFieldRect.Contains(e.mousePosition))
             {
-                ShowContextMenu(asset);
+                ShowContextMenu(asset, mainAsset);
             }
         }
 
-        private void ShowContextMenu(Asset asset)
+        private void ShowContextMenu(Asset asset, Asset mainAsset = null)
         {
             var menu = new GenericMenu();
 
@@ -1001,6 +1173,7 @@ namespace SearchHelper.Editor
             menu.AddItem(new GUIContent("Find in Scene"), false, () => { FindInHierarchyWindow(asset); });
             menu.AddItem(new GUIContent("Properties"), false, () => { OpenProperty(asset); });
 
+            menu.AddSeparator(string.Empty);
             menu.AddItem(new GUIContent("Copy/Path"), false, () => { CopyToClipboard(asset.Path); });
             menu.AddItem(new GUIContent("Copy/GUID"), false, () => { CopyToClipboard(asset.Guid); });
             menu.AddItem(new GUIContent("Copy/Type"), false, () => { CopyToClipboard(asset.Object.GetType().Name); });
@@ -1030,6 +1203,21 @@ namespace SearchHelper.Editor
                 }
             }
 
+            if (IsMetaDiffSupported)
+            {
+                menu.AddSeparator(string.Empty);
+
+                if (mainAsset != null)
+                {
+                    menu.AddItem(new GUIContent("Diff/Asset"), false, () => { InvokeDiffTool(mainAsset.Path, mainAsset.Path, asset.Path, asset.Path); });
+                    menu.AddItem(new GUIContent("Diff/Meta"), false, () => { InvokeDiffTool(mainAsset.MetaPath, mainAsset.MetaPath, asset.MetaPath, asset.MetaPath); });
+                }
+                else
+                {
+                    menu.AddItem(new GUIContent("Diff/Meta Diff"), false, () => { UpdateDiff(asset); });
+                }
+            }
+
             AddContextMenu(menu, asset);
 
             menu.ShowAsContext();
@@ -1044,6 +1232,35 @@ namespace SearchHelper.Editor
             return EGuiKit.Object(obj, typeof(Object), true, onNewObject, GUILayout.Width(SelectedObjectWidth), GUILayout.Height(HeaderHeight));
         }
 
+        /// <summary>
+        /// Returns text description and color coding for asset meta diff state only:
+        /// - Gray: Meta state is None (error/missing)
+        /// - Magenta: Meta differs from base
+        /// - Yellow: Meta is base object
+        /// - Green: Meta matches base
+        /// </summary>
+        protected virtual (string, Color)? GetAssetStateText(Asset asset)
+        {
+            return asset.MetaDiffState switch
+            {
+                AssetDiffState.NotTheSameAsBaseObject => ("Meta mismatch base", Color.magenta),
+                AssetDiffState.BaseObject             => ("Base object", Color.yellow),
+                AssetDiffState.SameAsBaseObject       => ("Meta matches Base", Color.green),
+                _                                     => null
+            };
+        }
+
+        protected virtual string GetEmptyAssetText(Asset mainAsset)
+        {
+            if (AreScopeRulesSupported)
+            {
+                return IsGlobalScope ? "The asset is not referenced anywhere in the project." : "The asset is not referenced locally.";
+            }
+            else
+            {
+                return "The asset is not referenced anywhere in the project.";
+            }
+        } 
         #endregion
 
         #region Helpers
@@ -1172,6 +1389,35 @@ namespace SearchHelper.Editor
             };
 
             SearchHelperWindow.TransferToTool(from, to, transferContext);
+        }
+
+        protected void InvokeDiffTool(string leftTitle, string leftFile, string rightTitle, string rightFile)
+        {
+            if (string.IsNullOrEmpty(leftFile))
+            {
+                Debug.LogError($"LeftFile is null");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(leftFile))
+            {
+                Debug.LogError($"RightFile is null");
+                return;
+            }
+
+            if (!File.Exists(leftFile))
+            {
+                Debug.LogError($"Can not find Left File");
+                return;
+            }
+
+            if (!File.Exists(rightFile))
+            {
+                Debug.LogError($"Can not find Right File");
+                return;
+            }
+
+            EditorUtility.InvokeDiffTool(leftTitle, leftFile, rightTitle, rightFile, null, null);
         }
         #endregion
     }

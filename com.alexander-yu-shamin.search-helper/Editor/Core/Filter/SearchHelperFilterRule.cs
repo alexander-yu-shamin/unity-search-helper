@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SearchHelper.Editor.Core;
+using SearchHelper.Editor.Core.Filter;
 using UnityEngine;
 
 namespace SearchHelper.Editor

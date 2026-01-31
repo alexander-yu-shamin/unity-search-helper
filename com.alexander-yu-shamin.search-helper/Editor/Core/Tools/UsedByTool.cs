@@ -17,28 +17,6 @@ namespace SearchHelper.Editor.Tools
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.UsedByTool;
 
-        protected override string EmptyObjectContextText
-        {
-            get
-            {
-                if (AreScopeRulesSupported)
-                {
-                    if (IsGlobalScope)
-                    {
-                        return "This object is not referenced anywhere in the project.";
-                    }
-                    else
-                    {
-                        return "This object is not referenced locally";
-                    }
-                }
-                else
-                {
-                    return "This object is not referenced anywhere in the project.";
-                }
-            }
-        } 
-
         public override void Draw(Rect windowRect)
         {
             EGuiKit.Horizontal(() =>
@@ -89,7 +67,7 @@ namespace SearchHelper.Editor.Tools
             }
 
             var assets = new List<Asset>() { searchedCtx };
-            UpdateAssets(assets);
+            UpdateAssets(assets, forceUpdate: true);
             return assets;
         }
     }

@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using SearchHelper.Editor.Core;
 using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
@@ -14,6 +13,7 @@ namespace SearchHelper.Editor.Tools
     public class DuplicatesTool : ToolBase
     {
         protected override bool AreShowingFoldersSupported { get; set; } = false;
+        protected override bool IsMetaDiffSupported { get; set; } = true;
         protected override bool ShowSize { get; set; } = true;
 
         private Object SelectedObject { get; set; }
@@ -26,7 +26,13 @@ namespace SearchHelper.Editor.Tools
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
         {
-            Run();
+        }
+
+        public override void Init()
+        {
+            base.Init();
+            DefaultModel.DrawState = true;
+            DefaultModel.GetSizeTooltipText = GetFullSize;
         }
 
         public override void Draw(Rect windowRect)
@@ -89,6 +95,12 @@ namespace SearchHelper.Editor.Tools
             }
             else
             {
+                var selectedObj = AssetDatabase.LoadMainAssetAtPath("Assets");
+                if (selectedObj != null)
+                {
+                    SelectedObject = selectedObj;
+                }
+
                 paths = SearchHelperService.FindAssetPaths();
             }
 
@@ -97,13 +109,12 @@ namespace SearchHelper.Editor.Tools
                 return null;
             }
 
-            var md5 = MD5.Create();
             var dict = new Dictionary<string, List<string>>();
 
             var searchedHash = string.Empty;
             if (!string.IsNullOrEmpty(searchedPath))
             {
-                searchedHash = SearchHelperService.GetFileHashMD5(ref md5, searchedPath);
+                searchedHash = DiffManager.GetFileHashMd5(searchedPath);
                 if (string.IsNullOrEmpty(searchedHash))
                 {
                     Debug.Log($"Can't count Hash for {searchedPath}");
@@ -115,7 +126,7 @@ namespace SearchHelper.Editor.Tools
             {
                 try
                 {
-                    var hash = SearchHelperService.GetFileHashMD5(ref md5, path);
+                    var hash = DiffManager.GetFileHashMd5(path);
                     if (dict.ContainsKey(hash))
                     {
                         dict[hash].Add(path);
@@ -139,8 +150,20 @@ namespace SearchHelper.Editor.Tools
                     return ctx;
                 }).ToList();
 
-            UpdateAssets(assets);
+            UpdateAssets(assets, forceUpdate: true);
             return assets;
+        }
+
+        private string GetFullSize(Asset asset)
+        {
+            if (asset == null)
+            {
+                return string.Empty;
+            }
+
+            var size = asset.Size;
+            var dependencyCount = asset.Dependencies?.Count ?? 1;
+            return FormatExtensions.ToHumanReadableSize(size * dependencyCount);
         }
     }
 }
