@@ -9,6 +9,7 @@ namespace SearchHelper.Editor.Tools
 {
     public class UsedByTool : ToolBase
     {
+        protected override bool IsLogViewSupported { get; set; } = false;
         protected override bool IsCacheUsed { get; set; } = false;
         private Object SelectedObject { get; set; }
         private List<Asset> Assets { get; set; }
@@ -17,17 +18,14 @@ namespace SearchHelper.Editor.Tools
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.UsedByTool;
 
-        public override void Draw(Rect windowRect)
+        public override void InnerDraw(Rect windowRect)
         {
-            EGuiKit.Horizontal(() =>
+            DrawHeaderLines(() =>
             {
-                SelectedObject = DrawObject(SelectedObject);
+                SelectedObject = DrawSelectedObject(SelectedObject);
                 EGuiKit.Button("Find", Run);
-                EGuiKit.FlexibleSpace();
-                DrawHeaderControls();
             });
-
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Assets));
+            DrawVirtualScroll(Assets);
         }
 
         public override void Run(Object selectedObject)

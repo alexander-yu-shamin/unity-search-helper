@@ -22,24 +22,28 @@ namespace SearchHelper.Editor.Tools
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.UnusedTool;
 
-        public override void Draw(Rect windowRect)
+        public override void InnerDraw(Rect windowRect)
         {
+            DrawHeaderLines(() =>
+            {
+                SelectedObject = DrawSelectedObject(SelectedObject);
+                EGuiKit.Button("Find", Run, GUILayout.Width(50));
+            });
             EGuiKit.Horizontal(() =>
             {
-                SelectedObject = DrawObject(SelectedObject);
-                EGuiKit.Button("Find", Run);
 
-                EGuiKit.Space();
-                EGuiKit.Color(Color.gray, () =>
-                {
-                    EGuiKit.Label("Similar to 'Used By', but scans all files within the folder");
-                });
 
-                EGuiKit.FlexibleSpace();
-                DrawHeaderControls();
+                //EGuiKit.Space();
+                //EGuiKit.Color(Color.gray, () =>
+                //{
+                //    EGuiKit.Label("Similar to 'Used By', but scans all files within the folder");
+                //});
+
+                //EGuiKit.FlexibleSpace();
+                //DrawHeaderControls();
             });
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Assets));
+            DrawVirtualScroll(Assets);
         }
 
         public override void Run(Object selectedObject)
@@ -53,15 +57,15 @@ namespace SearchHelper.Editor.Tools
             Assets = FindUnused(SelectedObject);
         }
 
-        protected override void AddActionContextMenu(GenericMenu menu)
+        protected override void AddActionContextMenu(GenericMenu menu, string prefix)
         {
             if (Assets.IsNullOrEmpty())
             {
-                menu.AddDisabledItem(new GUIContent("Remove Unused Items"));
+                menu.AddDisabledItem(new GUIContent(prefix + "Remove Unused Items"));
             }
             else
             {
-                menu.AddItem(new GUIContent("Remove Unused Items"), false, RemovedUnusedItems);
+                menu.AddItem(new GUIContent(prefix + "Remove Unused Items"), false, RemovedUnusedItems);
             }
         }
 

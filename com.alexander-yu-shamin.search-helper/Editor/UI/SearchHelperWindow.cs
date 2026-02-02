@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SearchHelper.Editor.Core;
 using SearchHelper.Editor.Tools;
+using Toolkit.Editor.Helpers.IMGUI;
 using UnityEditor;
 using UnityEngine;
 using Toolkit.Runtime.Extensions;
@@ -21,6 +22,7 @@ namespace SearchHelper.Editor.UI
             FindByGuidTool,
         }
 
+        public static bool IsFullScreenMode { get; set; } = true;
         private static ToolType SelectedToolType { get; set; } = ToolType.DependencyTool;
 
         private Dictionary<ToolType, ToolBase> ToolMap { get; set; } = new()
@@ -37,35 +39,35 @@ namespace SearchHelper.Editor.UI
             ? AssetDatabase.LoadMainAssetAtPath(AssetDatabase.GUIDToAssetPath(Selection.assetGUIDs.First()))
             : null;
 
-        [MenuItem(SearchHelperSettings.WindowMenuItemName)]
-        [MenuItem(SearchHelperSettings.ContextMenuItemOpenWindowName, priority = 100)]
+        [MenuItem(UISettings.WindowMenuItemName)]
+        [MenuItem(UISettings.ContextMenuItemOpenWindowName, priority = 100)]
         private static SearchHelperWindow OpenWindow()
         {
-            return GetWindow<SearchHelperWindow>(SearchHelperSettings.WindowTitle);
+            return GetWindow<SearchHelperWindow>(UISettings.WindowTitle);
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuItemFindDependenciesName, true)]
-        [MenuItem(SearchHelperSettings.ContextMenuFindUsedByItemName, true)]
-        [MenuItem(SearchHelperSettings.ContextMenuFindDuplicatesItemName, true)]
-        [MenuItem(SearchHelperSettings.ContextMenuShowObjectGuidItemName, true)]
+        [MenuItem(UISettings.ContextMenuItemFindDependenciesName, true)]
+        [MenuItem(UISettings.ContextMenuFindUsedByItemName, true)]
+        [MenuItem(UISettings.ContextMenuFindDuplicatesItemName, true)]
+        [MenuItem(UISettings.ContextMenuShowObjectGuidItemName, true)]
         public static bool ValidateActiveSelectedObject()
         {
             return SelectedObject != null;
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuItemFindDependenciesName, priority = 111)]
+        [MenuItem(UISettings.ContextMenuItemFindDependenciesName, priority = 111)]
         public static void ShowDependencies()
         {
             OpenWindow().SelectTool(ToolType.DependencyTool)?.Run(SelectedObject);
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuFindUsedByItemName, priority = 112)]
+        [MenuItem(UISettings.ContextMenuFindUsedByItemName, priority = 112)]
         public static void ShowUsesBy()
         {
             OpenWindow().SelectTool(ToolType.UsedByTool)?.Run(SelectedObject);
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuFindUnusedGlobalItemName, priority = 113)]
+        [MenuItem(UISettings.ContextMenuFindUnusedGlobalItemName, priority = 113)]
         public static void FindUnusedObjectsGlobal()
         {
             var selectTool = OpenWindow().SelectTool(ToolType.UnusedTool);
@@ -76,7 +78,7 @@ namespace SearchHelper.Editor.UI
             }
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuFindUnusedLocalItemName, priority = 114)]
+        [MenuItem(UISettings.ContextMenuFindUnusedLocalItemName, priority = 114)]
         public static void FindUnusedObjectsLocal()
         {
             var selectTool = OpenWindow().SelectTool(ToolType.UnusedTool);
@@ -87,19 +89,19 @@ namespace SearchHelper.Editor.UI
             }
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuFindDuplicatesItemName, priority = 115)]
+        [MenuItem(UISettings.ContextMenuFindDuplicatesItemName, priority = 115)]
         public static void FindDuplicates()
         {
             OpenWindow().SelectTool(ToolType.DuplicatesTool)?.Run(SelectedObject);
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuMergeItemName, priority = 116)]
+        [MenuItem(UISettings.ContextMenuMergeItemName, priority = 116)]
         public static void MergeFiles()
         {
             OpenWindow().SelectTool(ToolType.MergeTool)?.Run(SelectedObject);
         }
 
-        [MenuItem(SearchHelperSettings.ContextMenuShowObjectGuidItemName, priority = 117)]
+        [MenuItem(UISettings.ContextMenuShowObjectGuidItemName, priority = 117)]
         public static void ShowObjectGuid()
         {
             OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(SelectedObject);
@@ -107,7 +109,7 @@ namespace SearchHelper.Editor.UI
 
         private void OnEnable()
         {
-            foreach (var (_, tool) in ToolMap)
+            foreach (var (toolType, tool) in ToolMap)
             {
                 tool.Init();
             }
@@ -137,15 +139,25 @@ namespace SearchHelper.Editor.UI
                 return;
             }
 
-            var newToolType = (ToolType) GUILayout.SelectionGrid((int)SelectedToolType, ToolMap.Keys.Select(v => v.ToString().ToSpacedWords()).ToArray(), ToolMap.Keys.Count);
-            EditorGUILayout.Space(10);
-            SelectTool(newToolType)?.Draw(position);
+            var rect = new Rect(0.0f, UISettings.ToolLineHeight, position.width, position.height - UISettings.ToolLineHeight);
+            IsFullScreenMode = rect.width > UISettings.ToolButtonMinimalWidth * ToolMap.Count;
+            if (IsFullScreenMode)
+            {
+                var newToolType = (ToolType)GUILayout.SelectionGrid((int)SelectedToolType, ToolMap.Keys.Select(v => v.ToString().ToSpacedWords()).ToArray(), ToolMap.Keys.Count, GUILayout.Height(UISettings.ToolLineHeight));
+                SelectTool(newToolType);
+            }
+            else
+            {
+                SelectTool((ToolType)EditorGUILayout.EnumPopup(SelectedToolType, GUILayout.Height(UISettings.ToolLineHeight)));
+            }
+
+            SelectTool(SelectedToolType)?.Draw(rect);
         }
 
         private ToolBase SelectTool(ToolType toolType)
         {
             SelectedToolType = toolType;
-            return ToolMap.TryGetValue(toolType, out var tool) ? tool : null;
+            return ToolMap.GetValueOrDefault(toolType);
         }
 
         private void AssetChangedHandler(string[] importedAssets, string[] deletedAssets,

@@ -22,7 +22,6 @@ namespace SearchHelper.Editor.Tools
         protected override bool MetaDiffEnabled { get; set; } = true;
 
         private Asset BaseObject { get; set; }
-        private Model DrawModel { get; set; }
         private bool ShowDependents { get; set; } = false;
         private List<Asset> Assets { get; set; } = new();
         protected override IEnumerable<Asset> Data => Assets;
@@ -50,17 +49,17 @@ namespace SearchHelper.Editor.Tools
         {
             base.Init();
 
-            DefaultModel.DrawMergeButtons = true;
-            DefaultModel.DrawState = true;
-            DefaultModel.OnSelectedButtonPressed = SelectedButtonPressedHandler;
-            DefaultModel.OnRemoveButtonPressed = RemoveButtonPressedHandler;
-            DefaultModel.OnComparandButtonPressed = ComparandButtonPressedHandler;
-            DefaultModel.OnDiffButtonPressed = DiffButtonPressedHandler;
+            DefaultDrawModel.DrawMergeButtons = true;
+            DefaultDrawModel.DrawState = true;
+            DefaultDrawModel.OnSelectedButtonPressed = SelectedButtonPressedHandler;
+            DefaultDrawModel.OnRemoveButtonPressed = RemoveButtonPressedHandler;
+            DefaultDrawModel.OnComparandButtonPressed = ComparandButtonPressedHandler;
+            DefaultDrawModel.OnDiffButtonPressed = DiffButtonPressedHandler;
         }
 
-        public override void Draw(Rect windowRect)
+        public override void InnerDraw(Rect windowRect)
         {
-            EGuiKit.Horizontal(() =>
+            DrawHeaderLines(() =>
             {
                 EGuiKit.Button("Add Selected Object as Base", () => { AddToMerge(Selection.activeObject, isBaseAsset: true); });
                 EGuiKit.Button("Add Selected Object as Theirs", () => { AddToMerge(Selection.activeObject); });
@@ -77,15 +76,13 @@ namespace SearchHelper.Editor.Tools
                     Merge(BaseObject, Assets, IsCacheUsed);
                 });
 
-                EGuiKit.Space(HeaderIndent);
+                EGuiKit.Space(UISettings.HeaderSpace);
                 DrawSelectButton();
 
-                DrawHeaderControls();
             });
 
-            EGuiKit.Space(HeaderPadding);
-
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Assets, DrawModel));
+            EGuiKit.Space(UISettings.HeaderPadding);
+            DrawVirtualScroll(Assets);
         }
 
         public override void Run(Object selectedObject)

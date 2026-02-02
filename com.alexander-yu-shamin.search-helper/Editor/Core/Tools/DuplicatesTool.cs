@@ -31,15 +31,16 @@ namespace SearchHelper.Editor.Tools
         public override void Init()
         {
             base.Init();
-            DefaultModel.DrawState = true;
-            DefaultModel.GetSizeTooltipText = GetFullSize;
+            DefaultDrawModel.DrawState = true;
+            DefaultDrawModel.GetSizeTooltipText = GetFullSize;
         }
 
-        public override void Draw(Rect windowRect)
+        public override void InnerDraw(Rect windowRect)
         {
+            DrawHeaderLines();
             EGuiKit.Horizontal(() =>
             {
-                SelectedObject = DrawObject(SelectedObject);
+                SelectedObject = DrawSelectedObject(SelectedObject);
                 EGuiKit.Button("Find", Run);
 
                 EGuiKit.Space();
@@ -53,10 +54,11 @@ namespace SearchHelper.Editor.Tools
                 {
                     TransferTo(CurrentToolType, SearchHelperWindow.ToolType.MergeTool, Assets.FirstOrDefault());
                 });
-                DrawHeaderControls();
+
+
             });
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Assets));
+            DrawVirtualScroll(Assets);
         }
 
         public override void Run(Object selectedObject)

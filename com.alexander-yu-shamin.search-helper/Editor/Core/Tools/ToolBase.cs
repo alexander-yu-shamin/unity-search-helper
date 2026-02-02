@@ -19,7 +19,7 @@ namespace SearchHelper.Editor
 {
     public abstract class ToolBase
     {
-        protected class Model
+        protected class DrawModel
         {
             public Func<Asset, string> GetEmptyAssetText { get; set; }
             public Func<Asset, string> GetSizeTooltipText { get; set; }
@@ -37,6 +37,7 @@ namespace SearchHelper.Editor
 
         #region Capabilities
 
+        protected virtual bool IsLogViewSupported { get; set; } = true;
         protected virtual bool AreActionsSupported { get; set; } = true;
 
         // Settings
@@ -66,37 +67,6 @@ namespace SearchHelper.Editor
 
         #region DrawSettings
 
-        protected const float RowHeight = 20.0f;
-        protected const float RowPadding = 2f;
-
-        protected const float ContentHeight = RowHeight;
-        protected const float ContentPadding = RowPadding;
-        protected const float ContentHeightWithPadding = ContentHeight + ContentPadding;
-
-        protected const float HeaderHeight = ContentHeight;
-        protected const float HeaderPadding = 6.0f;
-        protected const float HeaderHeightWithPadding = ContentHeight + HeaderPadding * 2;
-        protected const float HeaderIndent = 5.0f;
-
-        protected const float HorizontalIndent = 15.0f;
-        protected const float FirstElementIndent = 4.0f;
-        protected const float ScrollBarWidth = 16.0f;
-        protected const float NoScrollBarWidth = 4.0f;
-        protected const float GuidTextAreaWidth = 275.0f;
-        protected const float StateTextAreaWidth = 180.0f;
-        protected const float ExtraHeightToPreventBlinking = ContentHeightWithPadding * 5;
-        protected const float BottomIndent = ContentHeightWithPadding * 3;
-        protected const float SelectedObjectWidth = HeaderHeight + 250.0f + HorizontalIndent / 2;
-
-        protected static readonly Color RectBoxColor = new Color(0.0f, 0.0f, 0.0f, 0.2f);
-        protected static readonly Color RectBoxEmptyColor = new Color(0.0f, 0.0f, 0.0f, 0.0f);
-
-        protected const string FolderIconName = "d_Folder Icon";
-        protected const string InspectorIconName = "d_UnityEditor.InspectorWindow";
-        protected const string HierarchyIconName = "d_UnityEditor.SceneHierarchyWindow";
-        protected const string SceneHierarchySearchReferenceFormat = "ref:{0}";
-
-        protected static readonly Color ErrorColor = Color.red;
 
         #endregion
         private Vector2 ScrollViewPosition { get; set; }
@@ -104,7 +74,10 @@ namespace SearchHelper.Editor
         private FilterByStringManager FilterByStringManager { get; set; }
         private SortManager SortManager { get; set; }
         protected DiffManager DiffManager { get; set; }
-        
+        protected DrawModel DefaultDrawModel { get; set; }
+        protected Rect CurrentToolRect { get; set; }
+        protected bool IsFullScreenMode => SearchHelperWindow.IsFullScreenMode;
+
         private List<SearchHelperWindow.ToolType> PossibleTransferTypes { get; set; } =
             new List<SearchHelperWindow.ToolType>()
             {
@@ -114,14 +87,19 @@ namespace SearchHelper.Editor
                 SearchHelperWindow.ToolType.MergeTool
             };
 
-        protected Model DefaultModel { get; set; }
 
         #region I
         protected abstract SearchHelperWindow.ToolType CurrentToolType { get; set; }
         protected abstract IEnumerable<Asset> Data { get; }
         public abstract void Run(Object selectedObject);
         public abstract void Run();
-        public abstract void Draw(Rect windowRect);
+        public abstract void InnerDraw(Rect windowRect);
+
+        public void Draw(Rect windowRect)
+        {
+            CurrentToolRect = windowRect;
+            InnerDraw(windowRect);
+        }
 
         public virtual void GetDataFromAnotherTool(SearchHelperWindow.ToolType from,
             SearchHelperWindow.ToolType to, IEnumerable<Asset> assets)
@@ -150,7 +128,7 @@ namespace SearchHelper.Editor
             SortManager.DataChanged += OnDataChanged;
             DiffManager.DataChanged += OnDataChanged;
 
-            DefaultModel ??= new Model()
+            DefaultDrawModel ??= new ToolBase.DrawModel()
             {
                 DrawMergeButtons = false,
                 DrawState = false,
@@ -363,40 +341,92 @@ namespace SearchHelper.Editor
 
         #region DrawFunctions
 
-        protected void DrawHeaderControls()
+        protected void DrawHeaderLines(Action firstLineLeft = null, Action<GenericMenu> firstLineRight = null, Action secondLineLeft = null, Action secondLineRight = null)
         {
-            EGuiKit.Horizontal(() =>
+            var menu = new GenericMenu();
+            EGuiKit.Vertical(() =>
             {
-                DrawActions();
-                DrawSettingsRules();
-                DrawVisibilityRules();
-                DrawScopeRules();
-                DrawSortingRules();
-                DrawFilterRules();
-                DrawFilterString();
+                EGuiKit.Horizontal(() =>
+                {
+                    firstLineLeft?.Invoke();
+                    EGuiKit.FlexibleSpace();
+                    firstLineRight?.Invoke(menu);
+                    DrawActions(menu);
+                    DrawScopeRules(menu);
+                    DrawVisibilityRules(menu);
+                    DrawSortingRules(menu);
+                    DrawFilterRules(menu);
+                    DrawSettingsRules(menu);
+                });
+
+                EGuiKit.Space(UISettings.HeaderPadding);
+
+                EGuiKit.Horizontal(() =>
+                {
+                    secondLineLeft?.Invoke();
+                    EGuiKit.FlexibleSpace();
+                    secondLineRight?.Invoke();
+                    DrawFilterString();
+                });
             });
         }
 
-        private void DrawActions()
+        protected void DrawLogView()
+        {
+            if (IsLogViewSupported)
+            {
+                var y = CurrentToolRect.yMax - UISettings.LogViewHeight - UISettings.LogViewPadding;
+                EGuiKit.Enable(false, () =>
+                {
+                    var textAreaRect = new Rect(UISettings.LogViewIndent, y, CurrentToolRect.width - UISettings.LogViewHeight - UISettings.LogViewIndent * 2, UISettings.LogViewHeight);
+                    EditorGUI.TextArea(textAreaRect, "test");
+                });
+                var dropdownRect = new Rect(CurrentToolRect.xMax - UISettings.LogViewHeight - UISettings.LogViewIndent, y, UISettings.LogViewHeight, UISettings.LogViewHeight);
+                EditorGUI.DropdownButton(dropdownRect, GUIContent.none, FocusType.Passive);
+            }
+        }
+
+        protected void DrawMain(Rect rect)
+        {
+            //DrawHeaderLines();
+            //DrawVirtualScroll(rect);
+            //DrawLogView(rect);
+        }
+
+        private void DrawActions(GenericMenu externalMenu)
         {
             if (!AreActionsSupported)
             {
                 return;
             }
 
-            EGuiKit.Space(HeaderIndent);
-            var content = new GUIContent($"Actions");
-
-            if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
+            if (IsFullScreenMode)
             {
-                var menu = new GenericMenu();
+                EGuiKit.Space(UISettings.HeaderSpace);
+                var content = new GUIContent($"Actions");
+                EGuiKit.DropdownButton(content, () =>
+                {
+                    var internalMenu = new GenericMenu();
+                    AddToMenu(internalMenu, string.Empty);
+                    internalMenu.ShowAsContext();
+                });
+            }
+            else
+            {
+                var prefix = "Actions/";
+                AddToMenu(externalMenu, prefix);
+            }
 
-                menu.AddItem(new GUIContent("Copy/Asset Paths"), false, () =>
+            return;
+
+            void AddToMenu(GenericMenu menu, string prefix)
+            {
+                menu.AddItem(new GUIContent(prefix + "Copy/Asset Paths"), false, () =>
                 {
                     CopyToClipboard(string.Join("\n", Data?.Where(IsMainAssetVisible)?.Select(asset => asset.Path) ?? Array.Empty<string>()));
                 });
 
-                menu.AddItem(new GUIContent("Copy/Asset Dependency Map"), false, () =>
+                menu.AddItem(new GUIContent(prefix + "Copy/Asset Dependency Map"), false, () =>
                 {
                     if (Data.IsNullOrEmpty())
                     {
@@ -428,34 +458,29 @@ namespace SearchHelper.Editor
                     CopyToClipboard(sb.ToString());
                 });
 
-                AddActionContextMenu(menu);
-
-                menu.ShowAsContext();
+                AddActionContextMenu(menu, prefix);
             }
         }
 
-        protected virtual void AddActionContextMenu(GenericMenu menu)
+        protected virtual void AddActionContextMenu(GenericMenu menu, string prefix)
         {
         }
 
-        private void DrawSettingsRules()
+        private void DrawSettingsRules(GenericMenu menu)
         {
             if (!AreSettingsSupported)
             {
                 return;
             }
 
-            EGuiKit.Space(HeaderIndent);
-            var content = new GUIContent($"Settings");
+            EGuiKit.Space(UISettings.HeaderSpace);
 
+            var content = new GUIContent($"Settings");
             if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
-                var menu = new GenericMenu();
-
-                menu.AddItem(new GUIContent("Show File Size"), ShowSize,
-                    () => { ShowSize = !ShowSize; });
-
+                menu.AddItem(new GUIContent("Show File Size"), ShowSize, () => { ShowSize = !ShowSize; });
                 menu.AddItem(new GUIContent("Use Cache"), IsCacheUsed, () => { IsCacheUsed = !IsCacheUsed; });
+                menu.AddItem(new GUIContent("Show Log"), IsLogViewSupported, () => { IsLogViewSupported = !IsLogViewSupported; });
 
                 if (IsMetaDiffSupported && DiffManager != null)
                 {
@@ -520,20 +545,35 @@ namespace SearchHelper.Editor
         {
         }
 
-        private void DrawVisibilityRules()
+        private void DrawVisibilityRules(GenericMenu externalMenu)
         {
             if (!AreVisibilityRulesSupported)
             {
                 return;
             }
 
-            EGuiKit.Space(HeaderIndent);
-            var content = new GUIContent($"Visibility");
-
-            if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
+            if (IsFullScreenMode)
             {
-                var menu = new GenericMenu();
-                menu.AddItem(new GUIContent("Expand All"), false, () =>
+                EGuiKit.Space(UISettings.HeaderSpace);
+                var content = new GUIContent($"Visibility");
+                EGuiKit.DropdownButton(content, () =>
+                {
+                    var internalMenu = new GenericMenu();
+                    AddToMenu(internalMenu, string.Empty);
+                    internalMenu.ShowAsContext();
+                });
+            }
+            else
+            {
+                var prefix = "Visability/";
+                AddToMenu(externalMenu, prefix);
+            }
+
+            return;
+
+            void AddToMenu(GenericMenu menu, string prefix)
+            {
+                menu.AddItem(new GUIContent(prefix + "Expand All"), false, () =>
                 {
                     foreach (var asset in Data)
                     {
@@ -541,7 +581,7 @@ namespace SearchHelper.Editor
                     }
                 });
 
-                menu.AddItem(new GUIContent("Collapse All"), false, () =>
+                menu.AddItem(new GUIContent(prefix + "Collapse All"), false, () =>
                 {
                     foreach (var asset in Data)
                     {
@@ -549,125 +589,179 @@ namespace SearchHelper.Editor
                     }
                 });
 
-                menu.AddSeparator(string.Empty);
+                menu.AddSeparator(prefix);
                 if (AreShowingFoldersSupported)
                 {
-                    menu.AddItem(new GUIContent("Show Folders"), ShowFolders, () =>
+                    menu.AddItem(new GUIContent(prefix + "Show Folders"), ShowFolders, () =>
                     {
                         ShowFolders = !ShowFolders;
                         UpdateAssets();
                     });
                 }
 
-                menu.AddItem(new GUIContent("Show Asset with No Dependencies"), ShowAssetWithNoDependencies, () =>
+                menu.AddItem(new GUIContent(prefix + "Show Asset with No Dependencies"), ShowAssetWithNoDependencies, () =>
                 {
                     ShowAssetWithNoDependencies = !ShowAssetWithNoDependencies;
                     UpdateAssets();
                 });
 
-                menu.AddItem(new GUIContent("Show Asset with Dependencies"), ShowAssetWithDependencies, () =>
+                menu.AddItem(new GUIContent(prefix + "Show Asset with Dependencies"), ShowAssetWithDependencies, () =>
                 {
                     ShowAssetWithDependencies = !ShowAssetWithDependencies;
                     UpdateAssets();
                 });
 
-                menu.AddItem(new GUIContent("Count Hidden Dependencies"), CountHiddenDependencies, () =>
+                menu.AddItem(new GUIContent(prefix + "Count Hidden Dependencies"), CountHiddenDependencies, () =>
                 {
                     CountHiddenDependencies = !CountHiddenDependencies;
                     UpdateAssets();
                 });
 
-                menu.AddItem(new GUIContent("Show Empty Dependency Text"), ShowEmptyDependencyText, () =>
+                menu.AddItem(new GUIContent(prefix + "Show Empty Dependency Text"), ShowEmptyDependencyText, () =>
                 {
                     ShowEmptyDependencyText = !ShowEmptyDependencyText;
                     UpdateAssets();
                 });
-
-                menu.ShowAsContext();
             }
         }
 
-        private void DrawScopeRules()
+        private void DrawScopeRules(GenericMenu externalMenu)
         {
             if (!AreScopeRulesSupported)
             {
                 return;
             }
 
-            EGuiKit.Space(HeaderIndent);
-
-            EGuiKit.Button(IsGlobalScope ? "Global" : "Local", () =>
+            if (IsFullScreenMode)
             {
-                IsGlobalScope = !IsGlobalScope;
-                Run();
-            });
+                EGuiKit.Space(UISettings.HeaderSpace);
+                var content = new GUIContent("Global");
+                EGuiKit.Button(IsGlobalScope ? "Global" : "Local", () =>
+                {
+                    IsGlobalScope = !IsGlobalScope;
+                    Run();
+                });
+            }
+            else
+            {
+                var prefix = "Scope Rules/";
+                externalMenu.AddItem(new GUIContent(prefix + "Global"), IsGlobalScope, () =>
+                {
+                    IsGlobalScope = !IsGlobalScope;
+                    Run();
+                });
+                externalMenu.AddItem(new GUIContent(prefix + "Local"), !IsGlobalScope, () =>
+                {
+                    IsGlobalScope = !IsGlobalScope;
+                    Run();
+                });
+            }
         }
 
-        private void DrawSortingRules()
+        private void DrawSortingRules(GenericMenu externalMenu)
         {
             if (!AreSortingRulesSupported || SortManager == null)
             {
                 return;
             }
 
-            EGuiKit.Space(HeaderIndent);
-
             var currentSortVariant = SortManager.CurrentSortVariant;
-            var content = new GUIContent(currentSortVariant.ToString().ToSpacedWords());
 
-            if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
+            if (IsFullScreenMode)
             {
-                var menu = new GenericMenu();
+                EGuiKit.Space(UISettings.HeaderSpace);
+                var content = new GUIContent(currentSortVariant.ToString().ToSpacedWords());
+                EGuiKit.DropdownButton(content, () =>
+                {
+                    var internalMenu = new GenericMenu();
+                    AddToMenu(internalMenu, string.Empty);
+                    internalMenu.ShowAsContext();
+                });
+            }
+            else
+            {
+                AddToMenu(externalMenu, "Sorting/");
+            }
+
+            return;
+                
+            void AddToMenu(GenericMenu menu, string prefix)
+            {
                 foreach (var sortVariant in SortManager.PossibleSortVariants)
                 {
-                    menu.AddItem(new GUIContent(sortVariant.ToString().ToSpacedWords()),
-                        currentSortVariant == sortVariant, () => { SortManager.Select(sortVariant); });
+                    menu.AddItem(new GUIContent(prefix + sortVariant.ToString().ToSpacedWords()),
+                        currentSortVariant == sortVariant, () =>
+                        {
+                            SortManager.Select(sortVariant);
+                        });
                 }
 
-                menu.AddSeparator(string.Empty);
+                menu.AddSeparator(prefix + string.Empty);
 
                 var currentSortOrder = SortManager.CurrentSortOrder;
                 foreach (var sortOrder in SortManager.PossibleSortOrders)
                 {
-                    menu.AddItem(new GUIContent(sortOrder.ToString()), sortOrder == currentSortOrder,
-                        () => { SortManager.Select(sortOrder); });
+                    menu.AddItem(new GUIContent(prefix + sortOrder.ToString()), sortOrder == currentSortOrder, () =>
+                    {
+                        SortManager.Select(sortOrder);
+                    });
                 }
 
-                menu.AddSeparator(string.Empty);
-                menu.AddItem(new GUIContent("Sort Main Assets"), SortManager.SortMainAssets,
-                    () => { SortManager.SortMainAssets = !SortManager.SortMainAssets; });
-
-                menu.ShowAsContext();
+                menu.AddSeparator(prefix + string.Empty);
+                menu.AddItem(new GUIContent(prefix + "Sort Main Assets"), SortManager.SortMainAssets, () =>
+                {
+                    SortManager.SortMainAssets = !SortManager.SortMainAssets;
+                });
             }
         }
 
-        private void DrawFilterRules()
+        private void DrawFilterRules(GenericMenu externalMenu)
         {
             if (!AreFilterByRuleSupported || FilterByRuleManager == null)
             {
                 return;
             }
 
-            EGuiKit.Space(HeaderIndent);
-
             var currentFilterName = FilterByRuleManager.CurrentFilterRule?.Name;
-            var content = new GUIContent(currentFilterName ?? "No Filter Rule");
 
-            if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
+            if (IsFullScreenMode)
+            {
+                EGuiKit.Space(UISettings.HeaderSpace);
+                var content = new GUIContent(currentFilterName ?? "No Filter Rule");
+                EGuiKit.DropdownButton(content, () =>
+                {
+                    FilterByRuleManager.UpdateFilterRulesIfEmpty();
+                    var internalMenu = new GenericMenu();
+                    var currentName = FilterByRuleManager.CurrentFilterRule?.Name;
+                    AddToMenu(internalMenu, string.Empty, currentName);
+                    internalMenu.ShowAsContext();
+                });
+            }
+            else
             {
                 FilterByRuleManager.UpdateFilterRulesIfEmpty();
 
-                var menu = new GenericMenu();
+                var prefix = "Filter Rules/";
+                externalMenu.AddItem(new GUIContent(prefix + $"Filter Rule: {(currentFilterName ?? "None".Replace("/", ": "))}"), !string.IsNullOrEmpty(currentFilterName), null);
+                externalMenu.AddSeparator(prefix);
+                AddToMenu(externalMenu, prefix, currentFilterName);
+            }
+
+            return;
+
+            void AddToMenu(GenericMenu menu, string prefix, string currentFilterName)
+            {
                 foreach (var rule in FilterByRuleManager.FilterRules)
                 {
-                    menu.AddItem(new GUIContent(rule.Name), currentFilterName == rule.Name,
-                        () => { FilterByRuleManager.SelectFilterRule(rule); });
+                    menu.AddItem(new GUIContent(prefix + rule.Name), currentFilterName == rule.Name, () =>
+                    {
+                        FilterByRuleManager.SelectFilterRule(rule);
+                    });
                 }
 
-                menu.AddSeparator(string.Empty);
-                menu.AddItem(new GUIContent("Load more from disk"), false, FilterByRuleManager.UpdateFilterRules);
-                menu.AddItem(new GUIContent("Remove Filter Rule"), false, FilterByRuleManager.UnselectFilterRule);
-                menu.ShowAsContext();
+                menu.AddSeparator(prefix);
+                menu.AddItem(new GUIContent(prefix + "Load more from disk"), false, FilterByRuleManager.UpdateFilterRules);
+                menu.AddItem(new GUIContent(prefix + "Remove Filter Rule"), false, FilterByRuleManager.UnselectFilterRule);
             }
         }
 
@@ -678,7 +772,7 @@ namespace SearchHelper.Editor
                 return;
             }
 
-            EGuiKit.Space(HeaderIndent);
+            EGuiKit.Space(UISettings.HeaderSpace);
 
             var target = FilterByStringManager.CurrentFilterByStringTarget;
             var mode = FilterByStringManager.CurrentFilterByStringMode;
@@ -710,8 +804,7 @@ namespace SearchHelper.Editor
                 menu.ShowAsContext();
             }
 
-            FilterByStringManager.SelectFilterByString(target, mode,
-                EditorGUILayout.TextArea(filter, GUILayout.Width(250)));
+            FilterByStringManager.SelectFilterByString(target, mode, EditorGUILayout.TextArea(filter, GUILayout.Width(250)));
 
             string ToString(FilterRuleMode mode)
             {
@@ -727,24 +820,30 @@ namespace SearchHelper.Editor
             }
         }
 
-        protected void DrawVirtualScroll(Rect windowRect, List<Asset> assets, Model model = null)
+        protected virtual Rect CalculateVirtualScrollRect(Rect rect, uint headerLineCount = 2)
+        {
+            return new Rect(
+                rect.x, 
+                rect.y + (headerLineCount * UISettings.HeaderHeight) + UISettings.HeaderPadding, 
+                rect.width,
+                rect.height - (headerLineCount * UISettings.HeaderHeight) - UISettings.HeaderPadding - (IsLogViewSupported ? UISettings.LogViewHeight + UISettings.LogViewPadding + UISettings.LogViewPadding : 0.0f));
+        }
+
+        protected void DrawVirtualScroll(List<Asset> assets, DrawModel drawModel = null)
         {
             if (assets.IsNullOrEmpty())
             {
                 return;
             }
 
-            if (model == null)
-            {
-                model = DefaultModel;
-            }
+            drawModel ??= DefaultDrawModel;
+            var rect = CalculateVirtualScrollRect(CurrentToolRect);
 
-            GUILayout.Space(HeaderPadding);
+            EGuiKit.Space(UISettings.HeaderPadding);
+            
+            ScrollViewPosition = EditorGUILayout.BeginScrollView(ScrollViewPosition, GUILayout.Height(rect.height));
 
-            ScrollViewPosition = EditorGUILayout.BeginScrollView(ScrollViewPosition,
-                GUILayout.Height(windowRect.height - BottomIndent));
-
-            var totalHeight = CalculateDisplayedHeight(assets, model);
+            var totalHeight = CalculateDisplayedHeight(assets, drawModel);
             var fullRect = GUILayoutUtility.GetRect(0, totalHeight);
 
             var x = fullRect.x;
@@ -753,15 +852,16 @@ namespace SearchHelper.Editor
             var drawnHeight = 0.0f;
 
             var displayRect = new Rect(0, 0,
-                totalHeight > windowRect.height
-                    ? windowRect.width - ScrollBarWidth
-                    : windowRect.width - NoScrollBarWidth, windowRect.height + ExtraHeightToPreventBlinking);
+                totalHeight > rect.height
+                    ? rect.width - UISettings.ScrollBarWidth
+                    : rect.width - UISettings.NoScrollBarWidth,
+                rect.height + UISettings.ExtraHeightToPreventBlinking * 2);
 
             foreach (var ctx in assets)
             {
                 if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect,
-                        () => TryDrawObjectHeader(ref x, ref y, displayRect.width, ctx, model),
-                        () => CalculateHeaderHeight(ctx, model)))
+                        () => TryDrawObjectHeader(ref x, ref y, displayRect.width, ctx, drawModel),
+                        () => CalculateHeaderHeight(ctx, drawModel)))
                 {
                     break;
                 }
@@ -769,8 +869,8 @@ namespace SearchHelper.Editor
                 if (ctx.Dependencies.IsNullOrEmpty())
                 {
                     if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect,
-                            () => TryDrawEmptyDependency(ref x, ref y, displayRect.width, ctx, model),
-                            () => CalculateEmptyDependencyHeight(ctx, model)))
+                            () => TryDrawEmptyDependency(ref x, ref y, displayRect.width, ctx, drawModel),
+                            () => CalculateEmptyDependencyHeight(ctx, drawModel)))
                     {
                         break;
                     }
@@ -780,7 +880,7 @@ namespace SearchHelper.Editor
                     foreach (var dependency in ctx.Dependencies)
                     {
                         if (!TryDraw(ref currentY, ScrollViewPosition, ref drawnHeight, displayRect,
-                                () => TryDrawDependency(ref x, ref y, displayRect.width, dependency, ctx, model),
+                                () => TryDrawDependency(ref x, ref y, displayRect.width, dependency, ctx, drawModel),
                                 () => CalculateDependencyHeight(dependency, ctx)))
                         {
                             break;
@@ -800,9 +900,9 @@ namespace SearchHelper.Editor
             return !beforeVisibleRect && !afterVisibleRect;
         }
 
-        private float CalculateDisplayedHeight(List<Asset> assets, Model model)
+        private float CalculateDisplayedHeight(List<Asset> assets, ToolBase.DrawModel drawModel)
         {
-            return assets.Sum(ctx => CalculateHeaderHeight(ctx, model) + CalculateDependenciesHeight(ctx, model));
+            return assets.Sum(ctx => CalculateHeaderHeight(ctx, drawModel) + CalculateDependenciesHeight(ctx, drawModel));
         }
 
         private bool TryDraw(ref float currentY, Vector2 scrollViewPosition, ref float drawnHeight, Rect windowRect,
@@ -817,92 +917,92 @@ namespace SearchHelper.Editor
             return !afterVisibleRect;
         }
 
-        private float CalculateDependenciesHeight(Asset asset, Model model)
+        private float CalculateDependenciesHeight(Asset asset, ToolBase.DrawModel drawModel)
         {
             return asset.Dependencies.IsNullOrEmpty()
-                ? CalculateEmptyDependencyHeight(asset, model)
+                ? CalculateEmptyDependencyHeight(asset, drawModel)
                 : asset.Dependencies.Sum(dependency => CalculateDependencyHeight(dependency, asset));
         }
 
-        private float CalculateHeaderHeight(Asset asset, Model model)
+        private float CalculateHeaderHeight(Asset asset, ToolBase.DrawModel drawModel)
         {
             if (!IsMainAssetVisible(asset))
             {
                 return 0.0f;
             }
 
-            return HeaderHeightWithPadding;
+            return UISettings.HeaderHeightWithPadding;
         }
 
-        private float TryDrawObjectHeader(ref float x, ref float y, float width, Asset asset, Model model)
+        private float TryDrawObjectHeader(ref float x, ref float y, float width, Asset asset, ToolBase.DrawModel drawModel)
         {
-            if (CalculateHeaderHeight(asset, model) == 0.0f)
+            if (CalculateHeaderHeight(asset, drawModel) == 0.0f)
             {
                 return 0.0f;
             }
 
-            var result = DrawObjectHeader(new Rect(x, y, width, HeaderHeightWithPadding), asset, model);
+            var result = DrawObjectHeader(new Rect(x, y, width, UISettings.HeaderHeightWithPadding), asset, drawModel);
             y += result;
             return result;
         }
 
-        private float DrawObjectHeader(Rect rect, Asset asset, Model model)
+        private float DrawObjectHeader(Rect rect, Asset asset, ToolBase.DrawModel drawModel)
         {
-            var x = rect.x + FirstElementIndent;
+            var x = rect.x + UISettings.FirstElementIndent;
             var y = rect.y;
-            EditorGUI.DrawRect(new Rect(rect.x, y, rect.width, HeaderPadding), RectBoxEmptyColor);
-            y += HeaderPadding;
+            //EditorGUI.DrawRect(new Rect(rect.x, y, rect.width, UISettings.HeaderHeight), UISettings.RectBoxEmptyColor);
 
-            EditorGUI.DrawRect(new Rect(rect.x, y, rect.width, HeaderHeight + HeaderPadding), RectBoxColor);
-            y += HeaderPadding / 2;
+            EditorGUI.DrawRect(new Rect(rect.x, y, rect.width, UISettings.HeaderHeight + UISettings.HeaderPadding), UISettings.RectBoxColor);
+            //y += UISettings.HeaderPadding / 2;
             var elementWidth = 0.0f;
 
-            if (model?.DrawMergeButtons ?? false)
+            if (drawModel?.DrawMergeButtons ?? false)
             {
-                elementWidth = 75.0f;
-                var toggleRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
+                elementWidth = UISettings.SelectButtonWidth;
+                var toggleRect = new Rect(x, y, elementWidth, UISettings.HeaderHeight);
                 var selected = EditorGUI.ToggleLeft(toggleRect, "Selected", asset.IsSelected);
                 if (selected != asset.IsSelected)
                 {
-                    model?.OnSelectedButtonPressed?.Invoke(asset);
+                    drawModel?.OnSelectedButtonPressed?.Invoke(asset);
                 }
 
-                x += elementWidth + HorizontalIndent / 2;
-                elementWidth = 75.0f;
-                var removeRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
+                x += elementWidth + UISettings.HeaderSpace;
+                elementWidth = UISettings.RemoveButtonWidth;
+                var removeRect = new Rect(x, y, elementWidth, UISettings.HeaderHeight);
                 if (GUI.Button(removeRect, "Remove"))
                 {
-                    model?.OnRemoveButtonPressed?.Invoke(asset);
+                    drawModel?.OnRemoveButtonPressed?.Invoke(asset);
                 }
 
-                x += elementWidth + HorizontalIndent / 2;
-                var comporandRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
+                x += elementWidth + UISettings.HeaderSpace;
+                elementWidth = UISettings.MergeButtonWidth;
+                var comporandRect = new Rect(x, y, elementWidth, UISettings.HeaderHeight);
                 if (GUI.Button(comporandRect, asset.IsBaseObject ? "Base" : "Theirs"))
                 {
-                    model?.OnComparandButtonPressed?.Invoke(asset);
+                    drawModel?.OnComparandButtonPressed?.Invoke(asset);
                 }
 
-                x += elementWidth + HorizontalIndent / 2;
-                var diffRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
+                x += elementWidth + UISettings.HeaderSpace;
+                var diffRect = new Rect(x, y, elementWidth, UISettings.HeaderHeight);
                 if (GUI.Button(diffRect, "Diff"))
                 {
-                    model?.OnDiffButtonPressed?.Invoke(asset);
+                    drawModel?.OnDiffButtonPressed?.Invoke(asset);
                 }
 
-                x += elementWidth + HorizontalIndent / 2;
+                x += elementWidth + UISettings.HeaderSpace;
             }
 
-            elementWidth = HeaderHeight;
-            if (GUI.Button(new Rect(x, y - 1, elementWidth, HeaderHeight),
-                    EditorGUIUtility.IconContent(FolderIconName)))
+            elementWidth = UISettings.HeaderHeight;
+            if (GUI.Button(new Rect(x, y - 1, elementWidth, UISettings.HeaderHeight),
+                    EditorGUIUtility.IconContent(UISettings.FolderIconName)))
             {
                 OpenInDefaultFileBrowser(asset);
             }
 
-            x += elementWidth + HorizontalIndent / 2;
+            x += elementWidth + UISettings.HorizontalIndent / 2;
             elementWidth = 250.0f;
-            var objectFieldRect = new Rect(x, y - 1, elementWidth, HeaderHeight);
-            var assetState = model?.GetAssetStateText?.Invoke(asset);
+            var objectFieldRect = new Rect(x, y - 1, elementWidth, UISettings.HeaderHeight);
+            var assetState = drawModel?.GetAssetStateText?.Invoke(asset);
             var objectColor = assetState?.Item2 ?? GUI.color;
 
             EGuiKit.Color(objectColor,
@@ -910,87 +1010,87 @@ namespace SearchHelper.Editor
 
             DrawContextMenu(asset, objectFieldRect);
 
-            x += elementWidth + HorizontalIndent / 2;
+            x += elementWidth + UISettings.HorizontalIndent / 2;
             elementWidth = EditorStyles.foldoutHeader.CalcSize(new GUIContent(asset.Path)).x;
-            asset.IsFoldout = EditorGUI.BeginFoldoutHeaderGroup(new Rect(x, y, elementWidth, HeaderHeight), asset.IsFoldout, asset.Path);
+            asset.IsFoldout = EditorGUI.BeginFoldoutHeaderGroup(new Rect(x, y, elementWidth, UISettings.HeaderHeight), asset.IsFoldout, asset.Path);
 
             EditorGUI.EndFoldoutHeaderGroup();
 
-            x += elementWidth + HorizontalIndent;
+            x += elementWidth + UISettings.HorizontalIndent;
 
             var leftWidth = rect.width - x;
-            var neededWidthForGuid = GuidTextAreaWidth + 40.0f;
+            var neededWidthForGuid = UISettings.GuidTextAreaWidth + 40.0f;
 
             if (leftWidth > neededWidthForGuid)
             {
-                elementWidth = GuidTextAreaWidth;
+                elementWidth = UISettings.GuidTextAreaWidth;
                 x = rect.width - elementWidth;
-                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), asset.Guid);
+                EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.HeaderHeight), asset.Guid);
 
                 elementWidth = 40.0f;
                 x -= elementWidth;
-                EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "GUID:");
+                EditorGUI.LabelField(new Rect(x, y, elementWidth, UISettings.HeaderHeight), "GUID:");
             }
 
-            var neededWidthForDependency = neededWidthForGuid + HorizontalIndent;
+            var neededWidthForDependency = neededWidthForGuid + UISettings.HorizontalIndent;
             if (ShowDependenciesCount)
             {
-                neededWidthForDependency = neededWidthForGuid + 50.0f + 90.0f + HorizontalIndent;
+                neededWidthForDependency = neededWidthForGuid + 50.0f + 90.0f + UISettings.HorizontalIndent;
                 if (leftWidth > neededWidthForDependency)
                 {
                     elementWidth = 50.0f;
-                    x -= elementWidth + HorizontalIndent;
-                    EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight),
+                    x -= elementWidth + UISettings.HorizontalIndent;
+                    EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.HeaderHeight),
                         !CountHiddenDependencies
                             ? asset.Dependencies.Count(IsDependencyAssetVisible).ToString()
                             : asset.Dependencies?.Count.ToString());
 
                     elementWidth = 90.0f;
                     x -= elementWidth;
-                    EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), "Dependencies:");
+                    EditorGUI.LabelField(new Rect(x, y, elementWidth, UISettings.HeaderHeight), "Dependencies:");
                 }
             }
 
-            var neededWidthForSize = neededWidthForDependency + HorizontalIndent;
+            var neededWidthForSize = neededWidthForDependency + UISettings.HorizontalIndent;
             if (ShowSize)
             {
-                neededWidthForSize = neededWidthForDependency + 70 + 40.0f + HorizontalIndent;
+                neededWidthForSize = neededWidthForDependency + 70 + 40.0f + UISettings.HorizontalIndent;
                 if (leftWidth > neededWidthForSize)
                 {
                     elementWidth = 70.0f;
-                    x -= elementWidth + HorizontalIndent;
-                    EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), asset.ReadableSize ?? "");
+                    x -= elementWidth + UISettings.HorizontalIndent;
+                    EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.HeaderHeight), asset.ReadableSize ?? "");
 
                     elementWidth = 40.0f;
                     x -= elementWidth;
-                    EditorGUI.LabelField(new Rect(x, y, elementWidth, HeaderHeight), new GUIContent("Size:", model?.GetSizeTooltipText?.Invoke(asset)));
+                    EditorGUI.LabelField(new Rect(x, y, elementWidth, UISettings.HeaderHeight), new GUIContent("Size:", drawModel?.GetSizeTooltipText?.Invoke(asset)));
                 }
             }
 
-            var neededWidthForState = neededWidthForSize + StateTextAreaWidth + HorizontalIndent;
+            var neededWidthForState = neededWidthForSize + UISettings.StateTextAreaWidth + UISettings.HorizontalIndent;
             if (leftWidth > neededWidthForState)
             {
-                if (model?.DrawState ?? true)
+                if (drawModel?.DrawState ?? true)
                 {
-                    var message = model?.GetAssetStateText?.Invoke(asset);
+                    var message = drawModel?.GetAssetStateText?.Invoke(asset);
                     if (message.HasValue)
                     {
-                        elementWidth = StateTextAreaWidth;
-                        x -= elementWidth + HorizontalIndent;
+                        elementWidth = UISettings.StateTextAreaWidth;
+                        x -= elementWidth + UISettings.HorizontalIndent;
 
                         EGuiKit.Color(message.Value.Item2,
                             () =>
                             {
-                                EditorGUI.TextArea(new Rect(x, y, elementWidth, HeaderHeight), message.Value.Item1);
+                                EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.HeaderHeight), message.Value.Item1);
                             });
                     }
                 }
             }
 
-            return HeaderHeightWithPadding;
+            return UISettings.HeaderHeightWithPadding;
         }
 
-        private float CalculateEmptyDependencyHeight(Asset mainAsset, Model model)
+        private float CalculateEmptyDependencyHeight(Asset mainAsset, ToolBase.DrawModel drawModel)
         {
             if (!IsMainAssetVisible(mainAsset))
             {
@@ -1007,30 +1107,30 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            return ContentHeightWithPadding;
+            return UISettings.ContentHeightWithPadding;
         }
 
-        private float TryDrawEmptyDependency(ref float x, ref float y, float width, Asset mainAsset, Model model)
+        private float TryDrawEmptyDependency(ref float x, ref float y, float width, Asset mainAsset, ToolBase.DrawModel drawModel)
         {
-            if (CalculateEmptyDependencyHeight(mainAsset, model) == 0.0f)
+            if (CalculateEmptyDependencyHeight(mainAsset, drawModel) == 0.0f)
             {
                 return 0.0f;
             }
 
-            var result = DrawEmptyDependency(new Rect(x, y, width, ContentHeightWithPadding), model.GetEmptyAssetText(mainAsset) ?? "None");
+            var result = DrawEmptyDependency(new Rect(x, y, width, UISettings.ContentHeightWithPadding), drawModel.GetEmptyAssetText(mainAsset) ?? "None");
             y += result;
             return result;
         }
 
         private float DrawEmptyDependency(Rect rect, string text)
         {
-            EditorGUI.DrawRect(rect, RectBoxColor);
-            EGuiKit.Color(ErrorColor,
+            EditorGUI.DrawRect(rect, UISettings.RectBoxColor);
+            EGuiKit.Color(UISettings.ErrorColor,
                 () =>
                 {
-                    EditorGUI.LabelField(new Rect(rect.x + FirstElementIndent, rect.y, rect.width, rect.height), text);
+                    EditorGUI.LabelField(new Rect(rect.x + UISettings.FirstElementIndent, rect.y, rect.width, rect.height), text);
                 });
-            return ContentHeightWithPadding;
+            return UISettings.ContentHeightWithPadding;
         }
 
         private float CalculateDependencyHeight(Asset dependency, Asset mainAsset)
@@ -1050,31 +1150,31 @@ namespace SearchHelper.Editor
                 return 0.0f;
             }
 
-            return ContentHeightWithPadding;
+            return UISettings.ContentHeightWithPadding;
         }
 
         private float TryDrawDependency(ref float x, ref float y, float width, Asset asset,
-            Asset mainAsset, Model model)
+            Asset mainAsset, ToolBase.DrawModel drawModel)
         {
             if (CalculateDependencyHeight(asset, mainAsset) == 0.0f)
             {
                 return 0.0f;
             }
 
-            var result = DrawDependency(new Rect(x, y, width, ContentHeightWithPadding), asset, mainAsset, model);
+            var result = DrawDependency(new Rect(x, y, width, UISettings.ContentHeightWithPadding), asset, mainAsset, drawModel);
             y += result;
             return result;
         }
 
-        private float DrawDependency(Rect rect, Asset asset, Asset mainAsset, Model model)
+        private float DrawDependency(Rect rect, Asset asset, Asset mainAsset, ToolBase.DrawModel drawModel)
         {
-            EditorGUI.DrawRect(rect, RectBoxColor);
+            EditorGUI.DrawRect(rect, UISettings.RectBoxColor);
 
-            var elementWidth = 500.0f;
-            var x = rect.x + FirstElementIndent;
-            var objectFieldRect = new Rect(x, rect.y, elementWidth, ContentHeight);
+            var elementWidth = rect.width / 4;
+            var x = rect.x + UISettings.FirstElementIndent;
+            var objectFieldRect = new Rect(x, rect.y, elementWidth, UISettings.ContentHeight);
 
-            var assetState = model?.GetAssetStateText?.Invoke(asset);
+            var assetState = drawModel?.GetAssetStateText?.Invoke(asset);
             var objectColor = assetState?.Item2 ?? GUI.color;
 
             EGuiKit.Color(objectColor, () =>
@@ -1082,37 +1182,37 @@ namespace SearchHelper.Editor
                 EditorGUI.ObjectField(objectFieldRect, asset.Object, typeof(Object), asset.Object);
             });
 
-            x += elementWidth + HorizontalIndent / 2;
+            x += elementWidth + UISettings.HorizontalIndent / 2;
 
             DrawContextMenu(asset, objectFieldRect, mainAsset);
 
-            elementWidth = ContentHeight;
-            if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight),
-                    EditorGUIUtility.IconContent(HierarchyIconName)))
+            elementWidth = UISettings.ContentHeight;
+            if (GUI.Button(new Rect(x, rect.y, elementWidth, UISettings.HeaderHeight),
+                    EditorGUIUtility.IconContent(UISettings.HierarchyIconName)))
             {
                 FindInHierarchyWindow(asset);
             }
 
-            x += elementWidth + HorizontalIndent / 2;
-            elementWidth = ContentHeight;
-            if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight),
-                    EditorGUIUtility.IconContent(InspectorIconName)))
+            x += elementWidth + UISettings.HorizontalIndent / 2;
+            elementWidth = UISettings.ContentHeight;
+            if (GUI.Button(new Rect(x, rect.y, elementWidth, UISettings.HeaderHeight),
+                    EditorGUIUtility.IconContent(UISettings.InspectorIconName)))
             {
                 OpenProperty(asset);
             }
 
-            x += elementWidth + HorizontalIndent / 2;
+            x += elementWidth + UISettings.HorizontalIndent / 2;
             elementWidth = 40.0f;
-            EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "GUID:");
+            EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, UISettings.ContentHeight), "GUID:");
             x += elementWidth;
 
-            elementWidth = GuidTextAreaWidth;
-            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), asset.Guid);
-            x += elementWidth + HorizontalIndent / 2;
+            elementWidth = rect.width / 6;
+            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, UISettings.ContentHeight), asset.Guid);
+            x += elementWidth + UISettings.HorizontalIndent / 2;
 
-            elementWidth = ContentHeight;
-            if (GUI.Button(new Rect(x, rect.y, elementWidth, HeaderHeight),
-                    EditorGUIUtility.IconContent(FolderIconName)))
+            elementWidth = UISettings.ContentHeight;
+            if (GUI.Button(new Rect(x, rect.y, elementWidth, UISettings.HeaderHeight),
+                    EditorGUIUtility.IconContent(UISettings.FolderIconName)))
             {
                 if (!string.IsNullOrEmpty(asset.Path))
                 {
@@ -1120,39 +1220,39 @@ namespace SearchHelper.Editor
                 }
             }
 
-            x += elementWidth + HorizontalIndent / 2;
+            x += elementWidth + UISettings.HorizontalIndent / 2;
             elementWidth = 40.0f;
-            EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, ContentHeight), "Path:");
+            EditorGUI.LabelField(new Rect(x, rect.y, elementWidth, UISettings.ContentHeight), "Path:");
             x += elementWidth;
 
-            var drawState = (model?.DrawState ?? false) && (asset.DiffState != AssetDiffState.None || asset.MetaDiffState != AssetDiffState.None);
+            var drawState = (drawModel?.DrawState ?? false) && (asset.DiffState != AssetDiffState.None || asset.MetaDiffState != AssetDiffState.None);
             if (drawState)
             {
-                elementWidth = rect.width - x - StateTextAreaWidth;
+                elementWidth = rect.width - x - UISettings.StateTextAreaWidth;
             }
             else
             {
                 elementWidth = rect.width - x;
             }
 
-            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, ContentHeight), asset.Path);
+            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, UISettings.ContentHeight), asset.Path);
             x += elementWidth;
 
             if (drawState)
             {
-                var message = model?.GetAssetStateText?.Invoke(asset);
+                var message = drawModel?.GetAssetStateText?.Invoke(asset);
                 if (message.HasValue)
                 {
-                    elementWidth = StateTextAreaWidth;
+                    elementWidth = UISettings.StateTextAreaWidth;
                     EGuiKit.Color(message.Value.Item2,
                         () =>
                         {
-                            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, HeaderHeight), message.Value.Item1);
+                            EditorGUI.TextArea(new Rect(x, rect.y, elementWidth, UISettings.HeaderHeight), message.Value.Item1);
                         });
                 }
             }
 
-            return ContentHeightWithPadding;
+            return UISettings.ContentHeightWithPadding;
         }
 
         private void DrawContextMenu(Asset asset, Rect objectFieldRect, Asset mainAsset = null)
@@ -1227,9 +1327,9 @@ namespace SearchHelper.Editor
         {
         }
 
-        protected virtual Object DrawObject(Object obj, Action<Object> onNewObject = null)
+        protected virtual Object DrawSelectedObject(Object obj, Action<Object> onNewObject = null)
         {
-            return EGuiKit.Object(obj, typeof(Object), true, onNewObject, GUILayout.Width(SelectedObjectWidth), GUILayout.Height(HeaderHeight));
+            return EGuiKit.Object(obj, typeof(Object), true, onNewObject, GUILayout.Height(UISettings.HeaderHeight));
         }
 
         /// <summary>
@@ -1329,7 +1429,7 @@ namespace SearchHelper.Editor
 
             method.Invoke(window, new object[]
             {
-                string.Format(SceneHierarchySearchReferenceFormat, asset.Path),
+                string.Format(UISettings.SceneHierarchySearchReferenceFormat, asset.Path),
                 0, // SearchableEditorWindow.SearchMode.All
                 false, // setAll
                 false // delayed

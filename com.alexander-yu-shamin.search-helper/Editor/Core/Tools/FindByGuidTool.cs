@@ -22,14 +22,14 @@ namespace SearchHelper.Editor.Tools
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.FindByGuidTool;
         protected override IEnumerable<Asset> Data => Contexts;
-        public override void Draw(Rect windowRect)
+        public override void InnerDraw(Rect windowRect)
         {
             EGuiKit.Horizontal(() =>
             {
-                var height = GUILayout.Height(HeaderHeight);
+                var height = GUILayout.Height(UISettings.HeaderHeight);
 
                 EGuiKit.Label("GUID:", height);
-                var newGuid = EditorGUILayout.TextField(CurrentGuid, GUILayout.Width(GuidTextAreaWidth), height);
+                var newGuid = EditorGUILayout.TextField(CurrentGuid, GUILayout.Width(UISettings.GuidTextAreaWidth), height);
                 if (newGuid != CurrentGuid)
                 {
                     CurrentGuid = newGuid;
@@ -43,7 +43,7 @@ namespace SearchHelper.Editor.Tools
 
                 EGuiKit.FlexibleSpace();
 
-                SelectedObject = DrawObject(SelectedObject);
+                SelectedObject = DrawSelectedObject(SelectedObject);
 
                 if (UsedObject != SelectedObject)
                 {
@@ -52,7 +52,7 @@ namespace SearchHelper.Editor.Tools
                     CurrentUsedObjectGuid = SearchHelperService.GetObjectGuid(UsedObject);
                 }
                 
-                EditorGUILayout.TextField(CurrentUsedObjectGuid, GUILayout.Width(GuidTextAreaWidth), height);
+                EditorGUILayout.TextField(CurrentUsedObjectGuid, GUILayout.Width(UISettings.GuidTextAreaWidth), height);
             });
 
             DrawContexts(windowRect);
@@ -93,7 +93,7 @@ namespace SearchHelper.Editor.Tools
             {
                 EGuiKit.Horizontal(() =>
                 {
-                    EGuiKit.Color(ErrorColor, () =>
+                    EGuiKit.Color(UISettings.ErrorColor, () =>
                     {
                         EGuiKit.Label($"The object with GUID {CurrentGuid} was not found.");
                     });
@@ -106,7 +106,7 @@ namespace SearchHelper.Editor.Tools
                 return;
             }
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Contexts));
+            DrawVirtualScroll(Contexts);
         }
     }
 }

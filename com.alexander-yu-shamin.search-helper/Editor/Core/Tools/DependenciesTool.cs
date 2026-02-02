@@ -16,18 +16,19 @@ namespace SearchHelper.Editor.Tools
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.DependencyTool;
 
-        public override void Draw(Rect windowRect)
+        public override void InnerDraw(Rect windowRect)
         {
-            EGuiKit.Horizontal(() =>
+            DrawHeaderLines(() =>
             {
-                SelectedObject = DrawObject(SelectedObject);
-
-                EGuiKit.Button("Find", Run);
-                EGuiKit.FlexibleSpace();
-                DrawHeaderControls();
+                EGuiKit.Horizontal(() =>
+                {
+                    SelectedObject = DrawSelectedObject(SelectedObject);
+                    EGuiKit.Button("Find", Run);
+                });
             });
 
-            EGuiKit.Vertical(() => DrawVirtualScroll(windowRect, Assets));
+            DrawVirtualScroll(Assets);
+            DrawLogView();
         }
 
         public override void Run(Object selectedObject)
