@@ -41,10 +41,8 @@ namespace SearchHelper.Editor.UI
         public const float ContentPadding = RowPadding;
         public const float ContentHeightWithPadding = ContentHeight + ContentPadding;
         public const float HorizontalIndent = 15.0f;
-        public const float FirstElementIndent = 4.0f;
         public const float ScrollBarWidth = 16.0f;
         public const float NoScrollBarWidth = 4.0f;
-        public const float GuidTextAreaWidth = 275.0f;
         public const float StateTextAreaWidth = 180.0f;
         public const float ExtraHeightToPreventBlinking = ContentHeightWithPadding * 5;
 
@@ -57,10 +55,31 @@ namespace SearchHelper.Editor.UI
         public const float HeaderSpace = 4.0f;
 
 
+        // Common
+        public const float CommonGuidWidth = 275.0f;
+        public const float CommonGuidTextWidth = 40.0f;
+
+        // AssetHeader
+        public const float AssetHeaderHeight = ContentHeight;
+        public const float AssetHeaderPadding = 6.0f;
+        public const float AssetHeaderHeightWithPadding = ContentHeight + HeaderPadding * 2;
+        public const float AssetHeaderSpace = 4.0f;
+        public const float AssetHeaderFirstElementIndent = 4.0f;
+        public const float AssetHeaderObjectWidth = 300.0f;
+        public const float AssetHeaderDependencyCountWidth = 50.0f;
+        public const float AssetHeaderDependencyCountTextWidth = 90.0f;
+        public const float AssetHeaderSizeWidth = 70.0f;
+        public const float AssetHeaderSizeTextWidth = 40.0f;
+
+
+        // Dependencies
+
+
 
         public const float SelectButtonWidth = 65.0f;
+        public const float BaseButtonWidth = 65.0f;
         public const float RemoveButtonWidth = 60.0f;
-        public const float MergeButtonWidth = 40.0f;
+        public const float DiffButtonWidth = 40.0f;
 
         // LogView
         public const float LogViewIndent = 5.0f;

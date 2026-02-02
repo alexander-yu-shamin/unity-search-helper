@@ -29,7 +29,7 @@ namespace SearchHelper.Editor.Tools
                 var height = GUILayout.Height(UISettings.HeaderHeight);
 
                 EGuiKit.Label("GUID:", height);
-                var newGuid = EditorGUILayout.TextField(CurrentGuid, GUILayout.Width(UISettings.GuidTextAreaWidth), height);
+                var newGuid = EditorGUILayout.TextField(CurrentGuid, GUILayout.Width(UISettings.CommonGuidWidth), height);
                 if (newGuid != CurrentGuid)
                 {
                     CurrentGuid = newGuid;
@@ -52,7 +52,7 @@ namespace SearchHelper.Editor.Tools
                     CurrentUsedObjectGuid = SearchHelperService.GetObjectGuid(UsedObject);
                 }
                 
-                EditorGUILayout.TextField(CurrentUsedObjectGuid, GUILayout.Width(UISettings.GuidTextAreaWidth), height);
+                EditorGUILayout.TextField(CurrentUsedObjectGuid, GUILayout.Width(UISettings.CommonGuidWidth), height);
             });
 
             DrawContexts(windowRect);

@@ -47,6 +47,7 @@ namespace SearchHelper.Editor
         protected virtual bool ShowDependenciesCount { get; set; } = true;
         protected virtual bool IsMetaDiffSupported { get; set; } = false;
         protected virtual bool MetaDiffEnabled { get; set; } = false;
+        protected virtual bool ShowPath { get; set; } = true;
 
         // Visibility
         protected virtual bool AreVisibilityRulesSupported { get; set; } = true;
@@ -481,6 +482,7 @@ namespace SearchHelper.Editor
                 menu.AddItem(new GUIContent("Show File Size"), ShowSize, () => { ShowSize = !ShowSize; });
                 menu.AddItem(new GUIContent("Use Cache"), IsCacheUsed, () => { IsCacheUsed = !IsCacheUsed; });
                 menu.AddItem(new GUIContent("Show Log"), IsLogViewSupported, () => { IsLogViewSupported = !IsLogViewSupported; });
+                menu.AddItem(new GUIContent("Show Path"), ShowPath, () => { ShowPath = !ShowPath; });
 
                 if (IsMetaDiffSupported && DiffManager != null)
                 {
@@ -948,126 +950,147 @@ namespace SearchHelper.Editor
 
         private float DrawObjectHeader(Rect rect, Asset asset, ToolBase.DrawModel drawModel)
         {
-            var x = rect.x + UISettings.FirstElementIndent;
+            var x = rect.x + UISettings.AssetHeaderFirstElementIndent;
             var y = rect.y;
-            //EditorGUI.DrawRect(new Rect(rect.x, y, rect.width, UISettings.HeaderHeight), UISettings.RectBoxEmptyColor);
 
-            EditorGUI.DrawRect(new Rect(rect.x, y, rect.width, UISettings.HeaderHeight + UISettings.HeaderPadding), UISettings.RectBoxColor);
-            //y += UISettings.HeaderPadding / 2;
+            EditorGUI.DrawRect(new Rect(rect.x, y, rect.width, UISettings.AssetHeaderHeightWithPadding), UISettings.RectBoxColor);
+            y += UISettings.AssetHeaderPadding / 2;
             var elementWidth = 0.0f;
 
             if (drawModel?.DrawMergeButtons ?? false)
             {
-                elementWidth = UISettings.SelectButtonWidth;
-                var toggleRect = new Rect(x, y, elementWidth, UISettings.HeaderHeight);
-                var selected = EditorGUI.ToggleLeft(toggleRect, "Selected", asset.IsSelected);
+                elementWidth = UISettings.AssetHeaderHeight;
+                var toggleRect = new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight);
+                var selected = EditorGUI.Toggle(toggleRect, asset.IsSelected);
                 if (selected != asset.IsSelected)
                 {
-                    drawModel?.OnSelectedButtonPressed?.Invoke(asset);
+                    drawModel.OnSelectedButtonPressed?.Invoke(asset);
                 }
 
-                x += elementWidth + UISettings.HeaderSpace;
+                x += elementWidth + UISettings.AssetHeaderSpace;
+
                 elementWidth = UISettings.RemoveButtonWidth;
-                var removeRect = new Rect(x, y, elementWidth, UISettings.HeaderHeight);
+                var removeRect = new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight);
                 if (GUI.Button(removeRect, "Remove"))
                 {
-                    drawModel?.OnRemoveButtonPressed?.Invoke(asset);
+                    drawModel.OnRemoveButtonPressed?.Invoke(asset);
                 }
 
-                x += elementWidth + UISettings.HeaderSpace;
-                elementWidth = UISettings.MergeButtonWidth;
-                var comporandRect = new Rect(x, y, elementWidth, UISettings.HeaderHeight);
+                x += elementWidth + UISettings.AssetHeaderSpace;
+
+                elementWidth = UISettings.BaseButtonWidth;
+                var comporandRect = new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight);
                 if (GUI.Button(comporandRect, asset.IsBaseObject ? "Base" : "Theirs"))
                 {
-                    drawModel?.OnComparandButtonPressed?.Invoke(asset);
+                    drawModel.OnComparandButtonPressed?.Invoke(asset);
                 }
 
-                x += elementWidth + UISettings.HeaderSpace;
-                var diffRect = new Rect(x, y, elementWidth, UISettings.HeaderHeight);
+                x += elementWidth + UISettings.AssetHeaderSpace;
+
+                elementWidth = UISettings.DiffButtonWidth;
+                var diffRect = new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight);
                 if (GUI.Button(diffRect, "Diff"))
                 {
-                    drawModel?.OnDiffButtonPressed?.Invoke(asset);
+                    drawModel.OnDiffButtonPressed?.Invoke(asset);
                 }
 
-                x += elementWidth + UISettings.HeaderSpace;
+                x += elementWidth + UISettings.AssetHeaderSpace;
             }
 
-            elementWidth = UISettings.HeaderHeight;
-            if (GUI.Button(new Rect(x, y - 1, elementWidth, UISettings.HeaderHeight),
-                    EditorGUIUtility.IconContent(UISettings.FolderIconName)))
+            elementWidth = UISettings.AssetHeaderHeight;
+            asset.IsFoldout = EditorGUI.Foldout(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight), asset.IsFoldout, string.Empty);
+            x += elementWidth + UISettings.AssetHeaderSpace;
+
+            if (IsFullScreenMode)
             {
-                OpenInDefaultFileBrowser(asset);
+                elementWidth = UISettings.AssetHeaderObjectWidth;
+            }
+            else
+            {
+                elementWidth = rect.width - x - UISettings.AssetHeaderSpace - UISettings.AssetHeaderDependencyCountWidth; 
             }
 
-            x += elementWidth + UISettings.HorizontalIndent / 2;
-            elementWidth = 250.0f;
-            var objectFieldRect = new Rect(x, y - 1, elementWidth, UISettings.HeaderHeight);
+            var objectFieldRect = new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight);
             var assetState = drawModel?.GetAssetStateText?.Invoke(asset);
             var objectColor = assetState?.Item2 ?? GUI.color;
 
-            EGuiKit.Color(objectColor,
-                () => { EditorGUI.ObjectField(objectFieldRect, asset.Object, typeof(Object), asset.Object); });
+            EGuiKit.Color(objectColor, () =>
+            {
+                EditorGUI.ObjectField(objectFieldRect, new GUIContent(string.Empty, asset.Path), asset.Object, typeof(Object), asset.Object);
+            });
 
             DrawContextMenu(asset, objectFieldRect);
+            x += elementWidth + UISettings.AssetHeaderSpace;
 
-            x += elementWidth + UISettings.HorizontalIndent / 2;
-            elementWidth = EditorStyles.foldoutHeader.CalcSize(new GUIContent(asset.Path)).x;
-            asset.IsFoldout = EditorGUI.BeginFoldoutHeaderGroup(new Rect(x, y, elementWidth, UISettings.HeaderHeight), asset.IsFoldout, asset.Path);
+            if (IsFullScreenMode)
+            {
+                elementWidth = EditorStyles.foldout.CalcSize(new GUIContent(asset.Path)).x;
+                EditorGUI.LabelField(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight), asset.Path);
+                x += elementWidth + UISettings.AssetHeaderSpace;
+            }
+            else
+            {
+                elementWidth = UISettings.AssetHeaderDependencyCountWidth;
+                EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight),
+                    !CountHiddenDependencies
+                        ? asset.Dependencies.Count(IsDependencyAssetVisible).ToString()
+                        : asset.Dependencies?.Count.ToString());
 
-            EditorGUI.EndFoldoutHeaderGroup();
+                x += elementWidth + UISettings.AssetHeaderSpace;
 
-            x += elementWidth + UISettings.HorizontalIndent;
+                return UISettings.AssetHeaderHeightWithPadding;
+            }
 
             var leftWidth = rect.width - x;
-            var neededWidthForGuid = UISettings.GuidTextAreaWidth + 40.0f;
+            var neededWidthForGuid = UISettings.CommonGuidWidth + UISettings.CommonGuidTextWidth;
 
             if (leftWidth > neededWidthForGuid)
             {
-                elementWidth = UISettings.GuidTextAreaWidth;
+                elementWidth = UISettings.CommonGuidWidth;
                 x = rect.width - elementWidth;
-                EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.HeaderHeight), asset.Guid);
+                EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight), asset.Guid);
 
-                elementWidth = 40.0f;
+                elementWidth = UISettings.CommonGuidTextWidth;
                 x -= elementWidth;
-                EditorGUI.LabelField(new Rect(x, y, elementWidth, UISettings.HeaderHeight), "GUID:");
+                EditorGUI.LabelField(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight), "GUID:");
             }
 
-            var neededWidthForDependency = neededWidthForGuid + UISettings.HorizontalIndent;
+            var neededWidthForDependency = neededWidthForGuid + UISettings.AssetHeaderSpace;
             if (ShowDependenciesCount)
             {
-                neededWidthForDependency = neededWidthForGuid + 50.0f + 90.0f + UISettings.HorizontalIndent;
+                neededWidthForDependency = neededWidthForGuid + UISettings.AssetHeaderDependencyCountWidth + UISettings.AssetHeaderDependencyCountTextWidth + UISettings.AssetHeaderSpace;
                 if (leftWidth > neededWidthForDependency)
                 {
-                    elementWidth = 50.0f;
-                    x -= elementWidth + UISettings.HorizontalIndent;
-                    EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.HeaderHeight),
+                    elementWidth = UISettings.AssetHeaderDependencyCountWidth;
+                    x -= elementWidth + UISettings.AssetHeaderSpace;
+                    EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight),
                         !CountHiddenDependencies
                             ? asset.Dependencies.Count(IsDependencyAssetVisible).ToString()
                             : asset.Dependencies?.Count.ToString());
 
-                    elementWidth = 90.0f;
+                    elementWidth = UISettings.AssetHeaderDependencyCountTextWidth;
                     x -= elementWidth;
-                    EditorGUI.LabelField(new Rect(x, y, elementWidth, UISettings.HeaderHeight), "Dependencies:");
+                    EditorGUI.LabelField(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight), "Dependencies:");
                 }
             }
 
-            var neededWidthForSize = neededWidthForDependency + UISettings.HorizontalIndent;
+            var neededWidthForSize = neededWidthForDependency + UISettings.AssetHeaderSpace;
             if (ShowSize)
             {
-                neededWidthForSize = neededWidthForDependency + 70 + 40.0f + UISettings.HorizontalIndent;
+                neededWidthForSize = neededWidthForDependency + UISettings.AssetHeaderSizeWidth + UISettings.AssetHeaderSizeTextWidth + UISettings.AssetHeaderSpace;
                 if (leftWidth > neededWidthForSize)
                 {
-                    elementWidth = 70.0f;
-                    x -= elementWidth + UISettings.HorizontalIndent;
-                    EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.HeaderHeight), asset.ReadableSize ?? "");
+                    elementWidth = UISettings.AssetHeaderSizeWidth;
+                    x -= elementWidth + UISettings.AssetHeaderSpace;
+                    EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight), asset.ReadableSize ?? "");
 
-                    elementWidth = 40.0f;
+                    elementWidth = UISettings.AssetHeaderSizeTextWidth;
                     x -= elementWidth;
-                    EditorGUI.LabelField(new Rect(x, y, elementWidth, UISettings.HeaderHeight), new GUIContent("Size:", drawModel?.GetSizeTooltipText?.Invoke(asset)));
+                    EditorGUI.LabelField(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight), new GUIContent("Size:", drawModel?.GetSizeTooltipText?.Invoke(asset)));
                 }
             }
 
-            var neededWidthForState = neededWidthForSize + UISettings.StateTextAreaWidth + UISettings.HorizontalIndent;
+            var neededWidthForState = neededWidthForSize + UISettings.StateTextAreaWidth + UISettings.AssetHeaderSpace;
             if (leftWidth > neededWidthForState)
             {
                 if (drawModel?.DrawState ?? true)
@@ -1076,18 +1099,18 @@ namespace SearchHelper.Editor
                     if (message.HasValue)
                     {
                         elementWidth = UISettings.StateTextAreaWidth;
-                        x -= elementWidth + UISettings.HorizontalIndent;
+                        x -= elementWidth + UISettings.AssetHeaderSpace;
 
                         EGuiKit.Color(message.Value.Item2,
                             () =>
                             {
-                                EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.HeaderHeight), message.Value.Item1);
+                                EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight), message.Value.Item1);
                             });
                     }
                 }
             }
 
-            return UISettings.HeaderHeightWithPadding;
+            return UISettings.AssetHeaderHeightWithPadding;
         }
 
         private float CalculateEmptyDependencyHeight(Asset mainAsset, ToolBase.DrawModel drawModel)
@@ -1128,7 +1151,7 @@ namespace SearchHelper.Editor
             EGuiKit.Color(UISettings.ErrorColor,
                 () =>
                 {
-                    EditorGUI.LabelField(new Rect(rect.x + UISettings.FirstElementIndent, rect.y, rect.width, rect.height), text);
+                    EditorGUI.LabelField(new Rect(rect.x + UISettings.AssetHeaderFirstElementIndent, rect.y, rect.width, rect.height), text);
                 });
             return UISettings.ContentHeightWithPadding;
         }
@@ -1171,7 +1194,7 @@ namespace SearchHelper.Editor
             EditorGUI.DrawRect(rect, UISettings.RectBoxColor);
 
             var elementWidth = rect.width / 4;
-            var x = rect.x + UISettings.FirstElementIndent;
+            var x = rect.x + UISettings.AssetHeaderFirstElementIndent;
             var objectFieldRect = new Rect(x, rect.y, elementWidth, UISettings.ContentHeight);
 
             var assetState = drawModel?.GetAssetStateText?.Invoke(asset);
