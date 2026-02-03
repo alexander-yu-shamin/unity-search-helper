@@ -18,6 +18,7 @@ namespace SearchHelper.Editor.UI
             UnusedTool,
             DuplicatesTool,
             MergeTool,
+            MissingTool,
             FindByGuidTool,
         }
 
@@ -31,6 +32,7 @@ namespace SearchHelper.Editor.UI
             { ToolType.UnusedTool, new UnusedTool() },
             { ToolType.DuplicatesTool, new DuplicatesTool() },
             { ToolType.MergeTool, new MergeTool() },
+            { ToolType.MissingTool, new MissingTool() },
             { ToolType.FindByGuidTool, new FindByGuidTool() },
         };
 
@@ -49,6 +51,7 @@ namespace SearchHelper.Editor.UI
         [MenuItem(UISettings.ContextMenuFindUsedByItemName, true)]
         [MenuItem(UISettings.ContextMenuFindDuplicatesItemName, true)]
         [MenuItem(UISettings.ContextMenuShowObjectGuidItemName, true)]
+        [MenuItem(UISettings.ContextMenuFindMissingItemName, true)]
         public static bool ValidateActiveSelectedObject()
         {
             return SelectedObject != null;
@@ -98,6 +101,12 @@ namespace SearchHelper.Editor.UI
         public static void MergeFiles()
         {
             OpenWindow().SelectTool(ToolType.MergeTool)?.Run(SelectedObject);
+        }
+
+        [MenuItem(UISettings.ContextMenuFindMissingItemName, priority = 111)]
+        public static void FindMissing()
+        {
+            OpenWindow().SelectTool(ToolType.MissingTool)?.Run(SelectedObject);
         }
 
         [MenuItem(UISettings.ContextMenuShowObjectGuidItemName, priority = 117)]

@@ -153,6 +153,50 @@ namespace SearchHelper.Editor.Core
             return objectContext;
         }
 
+        public static Asset FindMissing(Object obj)
+        {
+            if (obj == null)
+            {
+                return null;
+            }
+
+            using var measure = Profiler.Measure($"FindDependencies {obj.name}");
+
+            AssetDatabase.SaveAssets();
+
+            var dependencies = EditorUtility.CollectDependencies(new[] { obj });
+            if (dependencies.IsNullOrEmpty())
+            {
+                return null;
+            }
+
+            if (dependencies.All(dependency => dependency != null))
+            {
+                return null;
+            }
+
+            var path = AssetDatabase.GetAssetPath(obj);
+            var guid = string.Empty;
+            var isFolder = false;
+
+            if (!string.IsNullOrEmpty(path))
+            {
+                guid = AssetDatabase.AssetPathToGUID(path);
+                isFolder = AssetDatabase.IsValidFolder(path);
+            }
+
+            var objectContext = new Asset()
+            {
+                Object = obj,
+                Path = path,
+                Guid = guid,
+                IsFolder = isFolder,
+                Dependencies = null
+            };
+
+            return objectContext;
+        }
+
         public static Dictionary<string, List<Asset>> BuildDependencyMap(string root = null, bool useCache = true)
         {
             AssetDatabase.SaveAssets();

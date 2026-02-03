@@ -16,6 +16,7 @@ namespace SearchHelper.Editor.UI
         public const string FindByGuidToolName = "Find by GUID";
         public const string FindUnusedToolName = "Find Unused";
         public const string FindDuplicatesToolName = "Find Duplicates";
+        public const string MissingToolName = "Find Missing";
         public const string MergeToolName = "Add to Merge Tool";
 
         public const string ContextMenuItemOpenWindowName = ContextMenuBase + OpenWindowsName;
@@ -25,6 +26,7 @@ namespace SearchHelper.Editor.UI
         public const string ContextMenuFindUnusedGlobalItemName = ContextMenuBase + FindUnusedToolName + " (Global)";
         public const string ContextMenuFindUnusedLocalItemName = ContextMenuBase + FindUnusedToolName + " (Local)";
         public const string ContextMenuFindDuplicatesItemName = ContextMenuBase + FindDuplicatesToolName;
+        public const string ContextMenuFindMissingItemName = ContextMenuBase + MissingToolName;
         public const string ContextMenuMergeItemName = ContextMenuBase + MergeToolName;
 
         // General
