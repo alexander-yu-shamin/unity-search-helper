@@ -1129,7 +1129,7 @@ namespace SearchHelper.Editor.Core.Tools
                     x -= elementWidth + UISettings.AssetHeaderSpace;
                     EditorGUI.TextArea(new Rect(x, y, elementWidth, UISettings.AssetHeaderHeight),
                         !CountHiddenDependencies
-                            ? asset.Dependencies.Count(IsDependencyAssetVisible).ToString()
+                            ? asset.Dependencies?.Count(IsDependencyAssetVisible).ToString()
                             : asset.Dependencies?.Count.ToString());
 
                     elementWidth = UISettings.AssetHeaderDependencyCountTextWidth;

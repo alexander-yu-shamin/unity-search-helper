@@ -103,13 +103,13 @@ namespace SearchHelper.Editor.UI
             OpenWindow().SelectTool(ToolType.Merge)?.Run(SelectedObject);
         }
 
-        [MenuItem(UISettings.ContextMenuFindMissingItemName, priority = 111)]
+        [MenuItem(UISettings.ContextMenuFindMissingItemName, priority = 117)]
         public static void FindMissing()
         {
             OpenWindow().SelectTool(ToolType.Missing)?.Run(SelectedObject);
         }
 
-        [MenuItem(UISettings.ContextMenuShowObjectGuidItemName, priority = 117)]
+        [MenuItem(UISettings.ContextMenuShowObjectGuidItemName, priority = 118)]
         public static void ShowObjectGuid()
         {
             OpenWindow().SelectTool(ToolType.FindByGuid)?.Run(SelectedObject);
