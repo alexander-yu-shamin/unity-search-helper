@@ -1,15 +1,12 @@
 using System.Collections.Generic;
-using SearchHelper.Editor.Core;
 using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
-using UnityEditor;
 using UnityEngine;
 
-namespace SearchHelper.Editor.Tools
+namespace SearchHelper.Editor.Core.Tools
 {
     public class UsedByTool : ToolBase
     {
-        protected override bool IsLogViewSupported { get; set; } = false;
         protected override bool IsCacheUsed { get; set; } = false;
         private Object SelectedObject { get; set; }
         private List<Asset> Assets { get; set; }
@@ -18,24 +15,29 @@ namespace SearchHelper.Editor.Tools
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.UsedByTool;
 
+        public override void Init()
+        {
+            base.Init();
+            Log(LogType.Log, "Build a dependency map and track object references.");
+        }
+
         public override void InnerDraw(Rect windowRect)
         {
-            DrawHeaderLines(() =>
+            DrawMain(firstLineLeft: () =>
             {
-                SelectedObject = DrawSelectedObject(SelectedObject);
-                EGuiKit.Button("Find", Run);
+                EGuiKit.Horizontal(() =>
+                {
+                    SelectedObject = DrawSelectedObject(SelectedObject);
+                    EGuiKit.Button("Find", Run);
+                });
+            }, drawContent: () =>
+            {
+                DrawVirtualScroll(Assets);
             });
-            DrawVirtualScroll(Assets);
         }
 
         public override void Run(Object selectedObject)
         {
-            if (selectedObject == null)
-            {
-                Debug.LogError($"Selected Object is null!");
-                return;
-            }
-
             SelectedObject = selectedObject;
             Run();
         }
@@ -54,8 +56,11 @@ namespace SearchHelper.Editor.Tools
         {
             if (obj == null)
             {
+                Log(LogType.Error, "Choose an object to proceed.");
                 return null;
             }
+
+            Log(LogType.Warning, "Scanning for dependants...");
 
             var searchedCtx = SearchHelperService.FindUsedBy(obj, IsCacheUsed);
 
@@ -66,6 +71,8 @@ namespace SearchHelper.Editor.Tools
 
             var assets = new List<Asset>() { searchedCtx };
             UpdateAssets(assets, forceUpdate: true);
+
+            Log(LogType.Warning, "Scanning ready."); 
             return assets;
         }
     }

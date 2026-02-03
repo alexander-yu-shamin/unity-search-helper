@@ -1,61 +1,119 @@
 using System.Collections.Generic;
-using SearchHelper.Editor.Core;
 using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
 using UnityEngine;
 
-namespace SearchHelper.Editor.Tools
+namespace SearchHelper.Editor.Core.Tools
 {
     public class FindByGuidTool : ToolBase
     {
         protected override bool ShowEmptyDependencyText { get; set; } = false;
         protected override bool ShowDependenciesCount { get; set; } = false;
 
-        private string CurrentGuid { get; set; } 
+        private string CurrentGuid { get; set; }
         private Object SelectedObject { get; set; }
         private Object UsedObject { get; set; }
         private string CurrentUsedObjectGuid { get; set; }
         private List<Asset> Contexts { get; set; }
+        protected override IEnumerable<Asset> Data => Contexts;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.FindByGuidTool;
-        protected override IEnumerable<Asset> Data => Contexts;
+
         public override void InnerDraw(Rect windowRect)
         {
-            EGuiKit.Horizontal(() =>
+            var height = GUILayout.Height(UISettings.AssetHeaderHeight);
+            var width = GUILayout.Width(UISettings.CommonGuidTextWidth);
+            if (IsFullScreenMode)
             {
-                var height = GUILayout.Height(UISettings.HeaderHeight);
-
-                EGuiKit.Label("GUID:", height);
-                var newGuid = EditorGUILayout.TextField(CurrentGuid, GUILayout.Width(UISettings.CommonGuidWidth), height);
-                if (newGuid != CurrentGuid)
+                HeaderLineCount = 1;
+                EGuiKit.Horizontal(() =>
                 {
-                    CurrentGuid = newGuid;
-                    FindAssetByGuid(CurrentGuid);
-                }
-
-                EGuiKit.Button("Find", () =>
+                    DrawFindGuidField(height);
+                    EGuiKit.FlexibleSpace();
+                    DrawSelectedObjectGuidField(height);
+                });
+            }
+            else
+            {
+                HeaderLineCount = 2;
+                EGuiKit.Vertical(() =>
                 {
-                    FindAssetByGuid(CurrentGuid);
-                }, height);
+                    EGuiKit.Horizontal(() =>
+                    {
+                        DrawFindGuidField(height);
+                        EGuiKit.FlexibleSpace();
+                    });
 
-                EGuiKit.FlexibleSpace();
+                    EGuiKit.Horizontal(() =>
+                    {
+                        DrawSelectedObjectGuidField(height, UISettings.CommonGuidTextWidth * 2 + 4, false);
+                        EGuiKit.FlexibleSpace();
+                    });
+                });
+            }
 
-                SelectedObject = DrawSelectedObject(SelectedObject);
+            if (Contexts.IsNullOrEmpty() && !string.IsNullOrEmpty(CurrentGuid))
+            {
+                EGuiKit.Horizontal(
+                    () =>
+                    {
+                        EGuiKit.Color(UISettings.ErrorColor,
+                            () => { EGuiKit.Label($"Object referenced by GUID {CurrentGuid} could not be located."); });
+                    }, GUI.skin.box);
+            }
 
-                if (UsedObject != SelectedObject)
-                {
-                    UsedObject = SelectedObject;
-                    CurrentUsedObjectGuid = string.Empty;
-                    CurrentUsedObjectGuid = SearchHelperService.GetObjectGuid(UsedObject);
-                }
-                
-                EditorGUILayout.TextField(CurrentUsedObjectGuid, GUILayout.Width(UISettings.CommonGuidWidth), height);
-            });
+            if (!Contexts.IsNullOrEmpty())
+            {
+                DrawVirtualScroll(Contexts);
+            }
 
-            DrawContexts(windowRect);
+            DrawLogView();
+        }
+
+        private void DrawSelectedObjectGuidField(GUILayoutOption height, float selectedObjectWidth = 0.0f, bool drawLabel = true)
+        {
+            if (selectedObjectWidth == 0.0f)
+            {
+                SelectedObject = EGuiKit.Object(SelectedObject, typeof(Object), true, null, height);
+            }
+            else
+            {
+                SelectedObject = EGuiKit.Object(SelectedObject, typeof(Object), true, null, height,
+                    GUILayout.Width(selectedObjectWidth));
+            }
+
+            if (drawLabel)
+            {
+                EGuiKit.Label("=>");
+            }
+
+            if (UsedObject != SelectedObject)
+            {
+                UsedObject = SelectedObject;
+                CurrentUsedObjectGuid = string.Empty;
+                CurrentUsedObjectGuid = SearchHelperService.GetObjectGuid(UsedObject);
+            }
+
+            EditorGUILayout.TextField(CurrentUsedObjectGuid, GUILayout.Width(UISettings.CommonGuidWidth),
+                height);
+        }
+
+        private void DrawFindGuidField(GUILayoutOption height)
+        {
+            var width = GUILayout.Width(UISettings.CommonGuidTextWidth);
+            EGuiKit.Label("GUID:", height, width);
+            var newGuid = EditorGUILayout.TextField(CurrentGuid,
+                GUILayout.Width(UISettings.CommonGuidWidth), height);
+            if (newGuid != CurrentGuid)
+            {
+                CurrentGuid = newGuid;
+                FindAssetByGuid(CurrentGuid);
+            }
+
+            EGuiKit.Button("Find", () => { FindAssetByGuid(CurrentGuid); }, width);
         }
 
         public override void Run(Object selectedObject)
@@ -77,36 +135,16 @@ namespace SearchHelper.Editor.Tools
 
         private void FindAssetByGuid(string guid)
         {
-            var foundObject = SearchHelperService.FindObjectByGuid(CurrentGuid);
+            var foundObject = SearchHelperService.FindObjectByGuid(guid);
             if (foundObject == null)
             {
+                Log(LogType.Error, $"Object referenced by GUID {guid} could not be located.");
                 Contexts = null;
                 return;
             }
 
+            Log(LogType.Warning, $"Object referenced by GUID {guid} has been found.");
             Contexts = Asset.ToAsset(foundObject).AsList();
-        }
-
-        private void DrawContexts(Rect windowRect)
-        {
-            if (Contexts.IsNullOrEmpty() && !string.IsNullOrEmpty(CurrentGuid))
-            {
-                EGuiKit.Horizontal(() =>
-                {
-                    EGuiKit.Color(UISettings.ErrorColor, () =>
-                    {
-                        EGuiKit.Label($"The object with GUID {CurrentGuid} was not found.");
-                    });
-                }, GUI.skin.box);
-                return;
-            }
-
-            if (Contexts.IsNullOrEmpty())
-            {
-                return;
-            }
-
-            DrawVirtualScroll(Contexts);
         }
     }
 }

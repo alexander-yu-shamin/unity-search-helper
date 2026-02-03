@@ -1,14 +1,13 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using SearchHelper.Editor.Core;
 using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
 using UnityEngine;
 
-namespace SearchHelper.Editor.Tools
+namespace SearchHelper.Editor.Core.Tools
 {
     public class UnusedTool : ToolBase
     {
@@ -22,28 +21,25 @@ namespace SearchHelper.Editor.Tools
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.UnusedTool;
 
+        public override void Init()
+        {
+            base.Init();
+            Log(LogType.Log, $"[{(IsGlobalScope ? "Global" : "Local")}] Similar to 'Used By', but scans all files within the folder");
+        }
+
         public override void InnerDraw(Rect windowRect)
         {
-            DrawHeaderLines(() =>
+            DrawMain(firstLineLeft: () =>
             {
-                SelectedObject = DrawSelectedObject(SelectedObject);
-                EGuiKit.Button("Find", Run, GUILayout.Width(50));
-            });
-            EGuiKit.Horizontal(() =>
+                EGuiKit.Horizontal(() =>
+                {
+                    SelectedObject = DrawSelectedObject(SelectedObject);
+                    EGuiKit.Button("Find", Run);
+                });
+            }, drawContent: () =>
             {
-
-
-                //EGuiKit.Space();
-                //EGuiKit.Color(Color.gray, () =>
-                //{
-                //    EGuiKit.Label("Similar to 'Used By', but scans all files within the folder");
-                //});
-
-                //EGuiKit.FlexibleSpace();
-                //DrawHeaderControls();
+                DrawVirtualScroll(Assets);
             });
-
-            DrawVirtualScroll(Assets);
         }
 
         public override void Run(Object selectedObject)
@@ -61,11 +57,11 @@ namespace SearchHelper.Editor.Tools
         {
             if (Assets.IsNullOrEmpty())
             {
-                menu.AddDisabledItem(new GUIContent(prefix + "Remove Unused Items"));
+                menu.AddDisabledItem(new GUIContent(prefix + "Clean Up Unused Items"));
             }
             else
             {
-                menu.AddItem(new GUIContent(prefix + "Remove Unused Items"), false, RemovedUnusedItems);
+                menu.AddItem(new GUIContent(prefix + "Clean Up Unused Items"), false, RemovedUnusedItems);
             }
         }
 
@@ -73,9 +69,11 @@ namespace SearchHelper.Editor.Tools
         {
             if (obj == null)
             {
+                Log(LogType.Error, "Choose an object to proceed.");
                 return null;
             }
 
+            Log(LogType.Warning, $"[{(IsGlobalScope ? "Global" : "Local")}] Scanning for unused assets...");
             var map = FolderOrFile(obj).Select(Asset.ToAsset).ToDictionary(key => key.Path);
 
             var root = IsGlobalScope ? null : FolderPathFromObject(obj);
@@ -90,6 +88,7 @@ namespace SearchHelper.Editor.Tools
 
             var assets = map.Values.ToList();
             UpdateAssets(assets, forceUpdate: true);
+            Log(LogType.Warning, $"[{(IsGlobalScope ? "Global" : "Local")}] Scanning ready.");
             return assets;
         }
 
@@ -99,6 +98,8 @@ namespace SearchHelper.Editor.Tools
             {
                 return;
             }
+
+            Log(LogType.Warning, "Cleaning up unused items...");
 
             AssetDatabase.StartAssetEditing();
             foreach (var asset in Assets)
@@ -113,9 +114,11 @@ namespace SearchHelper.Editor.Tools
                     continue;
                 }
 
+                Log(LogType.Warning, $"Delete: {asset.Path}");
                 File.Delete(asset.Path);
             }
 
+            Log(LogType.Warning, "Cleaning up ready.");
             AssetDatabase.StopAssetEditing();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);

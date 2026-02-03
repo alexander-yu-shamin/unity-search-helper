@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using SearchHelper.Editor.Core;
 using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
@@ -8,7 +7,7 @@ using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace SearchHelper.Editor.Tools
+namespace SearchHelper.Editor.Core.Tools
 {
     public class DuplicatesTool : ToolBase
     {
@@ -33,32 +32,28 @@ namespace SearchHelper.Editor.Tools
             base.Init();
             DefaultDrawModel.DrawState = true;
             DefaultDrawModel.GetSizeTooltipText = GetFullSize;
+            Log(LogType.Log, $"Find object duplicates or scan the selected folder for all duplicates (defaults to Assets).");
         }
 
         public override void InnerDraw(Rect windowRect)
         {
-            DrawHeaderLines();
-            EGuiKit.Horizontal(() =>
+            DrawMain(firstLineLeft: () =>
             {
-                SelectedObject = DrawSelectedObject(SelectedObject);
-                EGuiKit.Button("Find", Run);
-
-                EGuiKit.Space();
-                EGuiKit.Color(Color.gray, () =>
+                EGuiKit.Horizontal(() =>
                 {
-                    EGuiKit.Label("Find object duplicates or scan the selected folder for all duplicates (defaults to Assets).");
+                    SelectedObject = DrawSelectedObject(SelectedObject);
+                    EGuiKit.Button("Find", Run);
                 });
-
-                EGuiKit.FlexibleSpace();
+            }, secondLineLeft: () =>
+            {
                 EGuiKit.Button(!Assets.IsNullOrEmpty() && Assets.Count == 1, "Open in Merge Tool", () =>
                 {
                     TransferTo(CurrentToolType, SearchHelperWindow.ToolType.MergeTool, Assets.FirstOrDefault());
                 });
-
-
+            }, drawContent: () =>
+            {
+                DrawVirtualScroll(Assets);
             });
-
-            DrawVirtualScroll(Assets);
         }
 
         public override void Run(Object selectedObject)
@@ -81,6 +76,7 @@ namespace SearchHelper.Editor.Tools
         {
             var searchedPath = string.Empty;
 
+            Log(LogType.Warning, "Scanning for duplicates...");
             IEnumerable<string> paths;
             if (obj != null)
             {
@@ -153,6 +149,7 @@ namespace SearchHelper.Editor.Tools
                 }).ToList();
 
             UpdateAssets(assets, forceUpdate: true);
+            Log(LogType.Warning, "Scanning ready.");
             return assets;
         }
 

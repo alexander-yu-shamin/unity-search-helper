@@ -1,11 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
-using SearchHelper.Editor.Core;
 using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
 using UnityEngine;
 
-namespace SearchHelper.Editor.Tools
+namespace SearchHelper.Editor.Core.Tools
 {
     public class DependenciesTool : ToolBase
     {
@@ -16,29 +15,29 @@ namespace SearchHelper.Editor.Tools
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.DependencyTool;
 
+        public override void Init()
+        {
+            base.Init();
+            Log(LogType.Log, "Compile all dependencies of a given object or an entire folder.");
+        }
+
         public override void InnerDraw(Rect windowRect)
         {
-            DrawHeaderLines(() =>
+            DrawMain(firstLineLeft: () =>
             {
                 EGuiKit.Horizontal(() =>
                 {
                     SelectedObject = DrawSelectedObject(SelectedObject);
                     EGuiKit.Button("Find", Run);
                 });
+            }, drawContent: () =>
+            {
+                DrawVirtualScroll(Assets);
             });
-
-            DrawVirtualScroll(Assets);
-            DrawLogView();
         }
 
         public override void Run(Object selectedObject)
         {
-            if (selectedObject == null)
-            {
-                Debug.LogError($"Selected Object is null!");
-                return;
-            }
-
             SelectedObject = selectedObject;
             Run();
         }
@@ -69,11 +68,16 @@ namespace SearchHelper.Editor.Tools
         {
             if (obj == null)
             {
+                Log(LogType.Error, "Choose an object to proceed.");
                 return null;
             }
 
+            Log(LogType.Warning, "Scanning for dependencies...");
+
             var assets = FolderOrFile(obj).Select(SearchHelperService.FindDependencies).ToList();
             UpdateAssets(assets, forceUpdate: true);
+
+            Log(LogType.Warning, "Scanning ready."); 
             return assets;
         }
     }

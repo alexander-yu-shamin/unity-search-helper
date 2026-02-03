@@ -11,7 +11,7 @@ using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace SearchHelper.Editor.Tools
+namespace SearchHelper.Editor.Core.Tools
 {
     public class MergeTool : ToolBase
     {
@@ -55,34 +55,34 @@ namespace SearchHelper.Editor.Tools
             DefaultDrawModel.OnRemoveButtonPressed = RemoveButtonPressedHandler;
             DefaultDrawModel.OnComparandButtonPressed = ComparandButtonPressedHandler;
             DefaultDrawModel.OnDiffButtonPressed = DiffButtonPressedHandler;
+
+            Log(LogType.Log, $"Merge assets in one.");
         }
 
         public override void InnerDraw(Rect windowRect)
         {
-            DrawHeaderLines(() =>
+            DrawMain(firstLineLeft: () =>
             {
-                EGuiKit.Button("Add Selected Object as Base", () => { AddToMerge(Selection.activeObject, isBaseAsset: true); });
-                EGuiKit.Button("Add Selected Object as Theirs", () => { AddToMerge(Selection.activeObject); });
-
-                EGuiKit.Button(BaseObject != null || !Assets.IsNullOrEmpty(), "Clear", () =>
+                EGuiKit.Horizontal(() =>
                 {
-                    BaseObject = null;
-                    Assets = null;
+                    EGuiKit.Button("Add as Base", () => { AddToMerge(Selection.activeObject, isBaseAsset: true); });
+                    EGuiKit.Button("Add as Theirs", () => { AddToMerge(Selection.activeObject); });
+                    EGuiKit.Button(BaseObject != null || !Assets.IsNullOrEmpty(), "Clear", () =>
+                    {
+                        BaseObject = null;
+                        Assets = null;
+                    });
                 });
-
-                EGuiKit.FlexibleSpace();
+            }, firstLineRight: SelectionRules, secondLineLeft: () =>
+            {
                 EGuiKit.Button(BaseObject != null && IsMainAssetVisible(BaseObject) && !Assets.IsNullOrEmpty(), "Merge", () =>
                 {
                     Merge(BaseObject, Assets, IsCacheUsed);
                 });
-
-                EGuiKit.Space(UISettings.HeaderSpace);
-                DrawSelectButton();
-
+            }, drawContent: () =>
+            {
+                DrawVirtualScroll(Assets);
             });
-
-            EGuiKit.Space(UISettings.HeaderPadding);
-            DrawVirtualScroll(Assets);
         }
 
         public override void Run(Object selectedObject)
@@ -101,6 +101,7 @@ namespace SearchHelper.Editor.Tools
             SearchHelperWindow.ToolType to, Asset asset)
         {
             using var measure = Profiler.Measure("GetDataFromAnotherTool");
+            Log(LogType.Log, $"Get data from {from}");
 
             if (asset == null || asset.Dependencies.IsNullOrEmpty())
             {
@@ -110,7 +111,7 @@ namespace SearchHelper.Editor.Tools
             Assets ??= new List<Asset>();
             if (Assets.Any(element => element.Path == asset.Path))
             {
-                Debug.LogError($"The asset {asset.Path} has already added.");
+                Log(LogType.Error, $"The asset {asset.Path} has already added.");
                 return;
             }
 
@@ -122,7 +123,6 @@ namespace SearchHelper.Editor.Tools
             {
                 AddToMerge(dependency.Object, batching: true);
             }
-
 
             UpdateDependents(ShowDependents);
             UpdateAssets(Assets, forceUpdate: true);
@@ -138,31 +138,39 @@ namespace SearchHelper.Editor.Tools
             });
         }
 
-        private void DrawSelectButton()
+        private void SelectionRules(GenericMenu externalMenu)
         {
-            var content = new GUIContent($"Selection");
-            if (EditorGUILayout.DropdownButton(content, FocusType.Passive, GUILayout.Width(75)))
+            if (IsFullScreenMode)
             {
-                var menu = new GenericMenu();
-                menu.AddItem(new GUIContent("Select All"), false,
+                EGuiKit.Space(UISettings.HeaderSpace);
+                var content = new GUIContent($"Selection");
+                EGuiKit.DropdownButton(content, () =>
+                {
+                    var internalMenu = new GenericMenu();
+                    AddToMenu(internalMenu, string.Empty);
+                    internalMenu.ShowAsContext();
+                });
+            }
+            else
+            {
+                AddToMenu(externalMenu, "Selection/");
+            }
+
+            void AddToMenu(GenericMenu menu, string prefix)
+            {
+                menu.AddItem(new GUIContent(prefix + "Select All"), false,
+                    () => { Assets.ForEach(asset => asset.IsSelected = IsMainAssetVisible(asset)); });
+
+                menu.AddItem(new GUIContent(prefix + "Unselect All"), false,
+                    () => { Assets.ForEach(asset => asset.IsSelected = false); });
+
+                menu.AddItem(new GUIContent(prefix + "Select Similar"), false,
                     () =>
                     {
-                        Assets.ForEach(asset => asset.IsSelected = IsMainAssetVisible(asset));
+                        Assets.ForEach(asset =>
+                            asset.IsSelected = asset.MetaDiffState == AssetDiffState.SameAsBaseObject
+                                               && IsMainAssetVisible(asset));
                     });
-
-                menu.AddItem(new GUIContent("Unselect All"), false,
-                    () =>
-                    {
-                        Assets.ForEach(asset => asset.IsSelected = false);
-                    });
-
-                menu.AddItem(new GUIContent("Select Similar"), false,
-                    () =>
-                    {
-                        Assets.ForEach(asset => asset.IsSelected = asset.MetaDiffState == AssetDiffState.SameAsBaseObject && IsMainAssetVisible(asset));
-                    });
-
-                menu.ShowAsContext();
             }
         }
 
@@ -174,6 +182,8 @@ namespace SearchHelper.Editor.Tools
             {
                 return;
             }
+
+            Log(LogType.Warning, $"Merging...");
 
             AssetDatabase.StartAssetEditing();
 
@@ -190,7 +200,7 @@ namespace SearchHelper.Editor.Tools
 
                 if(dependencies == null)
                 {
-                    Debug.LogError($"Can't find dependencies for {asset.Path}");
+                    Log(LogType.Error, $"Can't find dependencies for {asset.Path}");
                     continue;
                 }
 
@@ -207,6 +217,8 @@ namespace SearchHelper.Editor.Tools
                 }
                 asset.IsMerged = true;
             }
+
+            Log(LogType.Warning, $"Merge complete.");
 
             AssetDatabase.StopAssetEditing();
             AssetDatabase.SaveAssets();
@@ -265,14 +277,14 @@ namespace SearchHelper.Editor.Tools
                 case ValidationError.Null:
                 case ValidationError.NotAFile:
                 {
-                    Debug.LogError($"The asset {selectedObject.name}:{newAsset.Path} can't be used");
+                    Log(LogType.Error, $"The asset {selectedObject.name}:{newAsset.Path} can't be used");
                     return;
                 }
                 case ValidationError.BaseObject:
                 {
                     if (BaseObject == null)
                     {
-                        Debug.LogError($"The asset {newAsset.Object.name}:{newAsset.Path} is a base, but the Base is null!");
+                        Log(LogType.Error, $"The asset {newAsset.Object.name}:{newAsset.Path} is a base, but the Base is null!");
                         return;
                     }
 
@@ -507,8 +519,6 @@ namespace SearchHelper.Editor.Tools
             var usedBy = SearchHelperService.FindUsedBy(asset.Object, IsCacheUsed);
             asset.Dependencies = usedBy.Dependencies;
         }
-
-
 
         #region Handlers
         private void DiffButtonPressedHandler(Asset asset)

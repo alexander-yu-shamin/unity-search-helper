@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using SearchHelper.Editor.Core;
-using SearchHelper.Editor.Tools;
-using Toolkit.Editor.Helpers.IMGUI;
+using SearchHelper.Editor.Core.Tools;
 using UnityEditor;
 using UnityEngine;
 using Toolkit.Runtime.Extensions;
