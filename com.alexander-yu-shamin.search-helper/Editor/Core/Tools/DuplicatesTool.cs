@@ -20,7 +20,7 @@ namespace SearchHelper.Editor.Core.Tools
         protected override IEnumerable<Asset> Data => Assets;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
-            SearchHelperWindow.ToolType.DuplicatesTool;
+            SearchHelperWindow.ToolType.Duplicates;
 
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)
@@ -48,7 +48,7 @@ namespace SearchHelper.Editor.Core.Tools
             {
                 EGuiKit.Button(!Assets.IsNullOrEmpty() && Assets.Count == 1, "Open in Merge Tool", () =>
                 {
-                    TransferTo(CurrentToolType, SearchHelperWindow.ToolType.MergeTool, Assets.FirstOrDefault());
+                    TransferTo(CurrentToolType, SearchHelperWindow.ToolType.Merge, Assets.FirstOrDefault());
                 });
             }, drawContent: () =>
             {

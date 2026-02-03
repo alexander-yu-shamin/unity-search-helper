@@ -83,10 +83,10 @@ namespace SearchHelper.Editor.Core.Tools
         private List<SearchHelperWindow.ToolType> PossibleTransferTypes { get; set; } =
             new List<SearchHelperWindow.ToolType>()
             {
-                SearchHelperWindow.ToolType.DependencyTool,
-                SearchHelperWindow.ToolType.UsedByTool,
-                SearchHelperWindow.ToolType.DuplicatesTool,
-                SearchHelperWindow.ToolType.MergeTool
+                SearchHelperWindow.ToolType.Dependency,
+                SearchHelperWindow.ToolType.UsedBy,
+                SearchHelperWindow.ToolType.Duplicates,
+                SearchHelperWindow.ToolType.Merge
             };
 
         #region I

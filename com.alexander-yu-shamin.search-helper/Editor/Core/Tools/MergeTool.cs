@@ -27,7 +27,7 @@ namespace SearchHelper.Editor.Core.Tools
         protected override IEnumerable<Asset> Data => Assets;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
-            SearchHelperWindow.ToolType.MergeTool;
+            SearchHelperWindow.ToolType.Merge;
 
 
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,

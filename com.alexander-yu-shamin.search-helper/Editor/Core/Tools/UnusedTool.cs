@@ -19,7 +19,7 @@ namespace SearchHelper.Editor.Core.Tools
         protected override IEnumerable<Asset> Data => Assets;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
-            SearchHelperWindow.ToolType.UnusedTool;
+            SearchHelperWindow.ToolType.Unused;
 
         public override void Init()
         {

@@ -35,7 +35,7 @@ namespace SearchHelper.Editor.UI
 
         // Tool
         public const float ToolLineHeight = Height;
-        public const float ToolButtonMinimalWidth = 120.0f;
+        public const float ToolButtonMinimalWidth = 80.0f;
 
         // Header
         public const float HeaderHeight = Height;

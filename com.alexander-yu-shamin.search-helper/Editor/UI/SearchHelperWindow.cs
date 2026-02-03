@@ -13,27 +13,27 @@ namespace SearchHelper.Editor.UI
     {
         public enum ToolType
         {
-            DependencyTool = 0,
-            UsedByTool,
-            UnusedTool,
-            DuplicatesTool,
-            MergeTool,
-            MissingTool,
-            FindByGuidTool,
+            Dependency = 0,
+            UsedBy,
+            Unused,
+            Duplicates,
+            Merge,
+            Missing,
+            FindByGuid,
         }
 
         public static bool IsFullScreenMode { get; set; } = true;
-        private static ToolType SelectedToolType { get; set; } = ToolType.DependencyTool;
+        private static ToolType SelectedToolType { get; set; } = ToolType.Dependency;
 
         private Dictionary<ToolType, ToolBase> ToolMap { get; set; } = new()
         {
-            { ToolType.DependencyTool, new DependenciesTool() },
-            { ToolType.UsedByTool, new UsedByTool() },
-            { ToolType.UnusedTool, new UnusedTool() },
-            { ToolType.DuplicatesTool, new DuplicatesTool() },
-            { ToolType.MergeTool, new MergeTool() },
-            { ToolType.MissingTool, new MissingTool() },
-            { ToolType.FindByGuidTool, new FindByGuidTool() },
+            { ToolType.Dependency, new DependenciesTool() },
+            { ToolType.UsedBy, new UsedByTool() },
+            { ToolType.Unused, new UnusedTool() },
+            { ToolType.Duplicates, new DuplicatesTool() },
+            { ToolType.Merge, new MergeTool() },
+            { ToolType.Missing, new MissingTool() },
+            { ToolType.FindByGuid, new FindByGuidTool() },
         };
 
         private static Object SelectedObject => !Selection.assetGUIDs.IsNullOrEmpty()
@@ -60,19 +60,19 @@ namespace SearchHelper.Editor.UI
         [MenuItem(UISettings.ContextMenuItemFindDependenciesName, priority = 111)]
         public static void ShowDependencies()
         {
-            OpenWindow().SelectTool(ToolType.DependencyTool)?.Run(SelectedObject);
+            OpenWindow().SelectTool(ToolType.Dependency)?.Run(SelectedObject);
         }
 
         [MenuItem(UISettings.ContextMenuFindUsedByItemName, priority = 112)]
         public static void ShowUsesBy()
         {
-            OpenWindow().SelectTool(ToolType.UsedByTool)?.Run(SelectedObject);
+            OpenWindow().SelectTool(ToolType.UsedBy)?.Run(SelectedObject);
         }
 
         [MenuItem(UISettings.ContextMenuFindUnusedGlobalItemName, priority = 113)]
         public static void FindUnusedObjectsGlobal()
         {
-            var selectTool = OpenWindow().SelectTool(ToolType.UnusedTool);
+            var selectTool = OpenWindow().SelectTool(ToolType.Unused);
             if (selectTool != null)
             {
                 selectTool.IsGlobalScope = true;
@@ -83,7 +83,7 @@ namespace SearchHelper.Editor.UI
         [MenuItem(UISettings.ContextMenuFindUnusedLocalItemName, priority = 114)]
         public static void FindUnusedObjectsLocal()
         {
-            var selectTool = OpenWindow().SelectTool(ToolType.UnusedTool);
+            var selectTool = OpenWindow().SelectTool(ToolType.Unused);
             if (selectTool != null)
             {
                 selectTool.IsGlobalScope = false;
@@ -94,25 +94,25 @@ namespace SearchHelper.Editor.UI
         [MenuItem(UISettings.ContextMenuFindDuplicatesItemName, priority = 115)]
         public static void FindDuplicates()
         {
-            OpenWindow().SelectTool(ToolType.DuplicatesTool)?.Run(SelectedObject);
+            OpenWindow().SelectTool(ToolType.Duplicates)?.Run(SelectedObject);
         }
 
         [MenuItem(UISettings.ContextMenuMergeItemName, priority = 116)]
         public static void MergeFiles()
         {
-            OpenWindow().SelectTool(ToolType.MergeTool)?.Run(SelectedObject);
+            OpenWindow().SelectTool(ToolType.Merge)?.Run(SelectedObject);
         }
 
         [MenuItem(UISettings.ContextMenuFindMissingItemName, priority = 111)]
         public static void FindMissing()
         {
-            OpenWindow().SelectTool(ToolType.MissingTool)?.Run(SelectedObject);
+            OpenWindow().SelectTool(ToolType.Missing)?.Run(SelectedObject);
         }
 
         [MenuItem(UISettings.ContextMenuShowObjectGuidItemName, priority = 117)]
         public static void ShowObjectGuid()
         {
-            OpenWindow().SelectTool(ToolType.FindByGuidTool)?.Run(SelectedObject);
+            OpenWindow().SelectTool(ToolType.FindByGuid)?.Run(SelectedObject);
         }
 
         private void OnEnable()

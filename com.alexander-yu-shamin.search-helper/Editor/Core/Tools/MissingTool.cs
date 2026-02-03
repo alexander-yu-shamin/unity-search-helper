@@ -15,7 +15,7 @@ namespace SearchHelper.Editor.Core.Tools
         protected override IEnumerable<Asset> Data => Assets;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
-            SearchHelperWindow.ToolType.DependencyTool;
+            SearchHelperWindow.ToolType.Missing;
 
         public override void Init()
         {

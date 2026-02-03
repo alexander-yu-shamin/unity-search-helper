@@ -20,7 +20,7 @@ namespace SearchHelper.Editor.Core.Tools
         protected override IEnumerable<Asset> Data => Contexts;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
-            SearchHelperWindow.ToolType.FindByGuidTool;
+            SearchHelperWindow.ToolType.FindByGuid;
 
         public override void InnerDraw(Rect windowRect)
         {
