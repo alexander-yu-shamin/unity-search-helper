@@ -8,6 +8,7 @@ namespace SearchHelper.Editor.Core.Tools
 {
     public class DependenciesTool : ToolBase
     {
+        protected override bool IsCacheUsed { get; set; } = false;
         private Object SelectedObject { get; set; }
         private List<Asset> Assets { get; set; }
         protected override IEnumerable<Asset> Data => Assets;

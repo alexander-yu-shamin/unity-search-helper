@@ -88,7 +88,7 @@ namespace SearchHelper.Editor.Core.Tools
                 else
                 {
                     searchedPath = objPath;
-                    paths = SearchHelperService.FindAssetPaths();
+                    paths = SearchHelperService.FindAssetPaths(useCache: IsCacheUsed);
                 }
             }
             else
@@ -99,7 +99,7 @@ namespace SearchHelper.Editor.Core.Tools
                     SelectedObject = selectedObj;
                 }
 
-                paths = SearchHelperService.FindAssetPaths();
+                paths = SearchHelperService.FindAssetPaths(useCache: IsCacheUsed);
             }
 
             if (!paths.Any())

@@ -517,11 +517,6 @@ namespace SearchHelper.Editor.Core.Tools
                     menu.AddSeparator(string.Empty);
                 }
 
-                menu.AddItem(new GUIContent("Show File Size"), ShowSize, () => { ShowSize = !ShowSize; });
-                menu.AddItem(new GUIContent("Use Cache"), IsCacheUsed, () => { IsCacheUsed = !IsCacheUsed; });
-                menu.AddItem(new GUIContent("Show Log"), IsLogViewSupported, () => { IsLogViewSupported = !IsLogViewSupported; });
-                menu.AddItem(new GUIContent("Show Path"), ShowPath, () => { ShowPath = !ShowPath; });
-
                 if (IsMetaDiffSupported && DiffManager != null)
                 {
                     var ignoredLines = DiffManager.IgnoredLines;
@@ -570,6 +565,11 @@ namespace SearchHelper.Editor.Core.Tools
                         });
                     }
                 }
+
+                menu.AddItem(new GUIContent("Show File Size"), ShowSize, () => { ShowSize = !ShowSize; });
+                menu.AddItem(new GUIContent("Use Cache"), IsCacheUsed, () => { IsCacheUsed = !IsCacheUsed; });
+                menu.AddItem(new GUIContent("Show Log"), IsLogViewSupported, () => { IsLogViewSupported = !IsLogViewSupported; });
+                menu.AddItem(new GUIContent("Show Path"), ShowPath, () => { ShowPath = !ShowPath; });
 
                 AddSettingsContextMenu(menu);
 
@@ -958,7 +958,7 @@ namespace SearchHelper.Editor.Core.Tools
                 return 0.0f;
             }
 
-            var result = assets.Sum(ctx => CalculateAssetHeaderHeight(ctx, drawModel) + CalculateDependenciesHeight(ctx, drawModel) + UISettings.AssetHeaderSeparator);
+            var result = assets.Sum(ctx => CalculateAssetHeaderHeight(ctx, drawModel) + CalculateDependenciesHeight(ctx, drawModel));
 
             if (assets.Count == 1)
             {
@@ -994,7 +994,7 @@ namespace SearchHelper.Editor.Core.Tools
                 return 0.0f;
             }
 
-            return UISettings.AssetHeaderHeightWithPadding;
+            return UISettings.AssetHeaderHeightWithPadding + UISettings.AssetHeaderSeparator;
         }
 
         private float TryDrawAssetHeader(ref float x, ref float y, float width, Asset asset, DrawModel drawModel)
@@ -1177,7 +1177,7 @@ namespace SearchHelper.Editor.Core.Tools
             return UISettings.AssetHeaderHeightWithPadding;
         }
 
-        private float CalculateEmptyDependencyHeight(Asset mainAsset, ToolBase.DrawModel drawModel)
+        private float CalculateEmptyDependencyHeight(Asset mainAsset, DrawModel drawModel)
         {
             if (!IsMainAssetVisible(mainAsset))
             {
@@ -1197,7 +1197,7 @@ namespace SearchHelper.Editor.Core.Tools
             return UISettings.DependencyHeightWithPadding;
         }
 
-        private float TryDrawEmptyDependency(ref float x, ref float y, float width, Asset mainAsset, ToolBase.DrawModel drawModel)
+        private float TryDrawEmptyDependency(ref float x, ref float y, float width, Asset mainAsset, DrawModel drawModel)
         {
             if (CalculateEmptyDependencyHeight(mainAsset, drawModel) == 0.0f)
             {

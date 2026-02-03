@@ -161,14 +161,14 @@ namespace SearchHelper.Editor
 
         public static IEnumerable<Asset> ToAssets(IEnumerable<Object> objects, Object mainObject = null)
         {
-            if (objects == null)
+            if (objects.IsNullOrEmpty())
             {
                 return null;
             }
 
             if (mainObject != null)
             {
-                objects = objects.Where(value => value != mainObject).ToArray();
+                objects = objects.Where(value => value != null && value != mainObject).ToArray();
             }
 
             return objects.Select(ToAsset);
