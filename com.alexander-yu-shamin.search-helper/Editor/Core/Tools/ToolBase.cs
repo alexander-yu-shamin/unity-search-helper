@@ -7,6 +7,7 @@ using System.Text;
 using SearchHelper.Editor.Core.Filter;
 using SearchHelper.Editor.Core.Sort;
 using SearchHelper.Editor.UI;
+using Toolkit.Editor.Attributes;
 using Toolkit.Editor.Helpers.Diagnostics;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
@@ -16,11 +17,12 @@ using Object = UnityEngine.Object;
 
 namespace SearchHelper.Editor.Core.Tools
 {
-    public abstract class ToolBase
+    public abstract class ToolBase : IEditorPrefs
     {
         protected class DrawModel
         {
             public Func<Asset, string> GetEmptyAssetText { get; set; }
+            public Func<string> GetEmptyCollectionText { get; set; }
             public Func<Asset, string> GetSizeTooltipText { get; set; }
 
             // Merge
@@ -35,29 +37,38 @@ namespace SearchHelper.Editor.Core.Tools
         }
 
         #region Capabilities
-
+        [EditorPrefs(true)]
         protected virtual bool IsLogViewSupported { get; set; } = true;
         protected virtual bool AreActionsSupported { get; set; } = true;
 
         // Settings
         protected virtual bool AreSettingsSupported { get; set; } = true;
-        protected virtual bool ShowSize { get; set; } = false;
+        [EditorPrefs(false)]
+        protected virtual bool ShowSize { get; set; }
+        [EditorPrefs(true)]
         protected virtual bool IsCacheUsed { get; set; } = true;
         protected virtual bool ShowDependenciesCount { get; set; } = true;
-        protected virtual bool IsMetaDiffSupported { get; set; } = false;
-        protected virtual bool MetaDiffEnabled { get; set; } = false;
+        protected virtual bool IsMetaDiffSupported { get; set; }
+        protected virtual bool MetaDiffEnabled { get; set; }
+        [EditorPrefs(true)]
         protected virtual bool ShowPath { get; set; } = true;
 
         // Visibility
         protected virtual bool AreVisibilityRulesSupported { get; set; } = true;
         protected virtual bool AreShowingFoldersSupported { get; set; } = true;
-        protected virtual bool ShowFolders { get; set; } = false;
+
+        [EditorPrefs(false)]
+        protected virtual bool ShowFolders { get; set; }
+        [EditorPrefs(true)]
         protected virtual bool ShowEmptyDependencyText { get; set; } = true;
-        protected virtual bool CountHiddenDependencies { get; set; } = false;
+        [EditorPrefs(false)]
+        protected virtual bool CountHiddenDependencies { get; set; }
+        [EditorPrefs(true)] 
         protected virtual bool ShowAssetWithNoDependencies { get; set; } = true;
+        [EditorPrefs(true)] 
         protected virtual bool ShowAssetWithDependencies { get; set; } = true;
 
-        protected virtual bool AreScopeRulesSupported { get; set; } = false;
+        protected virtual bool AreScopeRulesSupported { get; set; }
         public virtual bool IsGlobalScope { get; set; } = true;
         protected virtual bool AreSortingRulesSupported { get; set; } = true;
         protected virtual bool AreFilterByRuleSupported { get; set; } = true;
@@ -66,10 +77,6 @@ namespace SearchHelper.Editor.Core.Tools
         protected virtual uint HeaderLineCount { get; set; } = 2;
         #endregion
 
-        #region DrawSettings
-
-
-        #endregion
         private Vector2 ScrollViewPosition { get; set; }
         private FilterByRuleManager FilterByRuleManager { get; set; }
         private FilterByStringManager FilterByStringManager { get; set; }
@@ -90,6 +97,7 @@ namespace SearchHelper.Editor.Core.Tools
             };
 
         #region I
+        public abstract string EditorPrefsPrefix { get; }
         protected abstract SearchHelperWindow.ToolType CurrentToolType { get; set; }
         protected abstract IEnumerable<Asset> Data { get; }
         public abstract void Run(Object selectedObject);
@@ -125,6 +133,7 @@ namespace SearchHelper.Editor.Core.Tools
         public virtual void Init()
         {
             Logger = new Logger.Logger(5);
+            this.LoadSettings();
 
             FilterByRuleManager = new FilterByRuleManager();
             FilterByStringManager = new FilterByStringManager();
@@ -140,6 +149,7 @@ namespace SearchHelper.Editor.Core.Tools
             {
                 DrawMergeButtons = false,
                 DrawState = false,
+                GetEmptyCollectionText = GetEmptyCollectionText,
                 GetAssetStateText = GetAssetStateText,
                 GetEmptyAssetText = GetEmptyAssetText
             };
@@ -512,30 +522,42 @@ namespace SearchHelper.Editor.Core.Tools
             var content = new GUIContent($"Settings");
             if (EditorGUILayout.DropdownButton(content, FocusType.Passive))
             {
-                if (menu.GetItemCount() > 1)
+                if (IsFullScreenMode)
                 {
-                    menu.AddSeparator(string.Empty);
+                    AddToMenu(menu, string.Empty);
+                }
+                else
+                {
+                    var prefix = "Settings/";
+                    AddToMenu(menu, prefix);
                 }
 
+                menu.ShowAsContext();
+            }
+
+            return;
+
+            void AddToMenu(GenericMenu menu, string prefix)
+            {
                 if (IsMetaDiffSupported && DiffManager != null)
                 {
                     var ignoredLines = DiffManager.IgnoredLines;
                     var possibleLines = DiffManager.PossibleIgnoredLines;
 
-                    menu.AddItem(new GUIContent("Meta Diff/Enabled"), MetaDiffEnabled, () =>
+                    menu.AddItem(new GUIContent(prefix + "Meta Diff/Enabled"), MetaDiffEnabled, () =>
                     {
                         MetaDiffEnabled = !MetaDiffEnabled;
                         DiffManager.UpdateState();
                     });
 
-                    menu.AddSeparator("Meta Diff/");
+                    menu.AddSeparator(prefix + "Meta Diff/");
 
                     foreach (var ignoredLine in possibleLines)
                     {
                         AddItem(ignoredLine);
                     }
 
-                    menu.AddItem(new GUIContent($"Meta Diff/Add your line"), false, () =>
+                    menu.AddItem(new GUIContent(prefix + $"Meta Diff/Add your line"), false, () =>
                     {
                         InputDialog.Show("Add Ignore Line", "", result =>
                         {
@@ -550,30 +572,54 @@ namespace SearchHelper.Editor.Core.Tools
                     void AddItem(string line)
                     {
                         var containLine = ignoredLines.Contains(line);
-                        menu.AddItem(new GUIContent($"Meta Diff/Ignore line with: {line}"), ignoredLines.Contains(line), () =>
-                        {
-                            if (containLine)
+                        menu.AddItem(new GUIContent(prefix + $"Meta Diff/Ignore line with: {line}"),
+                            ignoredLines.Contains(line), () =>
                             {
-                                DiffManager.RemoveLine(line);
-                            }
-                            else
-                            {
-                                DiffManager.AddToIgnoreLines(line);
-                            }
+                                if (containLine)
+                                {
+                                    DiffManager.RemoveLine(line);
+                                }
+                                else
+                                {
+                                    DiffManager.AddToIgnoreLines(line);
+                                }
 
-                            MetaDiffSettingsUpdated();
-                        });
+                                MetaDiffSettingsUpdated();
+                            });
                     }
                 }
 
-                menu.AddItem(new GUIContent("Show File Size"), ShowSize, () => { ShowSize = !ShowSize; });
-                menu.AddItem(new GUIContent("Use Cache"), IsCacheUsed, () => { IsCacheUsed = !IsCacheUsed; });
-                menu.AddItem(new GUIContent("Show Log"), IsLogViewSupported, () => { IsLogViewSupported = !IsLogViewSupported; });
-                menu.AddItem(new GUIContent("Show Path"), ShowPath, () => { ShowPath = !ShowPath; });
+                menu.AddItem(new GUIContent(prefix + "Show File Size"), ShowSize, () =>
+                {
+                    ShowSize = !ShowSize;
+                    this.SaveProperty(nameof(ShowSize));
+                });
+                menu.AddItem(new GUIContent(prefix + "Use Cache"), IsCacheUsed, () =>
+                {
+                    IsCacheUsed = !IsCacheUsed;
+                    this.SaveProperty(nameof(IsCacheUsed));
+                });
+                menu.AddItem(new GUIContent(prefix + "Show Log"), IsLogViewSupported, () =>
+                {
+                    IsLogViewSupported = !IsLogViewSupported;
+                    this.SaveProperty(nameof(IsLogViewSupported));
+                });
+                menu.AddItem(new GUIContent(prefix + "Show Path"), ShowPath, () =>
+                {
+                    ShowPath = !ShowPath;
+                    this.SaveProperty(nameof(ShowPath));
+                });
+
+                menu.AddSeparator(prefix);
+                
+                menu.AddItem(new GUIContent(prefix + "Screen Mode: " + (SearchHelperWindow.ForceFullScreenMode.HasValue ? SearchHelperWindow.ForceFullScreenMode.Value ? "Full" : "Window" : "Dynamic")), SearchHelperWindow.ForceFullScreenMode.HasValue, () =>
+                {
+                    SearchHelperWindow.ForceFullScreenMode = SearchHelperWindow.ForceFullScreenMode.HasValue ? SearchHelperWindow.ForceFullScreenMode.Value ? false : null : true;
+                });
+
+                menu.AddItem(new GUIContent(prefix + "Reset Settings"), false, this.ResetAndLoadDefaults);
 
                 AddSettingsContextMenu(menu);
-
-                menu.ShowAsContext();
             }
         }
 
@@ -635,6 +681,7 @@ namespace SearchHelper.Editor.Core.Tools
                     menu.AddItem(new GUIContent(prefix + "Show Folders"), ShowFolders, () =>
                     {
                         ShowFolders = !ShowFolders;
+                        this.SaveProperty(nameof(ShowFolders));
                         UpdateAssets();
                     });
                 }
@@ -642,24 +689,28 @@ namespace SearchHelper.Editor.Core.Tools
                 menu.AddItem(new GUIContent(prefix + "Show Asset with No Dependencies"), ShowAssetWithNoDependencies, () =>
                 {
                     ShowAssetWithNoDependencies = !ShowAssetWithNoDependencies;
+                    this.SaveProperty(nameof(ShowAssetWithNoDependencies));
                     UpdateAssets();
                 });
 
                 menu.AddItem(new GUIContent(prefix + "Show Asset with Dependencies"), ShowAssetWithDependencies, () =>
                 {
                     ShowAssetWithDependencies = !ShowAssetWithDependencies;
+                    this.SaveProperty(nameof(ShowAssetWithDependencies));
                     UpdateAssets();
                 });
 
                 menu.AddItem(new GUIContent(prefix + "Count Hidden Dependencies"), CountHiddenDependencies, () =>
                 {
                     CountHiddenDependencies = !CountHiddenDependencies;
+                    this.SaveProperty(nameof(CountHiddenDependencies));
                     UpdateAssets();
                 });
 
                 menu.AddItem(new GUIContent(prefix + "Show Empty Dependency Text"), ShowEmptyDependencyText, () =>
                 {
                     ShowEmptyDependencyText = !ShowEmptyDependencyText;
+                    this.SaveProperty(nameof(ShowEmptyDependencyText));
                     UpdateAssets();
                 });
             }
@@ -873,12 +924,26 @@ namespace SearchHelper.Editor.Core.Tools
 
         protected void DrawVirtualScroll(List<Asset> assets, DrawModel drawModel = null)
         {
-            if (assets.IsNullOrEmpty())
+            if (assets == null)
             {
                 return;
             }
 
             drawModel ??= DefaultDrawModel;
+
+            if (assets.IsNullOrEmpty())
+            {
+                EGuiKit.Horizontal(
+                    () =>
+                    {
+                        EGuiKit.Color(UISettings.ErrorColor, () =>
+                        {
+                            EGuiKit.Label(drawModel.GetEmptyCollectionText?.Invoke());
+                        });
+                    }, GUI.skin.box);
+                return;
+            }
+
             var rect = CalculateVirtualScrollRect(CurrentToolRect);
 
             EGuiKit.Space(UISettings.AssetHeaderPadding);
@@ -1465,6 +1530,11 @@ namespace SearchHelper.Editor.Core.Tools
                 return "The asset is not referenced anywhere in the project.";
             }
         } 
+        private string GetEmptyCollectionText()
+        {
+            return "Nothing to show.";
+        }
+
         #endregion
 
         #region Helpers
@@ -1624,5 +1694,6 @@ namespace SearchHelper.Editor.Core.Tools
             EditorUtility.InvokeDiffTool(leftTitle, leftFile, rightTitle, rightFile, null, null);
         }
         #endregion
+
     }
 }

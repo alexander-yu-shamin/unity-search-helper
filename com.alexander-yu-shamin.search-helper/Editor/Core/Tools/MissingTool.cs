@@ -13,6 +13,7 @@ namespace SearchHelper.Editor.Core.Tools
         private Object SelectedObject { get; set; }
         private List<Asset> Assets { get; set; }
         protected override IEnumerable<Asset> Data => Assets;
+        public override string EditorPrefsPrefix { get; } = typeof(MissingTool).FullName;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.Missing;

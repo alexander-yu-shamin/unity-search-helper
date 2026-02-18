@@ -87,6 +87,7 @@ namespace SearchHelper.Editor.UI
         public static readonly Color AssetHeaderRectBoxColor = new Color(0.0f, 0.0f, 0.0f, 0.15f);
         public static readonly Color SeparatorColor = new Color(0.0f, 1.0f, 1.0f, 0.0f);
         public static readonly Color ErrorColor = new Color(1f, 0.4f, 0.4f); // #FF6666
+        public static readonly Color WarningColor = new Color(1f, 0.9f, 0.3f); // #FFE64D
 
         // Icons
         public const string FolderIconName = "d_Folder Icon";

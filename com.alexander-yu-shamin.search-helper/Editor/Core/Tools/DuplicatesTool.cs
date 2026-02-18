@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using SearchHelper.Editor.UI;
+using Toolkit.Editor.Attributes;
 using Toolkit.Editor.Helpers.IMGUI;
 using Toolkit.Runtime.Extensions;
 using UnityEditor;
@@ -13,11 +14,13 @@ namespace SearchHelper.Editor.Core.Tools
     {
         protected override bool AreShowingFoldersSupported { get; set; } = false;
         protected override bool IsMetaDiffSupported { get; set; } = true;
+        [EditorPrefs(true)]
         protected override bool ShowSize { get; set; } = true;
 
         private Object SelectedObject { get; set; }
         private List<Asset> Assets { get; set; }
         protected override IEnumerable<Asset> Data => Assets;
+        public override string EditorPrefsPrefix { get; } = typeof(DuplicatesTool).FullName;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.Duplicates;

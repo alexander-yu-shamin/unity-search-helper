@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using SearchHelper.Editor.UI;
+using Toolkit.Editor.Attributes;
 using Toolkit.Editor.Helpers.IMGUI;
 using UnityEngine;
 
@@ -8,10 +9,15 @@ namespace SearchHelper.Editor.Core.Tools
 {
     public class DependenciesTool : ToolBase
     {
-        protected override bool IsCacheUsed { get; set; } = false;
+        #region Capabilities
+        [EditorPrefs(true)]
+        protected override bool IsCacheUsed { get; set; } = true;
+        #endregion
+
         private Object SelectedObject { get; set; }
         private List<Asset> Assets { get; set; }
         protected override IEnumerable<Asset> Data => Assets;
+        public override string EditorPrefsPrefix { get; } = typeof(DependenciesTool).FullName;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.Dependency;

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SearchHelper.Editor.Core;
 using SearchHelper.Editor.Core.Tools;
+using Toolkit.Editor.Attributes;
 using UnityEditor;
 using UnityEngine;
 using Toolkit.Runtime.Extensions;
@@ -9,7 +10,7 @@ using Object = UnityEngine.Object;
 
 namespace SearchHelper.Editor.UI
 {
-    public class SearchHelperWindow : EditorWindow
+    public class SearchHelperWindow : EditorWindow, IEditorPrefs
     {
         public enum ToolType
         {
@@ -22,7 +23,17 @@ namespace SearchHelper.Editor.UI
             FindByGuid,
         }
 
+        public string EditorPrefsPrefix { get; } = nameof(SearchHelperWindow);
+
+        [EditorPrefs]
+        private bool? ForceFullScreenModePrefs { get; set; }
+
+        [EditorPrefs]
+        private ToolType SelectedToolTypePrefs { get; set; } = ToolType.Dependency;
+
+        public static bool? ForceFullScreenMode { get; set; }
         public static bool IsFullScreenMode { get; set; } = true;
+
         private static ToolType SelectedToolType { get; set; } = ToolType.Dependency;
 
         private Dictionary<ToolType, ToolBase> ToolMap { get; set; } = new()
@@ -117,17 +128,23 @@ namespace SearchHelper.Editor.UI
 
         private void OnEnable()
         {
+            this.LoadSettings();
             foreach (var (toolType, tool) in ToolMap)
             {
                 tool.Init();
             }
 
+            ForceFullScreenMode = ForceFullScreenModePrefs;
+            SelectedToolType = SelectedToolTypePrefs;
             SearchHelperService.OnAssetChanged += AssetChangedHandler;
         }
 
         private void OnDisable()
         {
             SearchHelperService.OnAssetChanged -= AssetChangedHandler;
+            ForceFullScreenModePrefs = ForceFullScreenMode;
+            SelectedToolTypePrefs = SelectedToolType;
+            this.SaveSettings();
         }
 
         public static void TransferToTool(ToolType from, ToolType to, Asset context)
@@ -149,6 +166,12 @@ namespace SearchHelper.Editor.UI
 
             var rect = new Rect(0.0f, UISettings.ToolLineHeight, position.width, position.height - UISettings.ToolLineHeight);
             IsFullScreenMode = rect.width > UISettings.ToolButtonMinimalWidth * ToolMap.Count;
+
+            if (ForceFullScreenMode.HasValue)
+            {
+                IsFullScreenMode = ForceFullScreenMode.Value;
+            }
+
             if (IsFullScreenMode)
             {
                 var newToolType = (ToolType)GUILayout.SelectionGrid((int)SelectedToolType, ToolMap.Keys.Select(v => v.ToString().ToSpacedWords()).ToArray(), ToolMap.Keys.Count, GUILayout.Height(UISettings.ToolLineHeight));

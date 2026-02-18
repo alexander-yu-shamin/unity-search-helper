@@ -18,6 +18,7 @@ namespace SearchHelper.Editor.Core.Tools
         private string CurrentUsedObjectGuid { get; set; }
         private List<Asset> Contexts { get; set; }
         protected override IEnumerable<Asset> Data => Contexts;
+        public override string EditorPrefsPrefix { get; } = typeof(FindByGuidTool).FullName;
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.FindByGuid;
