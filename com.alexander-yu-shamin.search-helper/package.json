@@ -1,6 +1,6 @@
 {
   "name": "com.alexander-yu-shamin.search-helper",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "displayName": "AYS: Search Helper",
   "description": "Search helper tool for Unity",
   "__unity": "2019.1",
@@ -9,7 +9,7 @@
   "__changelogUrl": "https://example.com/changelog.html",
   "__licensesUrl": "https://example.com/licensing.html",
   "dependencies": {
-    "com.alexander-yu-shamin.toolkit": "0.0.2"
+    "com.alexander-yu-shamin.toolkit": "0.0.3"
   },
   "__keywords": [
     "Search"
