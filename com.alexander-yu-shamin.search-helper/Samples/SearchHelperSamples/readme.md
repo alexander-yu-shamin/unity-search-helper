@@ -1,5 +1,8 @@
-# Ignored Files
+# Filter Rules
 
-You can create a `SearchHelperIgnoredFiles` ScriptableObject to specify elements that should be excluded from search results.
+Create a `SearchHelperFilterRules` ScriptableObject to configure search filters — specify exactly which elements to include or exclude.
 
-The package uses `Regex.IsMatch` to evaluate file paths against your ignore patterns.
+A `SearchHelperFilterRules` ScriptableObject can contain multiple rules, each defined by:
+- `Mode`: Include or Exclude
+- `Target`: Path, Name, or Type
+- `Pattern`: Evaluated using Regex.IsMatch
