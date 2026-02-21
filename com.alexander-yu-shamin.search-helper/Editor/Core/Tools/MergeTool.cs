@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using SearchHelper.Editor.Core;
 using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.Diagnostics;
 using Toolkit.Editor.Helpers.IMGUI;
@@ -15,11 +14,13 @@ namespace SearchHelper.Editor.Core.Tools
 {
     public class MergeTool : ToolBase
     {
+        #region Capabilities
         protected override bool AreShowingFoldersSupported { get; set; } = false;
         protected override bool AreFilterByRuleSupported { get; set; } = false;
         protected override bool ShowEmptyDependencyText { get; set; } = false;
         protected override bool IsMetaDiffSupported { get; set; } = true;
         protected override bool MetaDiffEnabled { get; set; } = true;
+        #endregion
 
         private Asset BaseObject { get; set; }
         private bool ShowDependents { get; set; } = false;
@@ -29,7 +30,6 @@ namespace SearchHelper.Editor.Core.Tools
 
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.Merge;
-
 
         public override void AssetChanged(string[] importedAssets, string[] deletedAssets, string[] movedAssets,
             string[] movedFromAssetPaths)

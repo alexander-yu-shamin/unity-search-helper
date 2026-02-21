@@ -18,7 +18,6 @@ namespace SearchHelper.Editor.Core.Tools
         private List<Asset> Assets { get; set; }
         protected override IEnumerable<Asset> Data => Assets;
         public override string EditorPrefsPrefix { get; } = typeof(DependenciesTool).FullName;
-
         protected override SearchHelperWindow.ToolType CurrentToolType { get; set; } =
             SearchHelperWindow.ToolType.Dependency;
 
@@ -76,7 +75,7 @@ namespace SearchHelper.Editor.Core.Tools
             if (obj == null)
             {
                 Log(LogType.Error, "Choose an object to proceed.");
-                return null;
+                return new List<Asset>();
             }
 
             Log(LogType.Warning, "Scanning for dependencies...");

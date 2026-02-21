@@ -11,9 +11,12 @@ namespace SearchHelper.Editor.Core.Tools
 {
     public class UnusedTool : ToolBase
     {
+        #region Capabilities
         protected override bool AreScopeRulesSupported { get; set; } = true;
         protected override bool ShowAssetWithDependencies { get; set; } = false;
         protected override bool ShowSize { get; set; } = true;
+        #endregion
+
         private Object SelectedObject { get; set; }
         private List<Asset> Assets { get; set; }
         protected override IEnumerable<Asset> Data => Assets;
@@ -70,7 +73,7 @@ namespace SearchHelper.Editor.Core.Tools
             if (obj == null)
             {
                 Log(LogType.Error, "Choose an object to proceed.");
-                return null;
+                return new List<Asset>();
             }
 
             Log(LogType.Warning, $"[{(IsGlobalScope ? "Global" : "Local")}] Scanning for unused assets...");

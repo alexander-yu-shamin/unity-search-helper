@@ -57,19 +57,24 @@ namespace SearchHelper.Editor.Core.Tools
             if (obj == null)
             {
                 Log(LogType.Error, "Choose an object to proceed.");
-                return null;
+                return new List<Asset>();
             }
 
             Log(LogType.Warning, "Scanning for dependants...");
 
             var searchedCtx = SearchHelperService.FindUsedBy(obj, IsCacheUsed);
 
-            if (searchedCtx.IsFolder)
+            var assets = new List<Asset>();
+            if (searchedCtx != null)
             {
-                ShowFolders = true;
+                if (searchedCtx.IsFolder)
+                {
+                    ShowFolders = true;
+                }
+
+                assets = new List<Asset>() { searchedCtx };
             }
 
-            var assets = new List<Asset>() { searchedCtx };
             UpdateAssets(assets, forceUpdate: true);
 
             Log(LogType.Warning, "Scanning ready."); 

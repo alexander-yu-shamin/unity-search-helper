@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using Codice.Client.IssueTracker;
 using SearchHelper.Editor.UI;
 using Toolkit.Editor.Helpers.IMGUI;
 using UnityEditor;
@@ -52,14 +51,7 @@ namespace SearchHelper.Editor.Core.Tools
 
         protected override string GetEmptyAssetText(Asset mainAsset)
         {
-            if (mainAsset.IsFolder)
-            {
-                return "Folders are not supported.";
-            }
-            else
-            {
-                return "The asset has missing elements.";
-            }
+            return mainAsset.IsFolder ? "Folders are not supported." : "The asset has missing elements.";
         }
 
         private List<Asset> FindMissingElements(Object obj)
@@ -78,7 +70,7 @@ namespace SearchHelper.Editor.Core.Tools
             if (obj == null)
             {
                 Log(LogType.Error, "Choose an object to proceed.");
-                return null;
+                return new List<Asset>();
             }
 
             var assets = FolderOrFile(obj).Select(SearchHelperService.FindMissing).Where(asset => asset != null).ToList();

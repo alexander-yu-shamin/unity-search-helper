@@ -12,10 +12,12 @@ namespace SearchHelper.Editor.Core.Tools
 {
     public class DuplicatesTool : ToolBase
     {
+        #region Capabilities
         protected override bool AreShowingFoldersSupported { get; set; } = false;
         protected override bool IsMetaDiffSupported { get; set; } = true;
         [EditorPrefs(true)]
         protected override bool ShowSize { get; set; } = true;
+        #endregion
 
         private Object SelectedObject { get; set; }
         private List<Asset> Assets { get; set; }
@@ -107,7 +109,7 @@ namespace SearchHelper.Editor.Core.Tools
 
             if (!paths.Any())
             {
-                return null;
+                return new List<Asset>();
             }
 
             var dict = new Dictionary<string, List<string>>();
@@ -119,7 +121,7 @@ namespace SearchHelper.Editor.Core.Tools
                 if (string.IsNullOrEmpty(searchedHash))
                 {
                     Debug.Log($"Can't count Hash for {searchedPath}");
-                    return null;
+                    return new List<Asset>();
                 }
             }
 

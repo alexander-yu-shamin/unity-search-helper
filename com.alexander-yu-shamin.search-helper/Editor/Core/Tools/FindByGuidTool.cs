@@ -9,8 +9,10 @@ namespace SearchHelper.Editor.Core.Tools
 {
     public class FindByGuidTool : ToolBase
     {
+        #region Capabilities
         protected override bool ShowEmptyDependencyText { get; set; } = false;
         protected override bool ShowDependenciesCount { get; set; } = false;
+        #endregion
 
         private string CurrentGuid { get; set; }
         private Object SelectedObject { get; set; }
@@ -140,7 +142,7 @@ namespace SearchHelper.Editor.Core.Tools
             if (foundObject == null)
             {
                 Log(LogType.Error, $"Object referenced by GUID {guid} could not be located.");
-                Contexts = null;
+                Contexts = new List<Asset>();
                 return;
             }
 
