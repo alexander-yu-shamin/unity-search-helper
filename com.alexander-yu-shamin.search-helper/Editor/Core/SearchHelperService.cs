@@ -147,7 +147,7 @@ namespace SearchHelper.Editor.Core
                 Path = path,
                 Guid = guid,
                 IsFolder = isFolder,
-                Dependencies = dependencies.ToList()
+                Dependencies = dependencies?.ToList()
             };
 
             return objectContext;
