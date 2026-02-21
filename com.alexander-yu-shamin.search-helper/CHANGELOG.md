@@ -2,7 +2,11 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-2-21
+
 ### Added 
+- fixed ui
+- add full/window screen mode
 - sorting descending by dependency count
 - add selection control for merge tool
 

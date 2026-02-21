@@ -1,6 +1,6 @@
 <div align="center">
 
-[![LinkedIn Badge](https://img.shields.io/badge/-_-white?style=social&logo=Linkedin&link=https://www.linkedin.com/in/alexander-yu-shamin/)](https://www.linkedin.com/in/alexander-yu-shamin)
+[![LinkedIn](https://img.shields.io/badge/-LinkedIn-0077B5?style=flat-square&logo=LinkedIn&logoColor=white)](https://www.linkedin.com/in/alexander-yu-shamin/)
 &nbsp;
 [![Github Badge](https://img.shields.io/badge/-_-white?style=social&logo=GitHub&link=https://github.com/alexander-yu-shamin/)](https://github.com/alexander-yu-shamin/)
 &nbsp;

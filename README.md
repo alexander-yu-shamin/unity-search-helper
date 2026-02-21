@@ -24,6 +24,7 @@ A lightweight multi-tool for asset management:
 - [**Unused Tool**](README.md#Unused%20Tool): Identifies orphaned assets
 - [**Duplicates Tool**](README.md#Duplicates%20Tool): Finds redundant copies
 - [**Merge Tool**](README.md#Merge%20Tool): Consolidates duplicates
+- [**Missing Tool**](README.md#Missing%20Tool): Find missing references
 - [**Find By GUID Tool**](README.md#Find%20By%20GUID%20Tool): Locates assets by identifier
 
 ## Install
@@ -58,21 +59,32 @@ or SSH:
 The tool supports displaying unlimited items with comprehensive filtering and sorting functionality.
 
 1. **Available Tools**: Collection of specialized utilities for different tasks.
-2. **Settings**: *Note*: Not all tools have configurable settings.
+2. **Actions**: List of actions for every tools
 3. **Scan Rules**:
-   1. **Global Mode**: Scans the entire project for dependencies.
-   2. **Local Mode**: Limited to the specified folder only.
-4. **Ignore Rules**: Create `SearchHelperIgnoreRule` ScriptableObjects to exclude specific files from results.
+   - **Global Mode**: Scans the entire project for dependencies.
+   - **Local Mode**: Limited to the specified folder only.
+4. **Visability**: Choose what to show and how
 5. **Sorting Rules**: Customize how items are organized in the display.
-6. **Filter Rules**: Filter by: Name, Path, Asset Type.
-7. **Quick Access Buttons**: One-click actions: Open Folder, Show in Inspector, Search in Scene.
-8. **Object Context Menus**: Each object button features a specialized context menu with additional options.
-9. **File Information**: Size information where applicable.
+6. **Filter Rules**: Create `SearchHelperIgnoreRule` ScriptableObjects to exclude specific files from results.
+7. **Settings**: *Note*: Not all tools have configurable settings
+   - **Use Cache**: When enabled, caching improves search speed — the first launch builds the cache, and subsequent launches use it.
+   - **Screen Mode**: Dynamic/Full/Window
+8. **Fast filter**: Filter by contains/!contains on: Name, Path, Asset Type
+9.  **Contexts**: information found.
+10. **Object Context Menus**: Each object button features a specialized context menu with additional options.
+11. **Log**: Some information about how the tool works
+
+The tool has 3 display modes:
+- Dynamic: change the view by the window size.
+- Full: only full screen.
+- Window: only window screen.
+
+![search-helper-dynamic](com.alexander-yu-shamin.search-helper/Documentation~/images/search-helper-dynamic.gif)
 
 ### Ignore Rules
-![search-helper-ignore-rule](com.alexander-yu-shamin.search-helper/Documentation~/images/search-helper-ignore-rule.png)
+![search-helper-filter-rule](com.alexander-yu-shamin.search-helper/Documentation~/images/search-helper-filter-rule.png)
 
-You can create custom rule files to exclude specific files from search results. The system uses regex (regular expression) capabilities for matching, allowing you to filter by:
+You can create custom rule files to exclude/include specific files from search results. The system uses regex capabilities for matching, allowing you to filter by:
 - **File path**
 - **File name**
 - **Asset type**
@@ -115,15 +127,17 @@ The tool identifies duplicates by comparing file hashes (MD5) in a folder (defau
 The results can be transferred to "Merge Tool" by the button "Open in Merge Tool" or the context menu "Open in Merge Tool".
 
 ### Merge Tool
-
-For meta-files, it compares hashes (SHA256) while ignoring the first two lines, with results color-coded in red and green for easy distinction.
-
-**Please note**: This tool is currently under development.
-
 ![search-helper-merge-tool](com.alexander-yu-shamin.search-helper/Documentation~/images/search-helper-merge-tool.png)
 
+For meta-files, it compares hashes (SHA256) while ignoring the first two lines, with results color-coded for easy distinction.
+You should use this tool in Full Screen mode, to see all information.
+
+### Missing Tool
+![search-helper-missing-tool](com.alexander-yu-shamin.search-helper/Documentation~/images/search-helper-missing-tool.png)
+
+The tool can locate objects with missing references.
+
 ### Find By GUID Tool
+![search-helper-find-by-guid](com.alexander-yu-shamin.search-helper/Documentation~/images/search-helper-find-by-guid.png)
 
 The tool can locate objects by their GUID or display an object's GUID.
-
-**Please note**: This tool is currently under development.
